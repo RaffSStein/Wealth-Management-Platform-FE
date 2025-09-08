@@ -62,3 +62,6 @@ Thumbs.db
 /typings/
 .sass-cache/
 /connect.lock
+
+# Open API generated files
+/src/app/api

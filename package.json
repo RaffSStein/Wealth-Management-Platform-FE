@@ -4,10 +4,15 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
+    "start:proxy-debug": "cross-env DEBUG=http-proxy-middleware:* ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "serve:ssr:Wealth-Management-Platform-FE": "node dist/Wealth-Management-Platform-FE/server/server.mjs"
+    "serve:ssr:Wealth-Management-Platform-FE": "node dist/Wealth-Management-Platform-FE/server/server.mjs",
+    "openapi:gen:customer": "openapi-generator-cli generate -i openapi/customer-api-data.yaml -g typescript-angular -o src/app/api/customer-service --additional-properties=providedInRoot=true,withInterfaces=true,ngVersion=20.0.0,enumNameSuffix=Enum",
+    "openapi:gen:document": "openapi-generator-cli generate -i openapi/document-api-data.yaml -g typescript-angular -o src/app/api/document-service --additional-properties=providedInRoot=true,withInterfaces=true,ngVersion=20.0.0,enumNameSuffix=Enum",
+    "openapi:gen:user": "openapi-generator-cli generate -i openapi/user-api-data.yaml -g typescript-angular -o src/app/api/user-service --additional-properties=providedInRoot=true,withInterfaces=true,ngVersion=20.0.0,enumNameSuffix=Enum",
+    "openapi:gen:all": "npm run openapi:gen:customer && npm run openapi:gen:document && npm run openapi:gen:user"
   },
   "prettier": {
     "printWidth": 100,
@@ -43,6 +48,8 @@
     "@types/express": "^5.0.1",
     "@types/jasmine": "~5.1.0",
     "@types/node": "^20.17.19",
+    "@openapitools/openapi-generator-cli": "^2.13.1",
+    "cross-env": "^7.0.3",
     "jasmine-core": "~5.9.0",
     "karma": "~6.4.0",
     "karma-chrome-launcher": "~3.2.0",

@@ -1,0 +1,147 @@
+openapi: 3.1.0
+info:
+  title: Document Apis
+  version: 1.0.0
+  description: API for managing documents and related information.
+  contact:
+    name: RaffSStein
+    url: https://github.com/RaffSStein
+    email: raffaele.princee@gmail.com
+  license:
+    name: MIT License
+    url: https://opensource.org/license/mit/
+tags:
+  - name: Document
+    description: API related to document management
+
+paths:
+  /document/uploadDocument:
+    post:
+      tags:
+        - Document
+      summary: Upload a document with metadata
+      description: Uploads a document file along with its metadata.
+      operationId: uploadDocument
+      requestBody:
+          required: true
+          content:
+            multipart/form-data:
+                schema:
+                  type: object
+                  properties:
+                    multipartFile:
+                      type: string
+                      format: binary
+                      description: The document file to upload
+                    fileDTO:
+                      $ref: '#/components/schemas/FileDTO'
+                encoding:
+                  multipartFile:
+                    contentType: application/octet-stream
+                  fileDTO:
+                    contentType: application/json
+      responses:
+        "200":
+          description: Document uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentDTO'
+
+
+  /document/downloadDocument/{documentId}:
+    get:
+      tags:
+        - Document
+      summary: Download a document by its UUID
+      description: Downloads the document file for the given document UUID.
+      operationId: downloadDocument
+      parameters:
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The UUID of the document to download
+      responses:
+        "200":
+          description: Document downloaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentDTO'
+
+
+components:
+  schemas:
+    FileDTO:
+      type: object
+      description: Data transfer object for file metadata.
+      required:
+        - documentType
+        - metadata
+        - customerId
+      properties:
+        customerId:
+          type: string
+          format: uuid
+          description: Unique identifier for the customer associated with the file
+        description:
+          type: string
+        documentType:
+          type: string
+          description: Type of the file (e.g., ID, Passport, etc.)
+        metadata:
+          type: array
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/MetadataDTO'
+
+
+    DocumentDTO:
+      type: object
+      properties:
+        documentId:
+          type: string
+          format: uuid
+        customerId:
+          type: string
+          format: uuid
+        activeVersion:
+          type: integer
+        documentType:
+          type: string
+          description: Type of the document (e.g., ID, Passport, etc.)
+        metadata:
+          type: array
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/MetadataDTO'
+        uploadDate:
+          type: string
+          format: date-time
+        uploadedBy:
+          type: string
+        fileName:
+          type: string
+        mimeType:
+          type: string
+        fileSize:
+          type: integer
+          format: int64
+        fileContentBase64:
+          type: string
+          description: Base64 encoded content of the file
+
+
+    MetadataDTO:
+      type: object
+      properties:
+        key:
+          type: string
+        value:
+          type: string
+
+
+

@@ -2,7 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
-import { UserService } from '../../core/services/user.service';
+import { AuthService } from '../../core/services/auth.service';
 
 @Component({
   selector: 'app-login',
@@ -52,8 +52,8 @@ import { UserService } from '../../core/services/user.service';
 })
 export class LoginComponent {
   private readonly fb = inject(FormBuilder);
-  private readonly userService = inject(UserService);
   private readonly router = inject(Router);
+  private readonly auth = inject(AuthService);
 
   loading = signal(false);
 
@@ -64,19 +64,14 @@ export class LoginComponent {
 
   onSubmit() {
     if (this.form.invalid || this.loading()) return;
-
-    const username = this.form.value.username?.trim() || '';
-    // Password non usata realmente (login fittizia)
-
     this.loading.set(true);
-    this.userService.setUsername(username);
 
-    // Carica dati base utente e poi naviga alla homepage
-    this.userService.loadMe().subscribe({
-      next: () => this.router.navigateByUrl('/home'),
-      error: () => this.router.navigateByUrl('/home'),
-      complete: () => this.loading.set(false)
-    });
+    // Salva solo l'username per usi futuri; nessuna chiamata BE
+    const username = this.form.controls.username.value?.trim() || '';
+    this.auth.setUsername(username);
+
+    // Navigazione post-login fittizio
+    this.router.navigateByUrl('/home');
+    this.loading.set(false);
   }
 }
-

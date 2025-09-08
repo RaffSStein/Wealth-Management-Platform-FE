@@ -19,42 +19,48 @@
  */
 
 /** @type {import('http-proxy-middleware').Options | Record<string, import('http-proxy-middleware').Options>} */
-module.exports = {
-  /**
-   * Esempio 1: User Service
-   * - Il backend espone su http://localhost:8081 con context-path /user-service
-   * - Dal FE si chiamerà direttamente /user-service/... e il path verrà inoltrato così com'è
-   */
-  '/user-service': {
-    target: 'http://localhost:8081',
-    changeOrigin: true,
-    secure: false,
-    logLevel: 'debug'
-    // Nessuna pathRewrite: manteniamo il context-path /user-service
-  },
 
-  /**
-   * Esempio 2: Order Service con riscrittura del path
-   * - Il backend espone su http://localhost:8082 con context-path /order-service
-   * - Dal FE preferiamo chiamare /order-api/... e far riscrivere a /order-service/...
-   */
-  '/order-api': {
-    target: 'http://localhost:8082',
+// Helper per aggiungere logging verboso agli handler del proxy
+function withLogging(target) {
+  return {
+    target,
     changeOrigin: true,
     secure: false,
     logLevel: 'debug',
-    pathRewrite: { '^/order-api': '/order-service' }
-  },
+    onProxyReq(proxyReq, req) {
+      try {
+        const url = req.originalUrl || req.url;
+        // Stampo anche l'header Authentication se presente (solo presenza, non valore completo)
+        const hasAuth = !!req.headers['authentication'];
+        console.log(`[PROXY][REQ] ${req.method} ${url} -> ${target}${req.url}${hasAuth ? ' [Authentication]' : ''}`);
+      } catch {}
+    },
+    onProxyRes(proxyRes, req) {
+      try {
+        const url = req.originalUrl || req.url;
+        console.log(`[PROXY][RES] ${req.method} ${url} <- ${proxyRes.statusCode} from ${target}${req.url}`);
+      } catch {}
+    },
+    onError(err, req) {
+      try {
+        const url = req?.originalUrl || req?.url || '';
+        console.error(`[PROXY][ERR] ${req?.method || ''} ${url}: ${err?.message}`);
+      } catch {}
+    }
+  };
+}
 
-  /**
-   * Esempio 3: Proxy generico legacy /api
-   * - Mantiene la compatibilità con l'attuale configurazione verso un API gateway o un BE monolitico
-   */
-  '/api': {
-    target: 'http://localhost:8080',
-    changeOrigin: true,
-    secure: false,
-    logLevel: 'debug'
-  }
+module.exports = {
+
+  // User service BE Application
+  '/user-service': withLogging('http://localhost:8083'),
+
+  // Order service BE Application
+  '/order-service': withLogging('http://localhost:8082'),
+
+  // Document service BE Application
+  '/document-service': withLogging('http://localhost:8091'),
+
+  // Customer service BE Application
+  '/customer-service': withLogging('http://localhost:8090')
 };
-

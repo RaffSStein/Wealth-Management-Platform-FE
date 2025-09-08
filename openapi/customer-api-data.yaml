@@ -1,0 +1,706 @@
+openapi: 3.1.0
+info:
+  title: Customer Apis
+  version: 1.0.0
+  description: API for managing customer information.
+
+paths:
+
+  # ONBOARDING APIs
+  # Customer APIs
+  /customer/init:
+    post:
+      summary: Initialize a new customer onboarding
+      description: Receives the personal data of a customer to start the onboarding process.
+      operationId: initCustomer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerDTO'
+      responses:
+        '200':
+          description: Customer onboarding initialized successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerDTO'
+        '400':
+          description: Invalid input data
+        '500':
+          description: Internal server error
+      tags:
+        - Customer
+
+  # Financial and Goal Types
+  /financial/types:
+    get:
+      summary: Get all financial types
+      description: Returns the list of all available financial types.
+      operationId: getAllFinancialTypes
+      responses:
+        '200':
+          description: List of financial types
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FinancialTypeDTO'
+
+      tags:
+        - Financial
+
+  /goal/types:
+    get:
+      summary: Get all goal types
+      description: Returns the list of all available goal types.
+      operationId: getAllGoalTypes
+      responses:
+        '200':
+          description: List of goal types
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GoalTypeDTO'
+      tags:
+        - Goal
+
+  /customer/{customerId}/financials:
+    post:
+      summary: Add financial data for a customer
+      description: Adds a list of financial records for the specified customer.
+      operationId: addCustomerFinancials
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/CustomerFinancialDTO'
+      responses:
+        '200':
+          description: Financial records created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerDTO'
+      tags:
+        - Customer
+
+  /customer/{customerId}/goals:
+    post:
+      summary: Add goals for a customer
+      description: Adds a list of goals for the specified customer.
+      operationId: addCustomerGoals
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/CustomerGoalDTO'
+      responses:
+        '201':
+          description: Goals created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerDTO'
+      tags:
+        - Customer
+  # MIFID configuration
+  /mifid/questionnaire/config:
+    get:
+      summary: Get latest valid MIFID questionnaire configuration
+      description: Returns the configuration of the latest valid MIFID questionnaire (sections, questions, answer options) for the frontend to display and compile.
+      operationId: getLatestValidMifidQuestionnaireConfig
+      responses:
+        '200':
+          description: Latest valid MIFID questionnaire configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MifidQuestionnaireConfigDTO'
+      tags:
+        - Mifid
+
+  /customer/{customerId}/mifid/submit:
+    post:
+      summary: Submit MIFID questionnaire answers for a customer
+      description: Receives the answers to a MIFID questionnaire for a customer, including questionnaire name and responses. Returns the calculated risk profile.
+      operationId: submitQuestionnaire
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MifidFillingDTO'
+      responses:
+        '200':
+          description: MIFID questionnaire submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MifidFillingDTO'
+      tags:
+        - Mifid
+
+  /customer/{customerId}/mifid/{fillingId}:
+    get:
+      summary: Get MIFID questionnaire filling for a customer
+      description: Returns the current (possibly incomplete) MIFID questionnaire filling for the specified customer.
+      operationId: getMifidFillingForCustomer
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: fillingId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Current MIFID questionnaire filling for the customer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MifidFillingDTO'
+        '404':
+          description: No filling found for the customer
+      tags:
+        - Mifid
+
+  /customer/{customerId}/mifid/save:
+    post:
+      summary: Save (partial) MIFID questionnaire filling for a customer
+      description: Saves a (possibly incomplete) MIFID questionnaire filling for the specified customer. This can be used to persist progress before final submission.
+      operationId: saveMifidFillingForCustomer
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MifidFillingDTO'
+      responses:
+        '200':
+          description: MIFID questionnaire filling saved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MifidFillingDTO'
+      tags:
+        - Mifid
+
+  /customer/{customerId}/mifid/filling/{fillingId}:
+    patch:
+      summary: Update (partial) MIFID questionnaire filling for a customer
+      description: Updates a (possibly incomplete) MIFID questionnaire filling for the specified customer and fillingId. This can be used to persist progress before final submission.
+      operationId: updateMifidFillingForCustomer
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: fillingId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MifidFillingDTO'
+      responses:
+        '200':
+          description: MIFID questionnaire filling updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MifidFillingDTO'
+      tags:
+        - Mifid
+
+  # Onboarding APIs
+  /customer/{customerId}/onboarding/getActiveOnboarding:
+    get:
+      summary: Get the active onboarding instance for a customer
+      description: Returns the current active onboarding instance for the provided customer.
+      operationId: getActiveOnboarding
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Active onboarding instance
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerOnboardingDTO'
+      tags:
+        - Onboarding
+
+  /customer/{customerId}/onboarding/{onboardingId}:
+    get:
+      summary: Get a specific onboarding instance by ID
+      description: Returns the onboarding instance by ID for the provided customer.
+      operationId: getOnboardingById
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: onboardingId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Onboarding instance found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerOnboardingDTO'
+      tags:
+        - Onboarding
+
+  /customer/{customerId}/onboarding/getOnboardingInstances:
+    get:
+      summary: Get all onboarding instances for a customer
+      description: Returns the list of all onboarding instances for the specified customer (active and historical).
+      operationId: getOnboardingInstances
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of onboarding instances
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CustomerOnboardingDTO'
+      tags:
+        - Onboarding
+
+components:
+  schemas:
+    CustomerDTO:
+      type: object
+      required:
+        - customerType
+        - taxId
+        - customerStatus
+        - userId
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the customer
+        userId:
+          type: string
+          format: uuid
+          description: Unique identifier for the user associated with the customer
+        customerType:
+          $ref: '#/components/schemas/CustomerType'
+        firstName:
+          type: string
+        lastName:
+          type: string
+        dateOfBirth:
+          type: string
+          format: date
+        gender:
+          $ref: '#/components/schemas/Gender'
+        nationality:
+          type: string
+          description: ISO 3166-1 alpha-2
+          maxLength: 2
+        companyName:
+          type: string
+        taxId:
+          type: string
+        phoneNumber:
+          type: string
+        addressLine1:
+          type: string
+        addressLine2:
+          type: string
+        city:
+          type: string
+        zipCode:
+          type: string
+        country:
+          type: string
+          description: ISO 3166-1 alpha-2
+          maxLength: 2
+        customerStatus:
+          $ref: '#/components/schemas/CustomerStatus'
+        onboardingDate:
+          type: string
+          format: date
+        customerFinancials:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomerFinancialDTO'
+        customerGoals:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomerGoalDTO'
+        riskProfile:
+          $ref: '#/components/schemas/CustomerRiskProfileDTO'
+
+    CustomerType:
+      type: string
+      enum:
+        - INDIVIDUAL
+        - CORPORATE
+
+    Gender:
+      type: string
+      enum:
+        - MALE
+        - FEMALE
+        - OTHER
+        - NOT_SPECIFIED
+
+    CustomerStatus:
+      type: string
+      enum:
+        - DRAFT
+        - PENDING_VERIFICATION
+        - ACTIVE
+        - REJECTED
+
+    FinancialTypeDTO:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          description: Financial type (e.g. INCOME, EXPENSE)
+        description:
+          type: string
+
+    GoalTypeDTO:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+
+    CustomerFinancialDTO:
+      type: object
+      required:
+          - financialType
+          - amount
+          - date
+      properties:
+        id:
+          type: integer
+          format: int64
+        financialType:
+          $ref: '#/components/schemas/FinancialTypeDTO'
+        amount:
+          type: number
+        description:
+          type: string
+          maxLength: 500
+        notes:
+          type: string
+          maxLength: 500
+
+    CustomerGoalDTO:
+      type: object
+      required:
+          - goalType
+          - targetAmount
+          - goalTimeLine
+      properties:
+        id:
+          type: integer
+          format: int64
+        goalType:
+          $ref: '#/components/schemas/GoalTypeDTO'
+        targetAmount:
+          type: number
+        targetDate:
+          type: string
+          format: date
+        notes:
+          type: string
+          maxLength: 500
+        goalTimeline:
+          type: string
+          enum:
+            - SHORT_TERM
+            - MEDIUM_TERM
+            - LONG_TERM
+          description: Duration of the goal in months or years
+
+    MifidQuestionnaireConfigDTO:
+      type: object
+      properties:
+        questionnaireId:
+          type: integer
+          format: int64
+          description: Unique identifier for the MIFID questionnaire
+        name:
+          type: string
+        description:
+          type: string
+        questionnaireVersion:
+          type: string
+        status:
+          type: string
+        sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/MifidSectionDTO'
+        riskProfileConfigurations:
+          type: array
+          items:
+            $ref: '#/components/schemas/RiskProfileConfigurationDTO'
+
+    MifidSectionDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        orderIndex:
+          type: integer
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/MifidQuestionDTO'
+
+    MifidQuestionDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        text:
+          type: string
+        questionType:
+          type: string
+        isRequired:
+          type: boolean
+        orderIndex:
+          type: integer
+        answerOptions:
+          type: array
+          items:
+            $ref: '#/components/schemas/MifidAnswerOptionDTO'
+
+    MifidAnswerOptionDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        optionText:
+          type: string
+        score:
+          type: integer
+        orderIndex:
+          type: integer
+
+    RiskProfileConfigurationDTO:
+      type: object
+      properties:
+        profileCode:
+          type: string
+        profileLabel:
+          type: string
+        minScore:
+          type: integer
+        maxScore:
+          type: integer
+
+    MifidFillingDTO:
+      type: object
+      required:
+        - questionnaireId
+        - fillingDate
+        - responses
+      properties:
+        questionnaireId:
+          type: integer
+          format: int64
+          description: Unique identifier for the MIFID questionnaire
+        fillingId:
+          type: integer
+          format: int64
+          description: Unique identifier for the MIFID questionnaire filling (if existing)
+        fillingDate:
+          type: string
+          format: date
+        status:
+          type: string
+          enum:
+            - DRAFT
+            - COMPLETED
+            - SUBMITTED
+            - DEPRECATED
+          description: Status of the MIFID questionnaire filling
+        responses:
+          type: array
+          items:
+            $ref: '#/components/schemas/MifidResponseDTO'
+        customerRiskProfile:
+          $ref: '#/components/schemas/CustomerRiskProfileDTO'
+
+    MifidResponseDTO:
+      type: object
+      required:
+        - question
+        - answerOption
+      properties:
+        id:
+          type: integer
+          format: int64
+        question:
+          $ref: '#/components/schemas/MifidQuestionDTO'
+        answerOption:
+          $ref: '#/components/schemas/MifidAnswerOptionDTO'
+        freeText:
+          type: string
+        numericValue:
+          type: number
+          format: double
+
+        dateValue:
+          type: string
+          format: date
+
+    CustomerRiskProfileDTO:
+      type: object
+      properties:
+        profile:
+          type: string
+          description: Calculated risk profile for the customer
+        score:
+          type: integer
+          description: Total score from the questionnaire responses
+
+    CustomerOnboardingDTO:
+      type: object
+      description: Represents a customer onboarding process instance.
+      properties:
+        id:
+          type: integer
+          format: int64
+        customerId:
+          type: string
+          format: uuid
+        onboardingStatus:
+          $ref: '#/components/schemas/OnboardingStatus'
+        reason:
+          type: string
+          maxLength: 1000
+        valid:
+          type: boolean
+          description: Indicates if this onboarding instance is the active one
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomerOnboardingStepDTO'
+
+    CustomerOnboardingStepDTO:
+      type: object
+      description: Represents a single step in the onboarding process.
+      properties:
+        id:
+          type: integer
+          format: int64
+        customerOnboardingId:
+          type: integer
+          format: int64
+        step:
+          $ref: '#/components/schemas/OnboardingStep'
+        status:
+          type: string
+        reason:
+          type: string
+        stepOrder:
+          type: integer
+
+    OnboardingStatus:
+      type: string
+      enum:
+        - IN_PROGRESS
+        - DONE
+        - FAILED
+
+    OnboardingStep:
+      type: string
+      enum:
+        - INIT
+        - DOCUMENTS
+        - FINANCIALS
+        - GOALS
+        - MIFID
+        - AML
+        - FINALIZE
