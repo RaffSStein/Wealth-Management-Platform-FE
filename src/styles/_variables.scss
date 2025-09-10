@@ -1,0 +1,30 @@
+// Design tokens and timing variables for the whole app.
+// - CSS variables under :root are available at runtime and can be themed.
+// - Sass variables ($speed, etc.) are compile-time only and used for transitions.
+:root {
+  // Primary font stack used across the app (prefers system fonts for performance)
+  --font-sans: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+
+  // App color palette (backgrounds, surfaces, text, borders)
+  --color-bg: #f7f7f8;               // App page background
+  --color-surface: #ffffff;          // Card and control surface background
+  --color-text: #222;                // Default text color
+  --color-text-muted: #666;          // Secondary/quiet text
+  --color-border: #e5e7eb;           // Neutral border color
+
+  // Brand and semantic colors
+  --color-primary: #2563eb;          // Brand primary (used for buttons, accents, focus)
+  --color-primary-contrast: #fff;    // Text on primary backgrounds
+  --color-danger: #b42318;           // Error text and accents
+
+  // Radii and depth tokens
+  --radius: 8px;                     // Default corner radius for cards/controls
+  --shadow: 0 6px 24px rgba(0,0,0,.08); // Default soft shadow for elevated surfaces
+
+  // Focus ring used for accessibility feedback
+  --ring: 0 0 0 3px rgba(37,99,235,.3);
+}
+
+// Transition speeds used in various interactive elements
+$speed-fast: 120ms; // Quick feedback (hover/active)
+$speed: 180ms;      // Standard feedback (color/background/border changes)

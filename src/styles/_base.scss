@@ -1,0 +1,25 @@
+// Base resets and foundational typography/layout rules applied app-wide.
+// Keep this file minimal; avoid component-specific styles here.
+*,
+*::before,
+*::after { box-sizing: border-box; } // Include borders/padding in element's total size
+
+html, body { height: 100%; } // Make sure the page can stretch to full viewport height
+
+body {
+  margin: 0; // Remove default browser margin
+  font-family: var(--font-sans), serif; // Use the global sans font stack
+  color: var(--color-text); // Default text color
+  background: var(--color-bg); // App background color
+  line-height: 1.5; // Comfortable default line height for readability
+}
+
+// Media elements scale responsively by default
+img, svg, video { max-width: 100%; display: block; }
+
+// Link styles: brand color and standard hover underline
+ a { color: var(--color-primary); text-decoration: none; }
+ a:hover { text-decoration: underline; }
+
+// Accessibility: visible focus outline using the shared ring token
+:focus-visible { outline: none; box-shadow: var(--ring); border-radius: 4px; }

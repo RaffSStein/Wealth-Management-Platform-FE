@@ -1,1 +1,15 @@
-/* You can add global styles to this file, and also import other style files */
+/*
+  Global stylesheet entrypoint
+  - Purpose: wire up shared style modules for the entire app.
+  - Load order matters: variables first (design tokens), then base (resets/typography), then components/forms.
+  - Sass uses module system via `@use`; modules are namespaced unless imported `as *`.
+*/
+
+ /* Design tokens (CSS variables + Sass variables). Using `as *` exposes Sass vars in this file's scope if needed. */
+@use "./styles/variables" as *;
+
+/* Base styles (box-sizing, html/body defaults, typography, links, focus ring). */
+@use "./styles/base";
+
+/* Form controls and buttons (inputs, selects, textarea, buttons, helpers). */
+@use "./styles/forms";
