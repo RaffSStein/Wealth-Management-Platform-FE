@@ -1,0 +1,15 @@
+// Surface utilities: cards, rounded corners, and shadows
+// These classes help create consistent containers across the app.
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.card--padded { padding: 1.25rem; }
+
+.rounded { border-radius: var(--radius); }
+
+.shadow { box-shadow: var(--shadow); }

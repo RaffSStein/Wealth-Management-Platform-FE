@@ -1,7 +1,7 @@
-import { Component, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FinancialService, FinancialTypeDTO } from '../../api/customer-service';
-import { AuthService } from '../../core/services/auth.service';
+import {Component, inject, signal} from '@angular/core';
+import {CommonModule} from '@angular/common';
+import {FinancialService, FinancialTypeDTO} from '../../api/customer-service';
+import {AuthService} from '../../core/services/auth.service';
 
 /**
  * HomeComponent
@@ -62,20 +62,98 @@ import { AuthService } from '../../core/services/auth.service';
   `,
   styles: [`
     /* Page-specific styles (layout and typography). Shared control styles live in global stylesheets. */
-    .home-shell { min-height: 100dvh; display: grid; place-items: center; padding: 2rem; background: #f7f7f8; }
-    .card { width: 100%; max-width: 720px; background: #fff; border-radius: 12px; padding: 1.25rem 1.5rem; box-shadow: 0 6px 24px rgba(0,0,0,0.08); display: grid; gap: 1rem; }
-    h1 { margin: 0; font-size: 1.6rem; }
-    .subtitle { margin: 0; color: #555; }
-    .info { display: grid; gap: 0.5rem; padding: 0.75rem; background: #fafafa; border: 1px solid #eee; border-radius: 8px; }
-    .label { color: #666; margin-right: 0.25rem; }
-    .value { font-weight: 600; color: #222; }
-    .actions { display: flex; gap: 0.5rem; }
-    .list ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.5rem; }
-    .list li { padding: 0.75rem; border: 1px solid #eee; border-radius: 8px; background: #fafafa; }
-    .tag { margin-left: 0.5rem; font-size: 0.8rem; color: #555; }
-    .desc { color: #444; margin-top: 0.25rem; }
-    .muted { color: #777; }
-    .error { color: #b42318; background: #fee4e2; border: 1px solid #fecdca; padding: 0.5rem 0.75rem; border-radius: 8px; }
+    .home-shell {
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      padding: 2rem;
+      background: var(--color-bg);
+    }
+
+    .card {
+      width: 100%;
+      max-width: 720px;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      box-shadow: var(--shadow);
+      display: grid;
+      gap: 1rem;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.6rem;
+      color: var(--color-heading);
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--color-text-muted);
+    }
+
+    .info {
+      display: grid;
+      gap: 0.5rem;
+      padding: 0.75rem;
+      background: var(--color-surface-alt);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+    }
+
+    .label {
+      color: var(--color-text-muted);
+      margin-right: 0.25rem;
+    }
+
+    .value {
+      font-weight: 600;
+      color: var(--color-text);
+    }
+
+    .actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .list ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 0.5rem;
+    }
+
+    .list li {
+      padding: 0.75rem;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      background: var(--color-surface-alt);
+    }
+
+    .tag {
+      margin-left: 0.5rem;
+      font-size: 0.8rem;
+      color: var(--color-text-muted);
+    }
+
+    .desc {
+      color: var(--color-text);
+      margin-top: 0.25rem;
+    }
+
+    .muted {
+      color: var(--color-text-muted);
+    }
+
+    .error {
+      color: var(--color-danger);
+      background: color-mix(in oklab, var(--color-danger), white 92%);
+      border: 1px solid color-mix(in oklab, var(--color-danger), white 76%);
+      padding: 0.5rem 0.75rem;
+      border-radius: var(--radius);
+    }
   `]
 })
 export class HomeComponent {

@@ -13,3 +13,9 @@
 
 /* Form controls and buttons (inputs, selects, textarea, buttons, helpers). */
 @use "./styles/forms";
+
+/* Icon utilities (sizes and color helpers, plus mask technique). */
+@use "./styles/icons";
+
+/* Surface utilities (cards, rounded containers, shadows). */
+@use "./styles/surfaces.scss";

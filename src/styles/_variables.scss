@@ -3,26 +3,42 @@
 // - Sass variables ($speed, etc.) are compile-time only and used for transitions.
 :root {
   // Primary font stack used across the app (prefers system fonts for performance)
-  --font-sans: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+  --font-sans:
+    "Calibri",
+    system-ui,
+    -apple-system,
+    Segoe UI,
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    "Noto Sans",
+    "Apple Color Emoji",
+    "Segoe UI Emoji";
 
   // App color palette (backgrounds, surfaces, text, borders)
-  --color-bg: #f7f7f8;               // App page background
+  --color-bg: #E8E1EF;               // App page background (palette)
   --color-surface: #ffffff;          // Card and control surface background
-  --color-text: #222;                // Default text color
-  --color-text-muted: #666;          // Secondary/quiet text
-  --color-border: #e5e7eb;           // Neutral border color
+  --color-surface-alt: #F4F0F7;      // Subtle alternative surface (derived from E8E1EF)
+  --color-text: #020300;             // Default text color (palette near-black)
+  --color-text-muted: #6b6b6b;       // Secondary/quiet text
+  --color-border: #dcd6e3;           // Neutral border color (derived from bg)
+  --color-heading: #36311F;          // Headings color (palette)
 
   // Brand and semantic colors
-  --color-primary: #2563eb;          // Brand primary (used for buttons, accents, focus)
-  --color-primary-contrast: #fff;    // Text on primary backgrounds
-  --color-danger: #b42318;           // Error text and accents
+  --color-primary: #05668D;          // Brand primary (palette)
+  --color-primary-contrast: #ffffff; // Text on primary backgrounds
+  --color-secondary: #40BCD8;        // Secondary brand/accent (palette)
+  --color-accent: #40BCD8;           // Accent reuses secondary unless you add a distinct one
+  --color-success: #1a7f37;          // Success (kept neutral/standard)
+  --color-warning: #d92d20;          // Warning/Alert red (as requested)
+  --color-danger: #d92d20;           // Alias for error styling
 
   // Radii and depth tokens
   --radius: 8px;                     // Default corner radius for cards/controls
   --shadow: 0 6px 24px rgba(0,0,0,.08); // Default soft shadow for elevated surfaces
 
-  // Focus ring used for accessibility feedback
-  --ring: 0 0 0 3px rgba(37,99,235,.3);
+  // Focus ring used for accessibility feedback (based on primary)
+  --ring: 0 0 0 3px color-mix(in oklab, var(--color-primary), white 70%);
 }
 
 // Transition speeds used in various interactive elements

@@ -14,6 +14,9 @@ body {
   line-height: 1.5; // Comfortable default line height for readability
 }
 
+// apply global color to all heading levels
+h1, h2, h3, h4, h5, h6 { color: var(--color-heading); }
+
 // Media elements scale responsively by default
 img, svg, video { max-width: 100%; display: block; }
 

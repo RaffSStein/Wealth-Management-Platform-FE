@@ -1,0 +1,39 @@
+// Reusable icon utilities for consistent sizing and coloring across the app.
+// Usage for <img> SVG/PNG icons (size only):
+//   <img class="icon icon--md" src="assets/icons/..svg" alt="" />
+// To colorize, prefer inline <svg> with currentColor, or use the mask utility below.
+
+:root {
+  --icon-size: 18px;         // Default icon size
+  --icon-color: currentColor; // Default icon color inherits current text color
+  --icon-color-muted: #6b7280; // Muted grey
+}
+
+.icon { width: var(--icon-size); height: var(--icon-size); display: inline-block; object-fit: contain; vertical-align: middle; }
+.icon--sm { --icon-size: 16px; }
+.icon--md { --icon-size: 20px; }
+.icon--lg { --icon-size: 24px; }
+.icon--xl { --icon-size: 32px; }
+
+/* Color helpers: inherit from theme tokens */
+.icon--muted { color: var(--icon-color-muted); opacity: .9; }
+.icon--primary { color: var(--color-primary); }
+.icon--secondary { color: var(--color-secondary); }
+.icon--accent { color: var(--color-accent); }
+.icon--success { color: var(--color-success); }
+.icon--danger { color: var(--color-danger); }
+.icon--warning { color: var(--color-warning); }
+
+// Mask-based icon (allows recoloring external SVGs via background-color)
+// Usage:
+//   <span class="icon-mask icon--lg" style="--icon-src: url('assets/icons/check.svg');"></span>
+// Color via currentColor/class or explicit custom property:
+//   <span class="icon-mask icon--lg icon--primary" style="--icon-src: url('assets/icons/check.svg');"></span>
+//   <span class="icon-mask" style="--icon-src: url('...'); --icon-color: #05668D"></span>
+.icon-mask {
+  width: var(--icon-size); height: var(--icon-size);
+  background-color: var(--icon-color);
+  -webkit-mask: var(--icon-src) no-repeat center / contain;
+  mask: var(--icon-src) no-repeat center / contain;
+  display: inline-block;
+}
