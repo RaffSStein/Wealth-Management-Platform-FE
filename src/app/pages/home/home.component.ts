@@ -1,4 +1,4 @@
-import {Component, inject, signal} from '@angular/core';
+import {Component, signal} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import {FinancialService, FinancialTypeDTO} from '../../api/customer-service';
 import {AuthService} from '../../core/services/auth.service';
@@ -157,54 +157,30 @@ import {AuthService} from '../../core/services/auth.service';
   `]
 })
 export class HomeComponent {
-  /**
-   * API client generated from OpenAPI (customer-service)
-   * - Exposes typed methods to call backend endpoints (e.g., getAllFinancialTypes).
-   * - Provided via DI; an HTTP interceptor can attach Authorization headers globally.
-   */
-  private readonly financialApi = inject(FinancialService);
+  constructor(
+    private readonly financialApi: FinancialService,
+    private readonly auth: AuthService
+  ) {
+    this.username.set(this.auth.username());
+  }
 
-  /**
-   * Authentication/identity utility
-   * - Provides the stored username used for display and future requests.
-   */
-  private readonly auth = inject(AuthService);
-
-  /**
-   * Loading flag for the fetch action (true while a request is in flight).
-   */
+  // Reactive state signals
   loading = signal(false);
-
-  /**
-   * Error message to render on screen when the last request failed.
-   * - null means no error to show.
-   */
   error = signal<string | null>(null);
-
-  /**
-   * Logged-in username (if available). Read from AuthService once at component creation.
-   */
-  username = signal<string | null>(this.auth.username());
-
-  /**
-   * Financial types returned by the backend.
-   * - The DTO type is generated from OpenAPI for full type safety.
-   */
+  username = signal<string | null>(null);
   financialTypes = signal<FinancialTypeDTO[]>([]);
 
   /**
-   * Triggers loading of financial types from the backend.
-   * Guarded against double-clicks while an existing request is pending.
-   * Updates the three state signals: loading, error, and financialTypes.
+   * Fetch financial types from backend.
+   * Guards against concurrent requests and updates reactive state signals.
    */
   refresh() {
-    if (this.loading()) return; // Prevent concurrent requests
+    if (this.loading()) return; // prevent duplicate clicks
     this.loading.set(true);
     this.error.set(null);
-
     this.financialApi.getAllFinancialTypes().subscribe({
-      next: (list) => this.financialTypes.set(list ?? []), // Normalize null/undefined to [] for the UI
-      error: () => this.error.set('Errore nel caricamento dei financial types'), // Localized user-friendly message
+      next: (list) => this.financialTypes.set(list ?? []),
+      error: () => this.error.set('Errore nel caricamento dei financial types'),
       complete: () => this.loading.set(false)
     });
   }

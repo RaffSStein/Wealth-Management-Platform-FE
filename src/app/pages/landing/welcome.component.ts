@@ -24,9 +24,7 @@ import {RouterLink} from '@angular/router';
                 </span>
               <div class="text">
                 <div class="benefit-title">Personalized Investment Advice</div>
-                <div class="benefit-sub">A short placeholder description that explains this benefit in one or two
-                  lines.
-                </div>
+                <div class="benefit-sub">Custom strategies based on your risk tolerance and financial goals</div>
               </div>
             </li>
             <li>
@@ -36,7 +34,7 @@ import {RouterLink} from '@angular/router';
                 </span>
               <div class="text">
                 <div class="benefit-title">Portfolio Management</div>
-                <div class="benefit-sub">Manage, rebalance, and optimize your portfolio effortlessly over time.</div>
+                <div class="benefit-sub">Expert oversight and rebalancing to optimize your investments</div>
               </div>
             </li>
             <li>
@@ -46,12 +44,12 @@ import {RouterLink} from '@angular/router';
                 </span>
               <div class="text">
                 <div class="benefit-title">Advanced Analytics</div>
-                <div class="benefit-sub">Insights and metrics that help you make better financial decisions.</div>
+                <div class="benefit-sub">Comprehensive insights to track and improve performance</div>
               </div>
             </li>
           </ul>
 
-          <button class="cta primary" type="button" [routerLink]="['/login']">Sign In or Sign Up</button>
+          <button class="cta primary" type="button" [routerLink]="['/auth/sign-in']">Sign In or Sign Up</button>
           <p class="tos">
             By continuing, you agree to our <a [routerLink]="['/terms']">Terms of Service</a>
           </p>

@@ -3,15 +3,17 @@ import {CommonModule} from '@angular/common';
 import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
 import {Router} from '@angular/router';
 import {AuthService} from '../../core/services/auth.service';
+import {BackButtonComponent} from '../../shared/components/back-button/back-button.component';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, BackButtonComponent],
   template: `
     <section class="auth-shell">
       <div class="card">
-        <h1>Accedi</h1>
+        <app-back-button [showLabel]="false" fallback="/" />
+        <h1>Login</h1>
         <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
           <div class="field">
             <label for="username">Username</label>
@@ -53,6 +55,8 @@ import {AuthService} from '../../core/services/auth.service';
       border-radius: var(--radius);
       padding: 1.5rem;
       box-shadow: var(--shadow);
+      display: grid;
+      gap: 0.75rem;
     }
 
     h1 {
@@ -127,13 +131,10 @@ export class LoginComponent {
   onSubmit() {
     if (this.form.invalid || this.loading()) return;
     this.loading.set(true);
-
-    // Salva solo l'username per usi futuri; nessuna chiamata BE
     const username = this.form.controls.username.value?.trim() || '';
     this.auth.setUsername(username);
-
-    // Navigazione post-login fittizio
-    this.router.navigateByUrl('/home');
+    // fire-and-forget navigation
+    void this.router.navigateByUrl('/home').catch(() => {});
     this.loading.set(false);
   }
 }
