@@ -8,19 +8,20 @@ import {RouterLink} from '@angular/router';
   imports: [CommonModule, RouterLink, NgOptimizedImage],
   template: `
     <section class="landing-shell">
-      <div class="content card card--padded">
+      <div class="content card">
         <div class="visual" aria-hidden="true">
-          <!-- uso width/height per evitare layout shift e garantire visibilità -->
           <img class="hero-img rounded" ngSrc="assets/brand/landing.png" alt="" width="520" height="400" priority/>
         </div>
-        <div class="copy">
+        <div class="copy card--padded">
           <h1>Welcome to Wealth Management Platform</h1>
           <p>Your journey to financial success begins here. Our platform provides personalized investment strategies
             tailored to your unique goals.</p>
           <ul class="benefits">
             <li>
-              <span class="icon-mask icon--lg icon--primary"
-                    style="--icon-src: url('assets/icons/sack-dollar-solid.svg');"></span>
+              <span class="icon-bg">
+                <span class="icon-mask icon--xxl icon--primary"
+                      style="--icon-src: url('assets/icons/sack-dollar-solid.svg');"></span>
+                </span>
               <div class="text">
                 <div class="benefit-title">Personalized Investment Advice</div>
                 <div class="benefit-sub">A short placeholder description that explains this benefit in one or two
@@ -29,16 +30,20 @@ import {RouterLink} from '@angular/router';
               </div>
             </li>
             <li>
-              <span class="icon-mask icon--lg icon--primary"
-                    style="--icon-src: url('assets/icons/wallet-solid.svg');"></span>
+              <span class="icon-bg">
+                <span class="icon-mask icon--xxl icon--primary"
+                      style="--icon-src: url('assets/icons/wallet-solid.svg');"></span>
+                </span>
               <div class="text">
                 <div class="benefit-title">Portfolio Management</div>
                 <div class="benefit-sub">Manage, rebalance, and optimize your portfolio effortlessly over time.</div>
               </div>
             </li>
             <li>
-              <span class="icon-mask icon--lg icon--primary"
-                    style="--icon-src: url('assets/icons/chart-solid.svg');"></span>
+              <span class="icon-bg">
+                <span class="icon-mask icon--xxl icon--primary"
+                      style="--icon-src: url('assets/icons/chart-solid.svg');"></span>
+                </span>
               <div class="text">
                 <div class="benefit-title">Advanced Analytics</div>
                 <div class="benefit-sub">Insights and metrics that help you make better financial decisions.</div>
@@ -46,7 +51,7 @@ import {RouterLink} from '@angular/router';
             </li>
           </ul>
 
-          <button class="cta primary" type="button" [routerLink]="['/login']">sign in or sign up</button>
+          <button class="cta primary" type="button" [routerLink]="['/login']">Sign In or Sign Up</button>
           <p class="tos">
             By continuing, you agree to our <a [routerLink]="['/terms']">Terms of Service</a>
           </p>
@@ -58,39 +63,36 @@ import {RouterLink} from '@angular/router';
     .landing-shell {
       min-height: 100dvh;
       display: grid;
-      /* permetti al figlio (.content) di occupare tutta l'altezza disponibile */
-      align-items: stretch;
+      align-items: center;
       justify-items: center;
       padding: 2rem;
     }
 
     .content {
-      width: 100%;
+      width: fit-content;
       max-width: 1100px;
-      height: 100%; /* consente ai figli con height:100% di estendersi */
+      height: fit-content;
       display: grid;
-      gap: 2rem;
-      align-items: stretch; /* i figli (visual, copy) si estendono alla stessa altezza */
-      align-content: stretch; /* allunga la riga alla piena altezza disponibile */
+      gap: 0.5rem;
+      align-items: stretch;
+      align-content: stretch;
       grid-template-columns: 1fr;
     }
 
     @media (min-width: 900px) {
       .content {
         grid-template-columns: 1fr 1fr;
-        grid-auto-rows: 1fr; /* forza la riga a occupare tutta l'altezza su desktop */
+        align-items: start;
+        grid-auto-rows: auto;
       }
     }
 
     .visual {
-      display: flex;
       align-items: center;
       justify-content: center;
-      height: 100%;
     }
 
     .hero-img {
-      max-width: 520px;
       width: 100%;
       height: auto;
       display: block;
@@ -139,7 +141,28 @@ import {RouterLink} from '@angular/router';
       line-height: 1.3;
     }
 
-    /* Icone: usa utility globali .icon + .icon--lg per dimensioni; niente sizing locale qui */
+    .icon-bg {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 3.5rem;
+      height: 3.5rem;
+      border-radius: 50%;
+      background-color: rgba(0, 123, 255, 0.1);
+    }
+
+    .icon-mask {
+      width: 1.8rem;
+      height: 1.8rem;
+      display: inline-block;
+      -webkit-mask-image: var(--icon-src);
+      mask-repeat: no-repeat;
+      -webkit-mask-repeat: no-repeat;
+      mask-position: center;
+      -webkit-mask-position: center;
+      mask-size: contain;
+      -webkit-mask-size: contain;
+    }
 
     .cta {
       display: inline-flex;
@@ -161,16 +184,16 @@ import {RouterLink} from '@angular/router';
     }
 
     .primary:hover {
-      background:
-        linear-gradient(180deg,
-          color-mix(in oklab, var(--color-primary), black 6%),
-          color-mix(in oklab, var(--color-primary), black 12%));
+      background: linear-gradient(180deg,
+        color-mix(in oklab, var(--color-primary), black 6%),
+        color-mix(in oklab, var(--color-primary), black 12%));
     }
 
     .tos {
       margin-top: 0.5rem;
       font-size: 0.85rem;
       opacity: 0.95;
+      text-align: center;
     }
 
     .tos a {

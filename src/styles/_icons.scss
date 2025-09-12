@@ -4,25 +4,69 @@
 // To colorize, prefer inline <svg> with currentColor, or use the mask utility below.
 
 :root {
-  --icon-size: 18px;         // Default icon size
+  // Base icon size converted from 18px -> 1.125rem (assuming 16px root)
+  --icon-size: 1.125rem; /* 18px */
   --icon-color: currentColor; // Default icon color inherits current text color
   --icon-color-muted: #6b7280; // Muted grey
 }
 
-.icon { width: var(--icon-size); height: var(--icon-size); display: inline-block; object-fit: contain; vertical-align: middle; }
-.icon--sm { --icon-size: 16px; }
-.icon--md { --icon-size: 20px; }
-.icon--lg { --icon-size: 24px; }
-.icon--xl { --icon-size: 32px; }
+.icon {
+  width: var(--icon-size);
+  height: var(--icon-size);
+  display: inline-block;
+  object-fit: contain;
+  vertical-align: middle;
+}
+
+.icon--sm {
+  --icon-size: 1rem; /* 16px */
+}
+
+.icon--md {
+  --icon-size: 1.25rem; /* 20px */
+}
+
+.icon--lg {
+  --icon-size: 1.5rem; /* 24px */
+}
+
+.icon--xl {
+  --icon-size: 2rem; /* 32px */
+}
+
+.icon--xxl {
+  --icon-size: 2.5rem; /* 40px */
+}
 
 /* Color helpers: inherit from theme tokens */
-.icon--muted { color: var(--icon-color-muted); opacity: .9; }
-.icon--primary { color: var(--color-primary); }
-.icon--secondary { color: var(--color-secondary); }
-.icon--accent { color: var(--color-accent); }
-.icon--success { color: var(--color-success); }
-.icon--danger { color: var(--color-danger); }
-.icon--warning { color: var(--color-warning); }
+.icon--muted {
+  color: var(--icon-color-muted);
+  opacity: .9;
+}
+
+.icon--primary {
+  color: var(--color-primary);
+}
+
+.icon--secondary {
+  color: var(--color-secondary);
+}
+
+.icon--accent {
+  color: var(--color-accent);
+}
+
+.icon--success {
+  color: var(--color-success);
+}
+
+.icon--danger {
+  color: var(--color-danger);
+}
+
+.icon--warning {
+  color: var(--color-warning);
+}
 
 // Mask-based icon (allows recoloring external SVGs via background-color)
 // Usage:
@@ -31,7 +75,8 @@
 //   <span class="icon-mask icon--lg icon--primary" style="--icon-src: url('assets/icons/check.svg');"></span>
 //   <span class="icon-mask" style="--icon-src: url('...'); --icon-color: #05668D"></span>
 .icon-mask {
-  width: var(--icon-size); height: var(--icon-size);
+  width: var(--icon-size);
+  height: var(--icon-size);
   background-color: var(--icon-color);
   -webkit-mask: var(--icon-src) no-repeat center / contain;
   mask: var(--icon-src) no-repeat center / contain;
