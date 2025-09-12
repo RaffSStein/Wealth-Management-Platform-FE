@@ -1,40 +1,59 @@
-import {Component, inject, signal} from '@angular/core';
+import {Component, inject, signal, computed} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
-import {Router} from '@angular/router';
+import {Router, RouterLink} from '@angular/router';
 import {AuthService} from '../../core/services/auth.service';
-import {BackButtonComponent} from '../../shared/components/back-button/back-button.component';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, BackButtonComponent],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink],
   template: `
     <section class="auth-shell">
       <div class="card">
-        <app-back-button [showLabel]="false" fallback="/" />
-        <h1>Login</h1>
+        <a routerLink="/" class="back-link" aria-label="Back to home page">&larr; back to home page</a>
+
+        <header class="headline">
+          <h1 class="greeting">{{ greeting() }}</h1>
+          <p class="subtitle">Glad to see you! Please enter your details</p>
+        </header>
+
+        <div class="social-row">
+          <button type="button" class="social google" (click)="onSocial('google')">Continue with Google</button>
+          <button type="button" class="social apple" (click)="onSocial('apple')">Continue with Apple</button>
+        </div>
+
         <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
           <div class="field">
-            <label for="username">Username</label>
-            <input id="username" type="text" formControlName="username" autocomplete="username"/>
+            <label for="username">Username <span class="req" aria-hidden="true">*</span></label>
+            <input id="username" type="text" formControlName="username" autocomplete="username" required/>
             <small class="error" *ngIf="form.controls.username.touched && form.controls.username.invalid">
-              Inserisci uno username.
+              Please enter a username.
             </small>
           </div>
 
-          <div class="field">
-            <label for="password">Password</label>
-            <input id="password" type="password" formControlName="password" autocomplete="current-password"/>
-            <small class="error" *ngIf="form.controls.password.touched && form.controls.password.invalid">
-              Inserisci una password.
-            </small>
+            <div class="field">
+              <label for="password">Password <span class="req" aria-hidden="true">*</span></label>
+              <input id="password" type="password" formControlName="password" autocomplete="current-password" required/>
+              <small class="error" *ngIf="form.controls.password.touched && form.controls.password.invalid">
+                Please enter a password.
+              </small>
+            </div>
+
+          <div class="form-extras">
+            <label class="remember">
+              <input type="checkbox" formControlName="rememberMe" />
+              <span>Remember me</span>
+            </label>
+            <a routerLink="/auth/forgot-password" class="forgot">Forgot password?</a>
           </div>
 
           <button class="primary" type="submit" [disabled]="form.invalid || loading()">
-            {{ loading() ? 'Accesso in corso…' : 'Login' }}
+            {{ loading() ? 'Signing in…' : 'Login' }}
           </button>
         </form>
+
+        <p class="signup-hint">Not a customer yet? <a routerLink="/onboarding/start">Start building your portfolio now</a></p>
       </div>
     </section>
   `,
@@ -59,9 +78,58 @@ import {BackButtonComponent} from '../../shared/components/back-button/back-butt
       gap: 0.75rem;
     }
 
-    h1 {
-      margin: 0 0 1rem;
-      font-size: 1.5rem;
+    .headline {
+      display: grid;
+      gap: 0.25rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .greeting {
+      margin: 0;
+      font-size: 1.75rem;
+      line-height: 1.2;
+    }
+
+    .subtitle {
+      margin: 0;
+      font-size: 0.875rem;
+      color: var(--color-text-muted, var(--color-text));
+      opacity: 0.8;
+    }
+
+    .social-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+      margin: 0.25rem 0 0.75rem;
+    }
+
+    .social {
+      height: 40px;
+      border: 1px solid var(--color-border);
+      background: var(--color-surface-alt, var(--color-surface));
+      border-radius: var(--radius);
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 0.5rem;
+    }
+
+    .social.google {
+      /* color accent subtle */
+    }
+
+    .social.apple {
+      /* color accent subtle */
+    }
+
+    .social:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: var(--ring);
     }
 
     form {
@@ -77,27 +145,42 @@ import {BackButtonComponent} from '../../shared/components/back-button/back-butt
     label {
       font-size: 0.875rem;
       color: var(--color-text);
+      font-weight: 500;
     }
 
-    input {
-      height: 40px;
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius);
-      padding: 0 0.75rem;
-      font-size: 0.95rem;
-      background: var(--color-surface);
-      color: var(--color-text);
-    }
-
-    input:focus {
-      outline: none;
-      border-color: var(--color-primary);
-      box-shadow: var(--ring);
-    }
-
-    .error {
+    .req {
       color: var(--color-danger);
-      font-size: 0.8rem;
+    }
+
+    .form-extras {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: -0.25rem;
+    }
+
+    .remember {
+      display: inline-flex;
+      gap: 0.4rem;
+      align-items: center;
+      font-size: 0.75rem;
+      user-select: none;
+    }
+
+    .remember input {
+      width: 14px;
+      height: 14px;
+      margin: 0;
+    }
+
+    .forgot {
+      font-size: 0.75rem;
+      text-decoration: none;
+      color: var(--color-primary);
+    }
+
+    .forgot:hover {
+      text-decoration: underline;
     }
 
     .primary {
@@ -114,6 +197,37 @@ import {BackButtonComponent} from '../../shared/components/back-button/back-butt
       opacity: 0.65;
       cursor: not-allowed;
     }
+
+    .signup-hint {
+      margin: 0.75rem 0 0;
+      text-align: center;
+      font-size: 0.75rem;
+    }
+
+    .signup-hint a {
+      color: var(--color-primary);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .signup-hint a:hover {
+      text-decoration: underline;
+    }
+
+    .back-link {
+      display: inline-block;
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      text-decoration: none;
+      color: var(--color-primary);
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+
+    .back-link:hover {
+      text-decoration: underline;
+    }
   `]
 })
 export class LoginComponent {
@@ -123,18 +237,34 @@ export class LoginComponent {
 
   loading = signal(false);
 
+  greeting = computed(() => {
+    const u = this.auth.username();
+    if (u) return `Welcome back, ${u}`;
+    return 'Welcome to Wealth Management Platform';
+  });
+
   form = this.fb.group({
     username: this.fb.control('', {validators: [Validators.required]}),
-    password: this.fb.control('', {validators: [Validators.required]})
+    password: this.fb.control('', {validators: [Validators.required]}),
+    rememberMe: this.fb.control(true)
   });
 
   onSubmit() {
     if (this.form.invalid || this.loading()) return;
     this.loading.set(true);
     const username = this.form.controls.username.value?.trim() || '';
-    this.auth.setUsername(username);
-    // fire-and-forget navigation
+    const remember = !!this.form.controls.rememberMe.value;
+    if (remember) {
+      this.auth.setUsername(username);
+    } else {
+      this.auth.clear();
+    }
     void this.router.navigateByUrl('/home').catch(() => {});
     this.loading.set(false);
+  }
+
+  onSocial(provider: 'google' | 'apple') {
+    // Placeholder: future implementation with an SSO provider
+    console.log('Social login not yet implemented:', provider);
   }
 }
