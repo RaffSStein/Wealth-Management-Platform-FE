@@ -222,13 +222,14 @@ export class OnboardingNavigatorComponent {
   }
 
   get progressWidth(): number {
-    const total = this.viewSteps.length - 1;
-    if (total <= 0) return 100;
-    // Posizione: se step corrente ancora non completato usiamo il suo indice, altrimenti l'ultimo completato
-    const lastCompleted = [...this.viewSteps].reverse().find(s => s.completed) ?? this.viewSteps[this.currentStep];
-    const idx = (lastCompleted?.index ?? this.currentStep);
-    const width = (idx / total) * 100;
-    return Math.min(100, Math.max(0, width));
+    const steps = this.viewSteps;
+    const total = steps.length - 1;
+    if (total <= 0) return 0;
+    // Consider only completed steps (exclude current if not completed) so the bar mostra l'ultimo step effettivamente completato.
+    const completed = steps.filter(s => s.completed).map(s => s.index);
+    if (!completed.length) return 0;
+    const last = Math.max(...completed);
+    return Math.min(100, Math.max(0, (last / total) * 100));
   }
 
   go(s: ViewStep) {
