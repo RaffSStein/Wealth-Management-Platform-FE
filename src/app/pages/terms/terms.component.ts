@@ -1,13 +1,15 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import {BackButtonComponent} from '../../shared/components/back-button/back-button.component';
 
 @Component({
   selector: 'app-terms',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, BackButtonComponent],
   template: `
     <section class="terms-shell">
       <div class="container">
+        <app-back-button [showLabel]="false" fallback="/" />
         <h1>Terms of Service</h1>
         <p>
           This is a placeholder for the Terms of Service page. Replace this content with your
