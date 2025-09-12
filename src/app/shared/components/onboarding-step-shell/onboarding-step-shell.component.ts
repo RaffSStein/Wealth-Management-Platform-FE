@@ -64,7 +64,7 @@ import {OnboardingStep} from '../../../core/services/onboarding-progress.service
 
     .muted {
       margin: 0;
-      font-size: 0.8rem;
+      font-size: 1rem;
       opacity: 0.8;
     }
 

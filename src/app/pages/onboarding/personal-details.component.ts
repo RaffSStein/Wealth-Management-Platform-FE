@@ -11,7 +11,7 @@ import {Router} from '@angular/router';
   template: `
     <app-onboarding-step-shell
       [stepIndex]="step"
-      title="Personal details"
+      title="Personal Details"
       subtitle="Fill in the required personal information to continue."
     >
       <p class="placeholder">Form will be implemented next (fields + validation + file uploader).</p>
