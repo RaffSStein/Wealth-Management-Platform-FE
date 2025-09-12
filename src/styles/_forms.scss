@@ -25,10 +25,16 @@ textarea {
 }
 
 // Multi-line text input tweaks
-textarea { min-height: 88px; padding: 0.5rem 0.75rem; resize: vertical; }
+textarea {
+  min-height: 88px;
+  padding: 0.5rem 0.75rem;
+  resize: vertical;
+}
 
 // Placeholder text color is muted for subtlety
-input::placeholder, textarea::placeholder { color: var(--color-text-muted); }
+input::placeholder, textarea::placeholder {
+  color: var(--color-text-muted);
+}
 
 // Focus state: highlight border and show accessible focus ring
 input:focus, select:focus, textarea:focus {
@@ -45,7 +51,8 @@ input[disabled], select[disabled], textarea[disabled] {
 
 /* Checkboxes and radios: opt into accent-color where supported for easy theming */
 input[type="checkbox"], input[type="radio"] {
-  width: 16px; height: 16px;
+  width: 16px;
+  height: 16px;
   accent-color: var(--color-primary);
 }
 
@@ -54,18 +61,34 @@ input[type="checkbox"], input[type="radio"] {
    - Uses brand color and contrast token for text
    - Transition timings from Sass variables */
 button, [type="button"], [type="submit"], [type="reset"] {
-  display: inline-flex; align-items: center; justify-content: center;
-  height: 38px; padding: 0 0.9rem; // Match input height for visual rhythm
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 38px;
+  padding: 0 0.9rem; // Match input height for visual rhythm
   border-radius: var(--radius);
   border: 1px solid var(--color-primary);
   color: var(--color-primary-contrast);
   background: var(--color-primary);
-  font-weight: 600; cursor: pointer;
+  font-weight: 600;
+  cursor: pointer;
   transition: filter v.$speed-fast, background-color v.$speed, border-color v.$speed;
 }
-button:hover { filter: brightness(0.98); } // Subtle hover feedback
-button:active { filter: brightness(0.96); } // Pressed state
-button:disabled { opacity: .65; cursor: not-allowed; }
+
+button:hover {
+  filter: brightness(0.98);
+}
+
+// Subtle hover feedback
+button:active {
+  filter: brightness(0.96);
+}
+
+// Pressed state
+button:disabled {
+  opacity: .65;
+  cursor: not-allowed;
+}
 
 /* Secondary button variant: neutral surface with standard text color */
 .button-secondary {
@@ -75,13 +98,112 @@ button:disabled { opacity: .65; cursor: not-allowed; }
 }
 
 /* Optional field wrapper for form rows: label, hint, and error styling */
-.field { display: grid; gap: 0.35rem; }
-.field > label { font-size: 0.9rem; color: var(--color-text-muted); }
-.field .hint { font-size: 0.85rem; color: var(--color-text-muted); }
+.field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.field > label {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+.field .hint {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
 .field .error {
   color: var(--color-danger); // Error text uses semantic token
   background: #fee4e2; // Light error background
   border: 1px solid #fecdca; // Subtle error border
   padding: 0.4rem 0.5rem;
   border-radius: var(--radius);
+}
+
+/* === Shared form layout utilities (centralized) === */
+.wm-form {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.form-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.form-grid--auto2 {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.form-grid--2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.form-grid--3 {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.form-grid--max2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 640px) {
+  .form-grid--max2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.field--full {
+  grid-column: 1 / -1;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: .75rem;
+}
+
+.form-error-global {
+  font-size: 0.75rem;
+  color: var(--color-danger);
+}
+
+/* Compact variant for tighter vertical rhythm */
+.field--compact > label {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Uploader block (generic placeholder style) */
+.uploader-block {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.7rem;
+  padding: 0.75rem;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface-alt, var(--color-surface));
+}
+
+.uploader-block > .uploader-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Spacing helper for groups */
+.form-section {
+  display: grid;
+  gap: 1.25rem;
+}
+
+/* Inline errors smaller variant */
+.field .error--inline {
+  font-size: 0.65rem;
+  color: var(--color-danger);
+}
+
+.field.required > label::after {
+  content: ' *';
+  color: var(--color-danger);
 }
