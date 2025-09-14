@@ -207,3 +207,24 @@ button:disabled {
   content: ' *';
   color: var(--color-danger);
 }
+
+/* === Auth / form shared utilities extracted from components === */
+.auth-shell {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  background: var(--color-bg, var(--color-surface-alt, #fff));
+}
+
+.form-card {
+  width: 100%;
+  display: grid;
+  gap: 0.75rem; /* default vertical rhythm */
+  padding: 1.5rem; /* internal spacing (was duplicated) */
+}
+.form-card--sm { max-width: 420px; }
+.form-card--md { max-width: 540px; }
+
+/* Optional bigger button height for main submit actions */
+.btn--lg { height: 42px; }

@@ -10,7 +10,7 @@ import {AuthService} from '../../core/services/auth.service';
   imports: [CommonModule, ReactiveFormsModule, RouterLink],
   template: `
     <section class="auth-shell">
-      <div class="card">
+      <div class="card form-card form-card--sm">
         <a routerLink="/" class="back-link" aria-label="Back to home page">&larr; back to home page</a>
 
         <header class="headline">
@@ -23,7 +23,7 @@ import {AuthService} from '../../core/services/auth.service';
           <button type="button" class="social apple" (click)="onSocial('apple')">Continue with Apple</button>
         </div>
 
-        <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+        <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate class="wm-form">
           <div class="field">
             <label for="username">Username <span class="req" aria-hidden="true">*</span></label>
             <input id="username" type="text" formControlName="username" autocomplete="username" required/>
@@ -32,52 +32,34 @@ import {AuthService} from '../../core/services/auth.service';
             </small>
           </div>
 
-            <div class="field">
-              <label for="password">Password <span class="req" aria-hidden="true">*</span></label>
-              <input id="password" type="password" formControlName="password" autocomplete="current-password" required/>
-              <small class="error" *ngIf="form.controls.password.touched && form.controls.password.invalid">
-                Please enter a password.
-              </small>
-            </div>
+          <div class="field">
+            <label for="password">Password <span class="req" aria-hidden="true">*</span></label>
+            <input id="password" type="password" formControlName="password" autocomplete="current-password" required/>
+            <small class="error" *ngIf="form.controls.password.touched && form.controls.password.invalid">
+              Please enter a password.
+            </small>
+          </div>
 
           <div class="form-extras">
             <label class="remember">
-              <input type="checkbox" formControlName="rememberMe" />
+              <input type="checkbox" formControlName="rememberMe"/>
               <span>Remember me</span>
             </label>
             <a routerLink="/auth/forgot-password" class="forgot">Forgot password?</a>
           </div>
 
-          <button class="primary" type="submit" [disabled]="form.invalid || loading()">
+          <button class="primary btn--lg" type="submit" [disabled]="form.invalid || loading()">
             {{ loading() ? 'Signing in…' : 'Login' }}
           </button>
         </form>
 
-        <p class="signup-hint">Not a customer yet? <a routerLink="/onboarding/start">Start building your portfolio now</a></p>
+        <p class="signup-hint">Not a customer yet? <a routerLink="/onboarding/start">Start building your portfolio
+          now</a></p>
       </div>
     </section>
   `,
   styles: [`
-    .auth-shell {
-      min-height: 100dvh;
-      display: grid;
-      place-items: center;
-      padding: 2rem;
-      background: var(--color-bg);
-    }
-
-    .card {
-      width: 100%;
-      max-width: 420px;
-      background: var(--color-surface);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius);
-      padding: 1.5rem;
-      box-shadow: var(--shadow);
-      display: grid;
-      gap: 0.75rem;
-    }
-
+    /* Specific styles (shared basics moved to global _forms.scss) */
     .headline {
       display: grid;
       gap: 0.25rem;
@@ -116,40 +98,13 @@ import {AuthService} from '../../core/services/auth.service';
       align-items: center;
       justify-content: center;
       padding: 0 0.5rem;
-    }
-
-    .social.google {
-      /* color accent subtle */
-    }
-
-    .social.apple {
-      /* color accent subtle */
+      color: var(--color-text);
     }
 
     .social:focus {
       outline: none;
       border-color: var(--color-primary);
       box-shadow: var(--ring);
-    }
-
-    form {
-      display: grid;
-      gap: 1rem;
-    }
-
-    .field {
-      display: grid;
-      gap: 0.375rem;
-    }
-
-    label {
-      font-size: 0.875rem;
-      color: var(--color-text);
-      font-weight: 500;
-    }
-
-    .req {
-      color: var(--color-danger);
     }
 
     .form-extras {
@@ -183,19 +138,8 @@ import {AuthService} from '../../core/services/auth.service';
       text-decoration: underline;
     }
 
-    .primary {
-      height: 42px;
-      border: 1px solid var(--color-primary);
-      border-radius: var(--radius);
-      background: var(--color-primary);
-      color: var(--color-primary-contrast);
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    .primary[disabled] {
-      opacity: 0.65;
-      cursor: not-allowed;
+    .req {
+      color: var(--color-danger);
     }
 
     .signup-hint {
@@ -259,7 +203,8 @@ export class LoginComponent {
     } else {
       this.auth.clear();
     }
-    void this.router.navigateByUrl('/home').catch(() => {});
+    void this.router.navigateByUrl('/home').catch(() => {
+    });
     this.loading.set(false);
   }
 
