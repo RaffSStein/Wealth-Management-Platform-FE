@@ -6,7 +6,6 @@ info:
 
 paths:
 
-  # ONBOARDING APIs
   # Customer APIs
   /customer/init:
     post:
@@ -30,6 +29,28 @@ paths:
           description: Invalid input data
         '500':
           description: Internal server error
+      tags:
+        - Customer
+
+  /customer/{customerId}:
+    get:
+      summary: Get customer by ID
+      description: Returns the customer details for the specified customerId.
+      operationId: getCustomerById
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Customer found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerDTO'
       tags:
         - Customer
 

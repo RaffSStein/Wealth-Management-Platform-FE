@@ -118,7 +118,7 @@ export class PersonalDetailsComponent implements OnDestroy {
 
   loading = false;
   errorMsg: string | null = null;
-  private sub?: Subscription;
+  private readonly sub?: Subscription;
 
   uuidPattern = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/;
 
