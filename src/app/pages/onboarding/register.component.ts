@@ -56,8 +56,8 @@ function matchPassword(group: AbstractControl): ValidationErrors | null {
           <div class="field">
             <label for="role">Role *</label>
             <select id="role" formControlName="role">
-              <option value="cliente">Bank customer</option>
-              <option value="operatore">Bank operator</option>
+              <option value="customer">Customer</option>
+              <option value="advisor">Advisor</option>
             </select>
             @if (submitted() && form.controls.role.invalid) {
               <small class="error">Select a role</small>
@@ -106,18 +106,72 @@ function matchPassword(group: AbstractControl): ValidationErrors | null {
     </section>
   `,
   styles: [`
-    /* Component-specific styles only (shared styles moved to _forms.scss) */
-    .two-cols { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
-    .error { color: var(--color-danger, #c0392b); font-size: 0.65rem; }
-    .hint { font-size: 0.6rem; opacity: .7; }
-    .form-error { margin: 0; font-size: 0.7rem; color: var(--color-danger, #c0392b); }
-    .signin-hint { margin: 0.4rem 0 0; font-size: 0.7rem; text-align: center; }
-    .signin-hint a { color: var(--color-primary); text-decoration: none; font-weight: 600; }
-    .signin-hint a:hover { text-decoration: underline; }
-    .headline { display: grid; gap: 0.25rem; margin-bottom: 0.25rem; }
-    .greeting { margin: 0; font-size: 1.75rem; line-height: 1.2; }
-    .subtitle { margin: 0; font-size: 0.875rem; color: var(--color-text-muted, var(--color-text)); opacity: 0.8; }
-    .back-link { font-size: 0.6rem; text-decoration: none; color: var(--color-primary); font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+
+    .two-cols {
+      display: grid;
+      gap: 0.75rem;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+
+    .error {
+      color: var(--color-danger, #c0392b);
+      font-size: 0.65rem;
+    }
+
+    .hint {
+      font-size: 0.6rem;
+      opacity: .7;
+    }
+
+    .form-error {
+      margin: 0;
+      font-size: 0.7rem;
+      color: var(--color-danger, #c0392b);
+    }
+
+    .signin-hint {
+      margin: 0.4rem 0 0;
+      font-size: 0.7rem;
+      text-align: center;
+    }
+
+    .signin-hint a {
+      color: var(--color-primary);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .signin-hint a:hover {
+      text-decoration: underline;
+    }
+
+    .headline {
+      display: grid;
+      gap: 0.25rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .greeting {
+      margin: 0;
+      font-size: 1.75rem;
+      line-height: 1.2;
+    }
+
+    .subtitle {
+      margin: 0;
+      font-size: 0.875rem;
+      color: var(--color-text-muted, var(--color-text));
+      opacity: 0.8;
+    }
+
+    .back-link {
+      font-size: 0.6rem;
+      text-decoration: none;
+      color: var(--color-primary);
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
   `]
 })
 export class OnboardingStartComponent implements OnInit {
@@ -135,7 +189,7 @@ export class OnboardingStartComponent implements OnInit {
     firstName: this.fb.control('', {validators: [Validators.required]}),
     lastName: this.fb.control('', {validators: [Validators.required]}),
     email: this.fb.control('', {validators: [Validators.required, Validators.email]}),
-    role: this.fb.control<'cliente' | 'operatore'>('cliente', {validators: [Validators.required]}),
+    role: this.fb.control<'customer' | 'advisor'>('customer', {validators: [Validators.required]}),
     companyId: this.fb.control('', {validators: []}),
     passwords: this.fb.group({
       password: this.fb.control('', {validators: [Validators.required, Validators.minLength(8)]}),
@@ -145,7 +199,7 @@ export class OnboardingStartComponent implements OnInit {
 
   passwords = this.form.controls.passwords as any;
 
-  showCompanyId = computed(() => this.form.controls.role.value === 'operatore');
+  showCompanyId = computed(() => this.form.controls.role.value === 'advisor');
 
   ngOnInit(): void {
     // no automatic redirect: the page now shows the sign up form
@@ -165,7 +219,7 @@ export class OnboardingStartComponent implements OnInit {
     const first = v.firstName?.trim() || '';
     const last = v.lastName?.trim() || '';
     const email = v.email?.trim() || '';
-    const role = v.role || 'cliente';
+    const role = v.role || 'customer';
     const companyId = this.showCompanyId() ? (v.companyId?.trim() || '') : 'public-company';
 
     if (this.showCompanyId() && !companyId) {
@@ -174,7 +228,7 @@ export class OnboardingStartComponent implements OnInit {
     }
 
     const username = this.buildUsername(first, last);
-    const mappedRole = role === 'operatore' ? 'BANK_OPERATOR' : 'CUSTOMER';
+    const mappedRole = role === 'advisor' ? 'ADVISOR' : 'CUSTOMER';
 
     this.loading.set(true);
     this.userService.createUser({

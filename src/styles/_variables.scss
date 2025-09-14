@@ -3,39 +3,38 @@
 // - Sass variables ($speed, etc.) are compile-time only and used for transitions.
 :root {
   // Primary font stack used across the app (prefers system fonts for performance)
-  --font-sans:
-    "Calibri",
-    system-ui,
-    -apple-system,
-    Segoe UI,
-    Roboto,
-    "Helvetica Neue",
-    Arial,
-    "Noto Sans",
-    "Apple Color Emoji",
-    "Segoe UI Emoji";
+  --font-sans: "Calibri",
+  system-ui,
+  -apple-system,
+  Segoe UI,
+  Roboto,
+  "Helvetica Neue",
+  Arial,
+  "Noto Sans",
+  "Apple Color Emoji",
+  "Segoe UI Emoji";
 
   // App color palette (backgrounds, surfaces, text, borders)
-  --color-bg: #ECF8FE;               // App page background (palette)
-  --color-surface: #ffffff;          // Card and control surface background
-  --color-surface-alt: #F4F0F7;      // Subtle alternative surface (derived from E8E1EF)
-  --color-text: #020300;             // Default text color (palette near-black)
-  --color-text-muted: #6b6b6b;       // Secondary/quiet text
-  --color-border: #dcd6e3;           // Neutral border color (derived from bg)
-  --color-heading: #36311F;          // Headings color (palette)
+  --color-bg: #ECF8FE; // App page background (palette)
+  --color-surface: #ffffff; // Card and control surface background
+  --color-surface-alt: #F4F0F7; // Subtle alternative surface (derived from E8E1EF)
+  --color-text: #020300; // Default text color (palette near-black)
+  --color-text-muted: #6b6b6b; // Secondary/quiet text
+  --color-border: #dcd6e3; // Neutral border color (derived from bg)
+  --color-heading: #36311F; // Headings color (palette)
 
   // Brand and semantic colors
-  --color-primary: #05668D;          // Brand primary (palette)
+  --color-primary: #05668D; // Brand primary (palette)
   --color-primary-contrast: #ffffff; // Text on primary backgrounds
-  --color-secondary: #40BCD8;        // Secondary brand/accent (palette)
-  --color-accent: #40BCD8;           // Accent reuses secondary unless you add a distinct one
-  --color-success: #1a7f37;          // Success (kept neutral/standard)
-  --color-warning: #d92d20;          // Warning/Alert red (as requested)
-  --color-danger: #d92d20;           // Alias for error styling
+  --color-secondary: #40BCD8; // Secondary brand/accent (palette)
+  --color-accent: #40BCD8; // Accent reuses secondary unless you add a distinct one
+  --color-success: #1a7f37; // Success (kept neutral/standard)
+  --color-warning: #d92d20; // Warning/Alert red (as requested)
+  --color-danger: #d92d20; // Alias for error styling
 
   // Radii and depth tokens
-  --radius: 8px;                     // Default corner radius for cards/controls
-  --shadow: 0 6px 24px rgba(0,0,0,.08); // Default soft shadow for elevated surfaces
+  --radius: 8px; // Default corner radius for cards/controls
+  --shadow: 0 6px 24px rgba(0, 0, 0, .08); // Default soft shadow for elevated surfaces
 
   // Focus ring used for accessibility feedback (based on primary)
   --ring: 0 0 0 3px color-mix(in oklab, var(--color-primary), white 70%);
@@ -43,4 +42,4 @@
 
 // Transition speeds used in various interactive elements
 $speed-fast: 120ms; // Quick feedback (hover/active)
-$speed: 180ms;      // Standard feedback (color/background/border changes)
+$speed: 180ms; // Standard feedback (color/background/border changes)
