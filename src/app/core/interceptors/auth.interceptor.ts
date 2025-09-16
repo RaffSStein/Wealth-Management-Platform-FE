@@ -9,6 +9,7 @@ const PROXY_BASE_PATHS = [
   '/customer-service',
   '/document-service',
   '/order-service',
+  '/bank-service'
 ];
 
 // absolute urls pointing to local targets (for dev)
@@ -17,6 +18,7 @@ const LOCAL_TARGET_HOSTS = [
   'localhost:8083', // user-service
   'localhost:8090', // customer-service
   'localhost:8091', // document-service
+  'localhost:8089'  // bank-service
 ];
 
 function isBackendUrl(url: string): boolean {

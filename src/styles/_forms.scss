@@ -228,3 +228,42 @@ button:disabled {
 
 /* Optional bigger button height for main submit actions */
 .btn--lg { height: 42px; }
+
+/* === Shared headline / auth typography === */
+.headline { display: grid; gap: 0.25rem; margin-bottom: 0.25rem; }
+.greeting { margin: 0; font-size: 1.75rem; line-height: 1.2; }
+.subtitle { margin: 0; font-size: 0.875rem; color: var(--color-text-muted, var(--color-text)); opacity: .8; }
+.back-link { display:inline-block; font-size:0.65rem; text-transform:uppercase; letter-spacing:.05em; text-decoration:none; color:var(--color-primary); font-weight:600; margin-bottom:0.25rem; }
+.back-link:hover { text-decoration: underline; }
+.signin-hint, .signup-hint { margin: 0.75rem 0 0; text-align: center; font-size: 0.75rem; }
+.signin-hint a, .signup-hint a { color: var(--color-primary); text-decoration: none; font-weight: 500; }
+.signin-hint a:hover, .signup-hint a:hover { text-decoration: underline; }
+
+/* Utility grid */
+.two-cols { display:grid; gap:0.75rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+
+/* Bank branch picker overlay */
+.branch-picker-overlay { position:fixed; inset:0; background:rgba(0,0,0,.35); display:grid; place-items:center; z-index:1000; animation: fadeIn .18s ease-out; }
+.branch-picker { width:min(860px,92vw); max-height:82vh; background:var(--color-surface,#fff); border-radius:var(--radius-lg,var(--radius)); padding:1rem 1.25rem 1.25rem; display:grid; grid-template-rows:auto 1fr auto; gap:0.75rem; box-shadow:0 6px 24px -4px rgba(0,0,0,.15),0 2px 6px -2px rgba(0,0,0,.1); animation: scaleIn .22s cubic-bezier(.4,.2,.2,1); }
+.branch-picker header { display:flex; justify-content:space-between; align-items:center; }
+.branch-picker h2 { margin:0; font-size:1.1rem; }
+.branch-picker .filters { display:grid; gap:0.75rem; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); }
+.branch-picker .results { overflow:auto; border:1px solid var(--color-border); border-radius:var(--radius); background:var(--color-surface-alt,var(--color-surface)); }
+.branch-picker .result-row { display:grid; grid-template-columns:1fr auto; gap:0.5rem; padding:0.55rem 0.75rem; font-size:0.75rem; cursor:pointer; align-items:center; border-bottom:1px solid var(--color-border); }
+.branch-picker .result-row:last-child { border-bottom:none; }
+.branch-picker .result-row:hover { background:var(--color-surface-hover, #f6f7f9); }
+.branch-picker .result-row.active { outline:2px solid var(--color-primary); outline-offset:-2px; }
+.branch-picker .empty { padding:1.25rem; text-align:center; font-size:0.75rem; color:var(--color-text-muted); }
+.branch-picker footer { display:flex; justify-content:space-between; gap:0.75rem; }
+.branch-picker .actions { display:flex; gap:0.5rem; }
+.selector-input { min-height:38px; display:flex; align-items:center; padding:0 0.75rem; border:1px dashed var(--color-border); border-radius:var(--radius); background:var(--color-surface-alt,var(--color-surface)); font-size:0.8rem; cursor:pointer; }
+.selector-input.placeholder { color:var(--color-text-muted); font-style:italic; }
+
+@keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
+@keyframes scaleIn { from { transform:scale(.96); opacity:0 } to { transform:scale(1); opacity:1 } }
+
+/* Subtle exit animation helper (class toggled before removal) */
+.branch-picker-overlay.closing { animation: fadeOut .16s ease-in forwards; }
+.branch-picker-overlay.closing .branch-picker { animation: scaleOut .16s ease-in forwards; }
+@keyframes fadeOut { to { opacity:0 } }
+@keyframes scaleOut { to { transform:scale(.97); opacity:0 } }

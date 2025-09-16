@@ -1,10 +1,12 @@
-import {Component, inject, OnInit, signal, computed} from '@angular/core';
+import {Component, inject, signal, computed, effect} from '@angular/core';
 import {Router, RouterLink} from '@angular/router';
 import {OnboardingProgressService} from '../../core/services/onboarding-progress.service';
 import {CommonModule} from '@angular/common';
 import {FormBuilder, ReactiveFormsModule, Validators, AbstractControl, ValidationErrors} from '@angular/forms';
 import {UserService} from '../../api/user-service';
 import {AuthService} from '../../core/services/auth.service';
+import {BankService, BankBranchDto, PageBankBranchDto} from '../../api/bank-service';
+import {debounceTime} from 'rxjs';
 
 // Validator for matching passwords
 function matchPassword(group: AbstractControl): ValidationErrors | null {
@@ -23,8 +25,8 @@ function matchPassword(group: AbstractControl): ValidationErrors | null {
       <div class="card form-card form-card--md">
         <a routerLink="/" class="back-link" aria-label="Back to home">&larr; home</a>
         <header class="headline">
-          <h1 class="greeting">Sign up</h1>
-          <p class="subtitle">Create a new account to start the onboarding</p>
+          <h1 class="greeting">Welcome</h1>
+          <p class="subtitle">Create your account to get started</p>
         </header>
 
         <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate class="wm-form">
@@ -68,12 +70,22 @@ function matchPassword(group: AbstractControl): ValidationErrors | null {
             <div class="field">
               <label for="companyId">Company ID *</label>
               <input id="companyId" type="text" formControlName="companyId" placeholder="Company UUID"/>
-              <small class="hint">Required for operator role</small>
+              <small class="hint">Required for advisor role</small>
               @if (submitted() && form.controls.companyId.invalid) {
-                <small class="error">Required for operator</small>
+                <small class="error">Required for advisor</small>
               }
             </div>
           }
+
+          <div class="field">
+            <label>Bank Branch *</label>
+            <div class="selector-input" (click)="openBranchPicker()" [class.placeholder]="!selectedBranch()">
+              {{ selectedBranch()?.branchName || 'Select a bank branch' }}
+            </div>
+            @if (submitted() && !selectedBranch()) {
+              <small class="error">Bank branch is required</small>
+            }
+          </div>
 
           <div formGroupName="passwords" class="two-cols">
             <div class="field">
@@ -93,7 +105,7 @@ function matchPassword(group: AbstractControl): ValidationErrors | null {
             </div>
           </div>
 
-          <button class="primary btn--lg" type="submit"
+          <button class="primary btn--lg register-submit" type="submit"
                   [disabled]="loading()">{{ loading() ? 'Signing up…' : 'Create account' }}
           </button>
           @if (error()) {
@@ -103,87 +115,120 @@ function matchPassword(group: AbstractControl): ValidationErrors | null {
 
         <p class="signin-hint">Already have an account? <a routerLink="/auth/sign-in">Sign in</a></p>
       </div>
+
+      @if (branchPickerOpen()) {
+        <div class="branch-picker-overlay" (keydown.escape)="closeBranchPicker()" tabindex="-1">
+          <div class="branch-picker" role="dialog" aria-modal="true" aria-labelledby="branchPickerTitle">
+            <header>
+              <h2 id="branchPickerTitle">Select bank branch</h2>
+              <button type="button" class="button-secondary" (click)="closeBranchPicker()">Close</button>
+            </header>
+            <div class="filters">
+              <div class="field">
+                <label>Country</label>
+                <input type="text" [formControl]="branchFilters.controls.countryCode" placeholder="e.g. US"
+                       maxlength="2"/>
+              </div>
+              <div class="field">
+                <label>Bank name</label>
+                <input type="text" [formControl]="branchFilters.controls.bankName" placeholder="Partial name"/>
+              </div>
+              <div class="field">
+                <label>Branch city</label>
+                <input type="text" [formControl]="branchFilters.controls.branchCity" placeholder="City"/>
+              </div>
+              <div class="field">
+                <label>Zip code</label>
+                <input type="text" [formControl]="branchFilters.controls.zipCode" placeholder="Zip"/>
+              </div>
+              <div class="field">
+                <label>Branch code</label>
+                <input type="text" [formControl]="branchFilters.controls.branchCode" placeholder="Code"/>
+              </div>
+              <div class="field">
+                <label>SWIFT / Bank code</label>
+                <input type="text" [formControl]="branchFilters.controls.bankCode" placeholder="Bank code"/>
+              </div>
+            </div>
+            <div class="results" role="listbox" aria-label="Bank branches results">
+              @if (branchesLoading()) {
+                <div class="empty">Loading branches…</div>
+              } @else {
+                @if (branches().length === 0) {
+                  <div class="empty">No branches found</div>
+                } @else {
+                  <div *ngFor="let b of branches(); trackBy: trackBranch" class="result-row" role="option"
+                       [attr.aria-selected]="b.branchCode === tentativeSelection()?.branchCode"
+                       (click)="selectTentative(b)" [class.active]="b.branchCode === tentativeSelection()?.branchCode">
+                    <div>
+                      <strong>{{ b.branchName }}</strong><br>
+                      <span>{{ b.bankName || b.bankCode }} • {{ b.countryCode }} • {{ b.branchCity }}</span>
+                    </div>
+                    <span>{{ b.branchCode }}</span>
+                  </div>
+                }
+              }
+            </div>
+            <footer>
+              <div class="pagination">
+                <button type="button" class="button-secondary" (click)="prevPage()"
+                        [disabled]="branchesPage() === 0 || branchesLoading()">Prev
+                </button>
+                <span style="font-size:0.7rem; opacity:.8;">Page {{ branchesPage() + 1 }}
+                  / {{ branchesTotalPages() || 1 }}</span>
+                <button type="button" class="button-secondary" (click)="nextPage()"
+                        [disabled]="(branchesPage()+1) >= (branchesTotalPages()||1) || branchesLoading()">Next
+                </button>
+              </div>
+              <div class="actions">
+                <button type="button" class="button-secondary" (click)="resetFilters()" [disabled]="branchesLoading()">
+                  Reset
+                </button>
+                <button type="button" (click)="confirmBranchSelection()" [disabled]="!tentativeSelection()">Confirm
+                </button>
+              </div>
+            </footer>
+          </div>
+        </div>
+      }
     </section>
   `,
   styles: [`
-
-    .two-cols {
-      display: grid;
-      gap: 0.75rem;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    }
-
-    .error {
-      color: var(--color-danger, #c0392b);
-      font-size: 0.65rem;
-    }
-
-    .hint {
-      font-size: 0.6rem;
-      opacity: .7;
-    }
-
+    /* Component-specific minor tweaks */
     .form-error {
       margin: 0;
       font-size: 0.7rem;
       color: var(--color-danger, #c0392b);
     }
 
-    .signin-hint {
-      margin: 0.4rem 0 0;
-      font-size: 0.7rem;
-      text-align: center;
-    }
-
-    .signin-hint a {
-      color: var(--color-primary);
-      text-decoration: none;
-      font-weight: 600;
-    }
-
-    .signin-hint a:hover {
-      text-decoration: underline;
-    }
-
-    .headline {
-      display: grid;
-      gap: 0.25rem;
-      margin-bottom: 0.25rem;
-    }
-
-    .greeting {
-      margin: 0;
-      font-size: 1.75rem;
-      line-height: 1.2;
-    }
-
-    .subtitle {
-      margin: 0;
-      font-size: 0.875rem;
-      color: var(--color-text-muted, var(--color-text));
-      opacity: 0.8;
-    }
-
-    .back-link {
-      font-size: 0.6rem;
-      text-decoration: none;
-      color: var(--color-primary);
-      font-weight: 600;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
+    .register-submit {
+      margin-top: 0.4rem;
     }
   `]
 })
-export class OnboardingStartComponent implements OnInit {
+export class OnboardingStartComponent {
   private readonly fb = inject(FormBuilder);
   private readonly router = inject(Router);
   private readonly userService = inject(UserService);
   private readonly auth = inject(AuthService);
   private readonly progress: OnboardingProgressService = inject(OnboardingProgressService);
+  private readonly bankService = inject(BankService);
 
   loading = signal(false);
   error = signal<string | null>(null);
   submitted = signal(false);
+
+  branchPickerOpen = signal(false);
+  branchesLoading = signal(false);
+  branches = signal<BankBranchDto[]>([]);
+  branchesPage = signal(0);
+  branchesTotalPages = signal(0);
+  tentativeSelection = signal<BankBranchDto | null>(null);
+  selectedBranch = signal<BankBranchDto | null>(null);
+
+  branchFilters = this.fb.group({
+    bankCode: [''], bankName: [''], branchCode: [''], countryCode: [''], branchCity: [''], zipCode: ['']
+  });
 
   form = this.fb.group({
     firstName: this.fb.control('', {validators: [Validators.required]}),
@@ -191,6 +236,7 @@ export class OnboardingStartComponent implements OnInit {
     email: this.fb.control('', {validators: [Validators.required, Validators.email]}),
     role: this.fb.control<'customer' | 'advisor'>('customer', {validators: [Validators.required]}),
     companyId: this.fb.control('', {validators: []}),
+    bankBranchCode: this.fb.control('', {validators: [Validators.required]}),
     passwords: this.fb.group({
       password: this.fb.control('', {validators: [Validators.required, Validators.minLength(8)]}),
       confirmPassword: this.fb.control('', {validators: [Validators.required]})
@@ -201,8 +247,90 @@ export class OnboardingStartComponent implements OnInit {
 
   showCompanyId = computed(() => this.form.controls.role.value === 'advisor');
 
-  ngOnInit(): void {
-    // no automatic redirect: the page now shows the sign up form
+  constructor() {
+    // React to filter changes with debounce
+    this.branchFilters.valueChanges.pipe(debounceTime(350)).subscribe(() => {
+      this.branchesPage.set(0); // reset to first page when filters change
+      if (this.branchPickerOpen()) this.loadBranches();
+    });
+    // React to page changes
+    effect(() => {
+      this.branchesPage();
+      if (this.branchPickerOpen()) this.loadBranches();
+    });
+  }
+
+  openBranchPicker() {
+    this.branchPickerOpen.set(true);
+    this.tentativeSelection.set(this.selectedBranch());
+    if (this.branches().length === 0) this.loadBranches();
+  }
+
+  closeBranchPicker() {
+    this.branchPickerOpen.set(false);
+  }
+
+  resetFilters() {
+    this.branchFilters.reset({
+      bankCode: '',
+      bankName: '',
+      branchCode: '',
+      countryCode: '',
+      branchCity: '',
+      zipCode: ''
+    });
+    this.branchesPage.set(0);
+    this.loadBranches();
+  }
+
+  selectTentative(b: BankBranchDto) {
+    this.tentativeSelection.set(b);
+  }
+
+  confirmBranchSelection() {
+    const sel = this.tentativeSelection();
+    if (sel) {
+      this.selectedBranch.set(sel);
+      this.form.controls.bankBranchCode.setValue(sel.branchCode || '');
+    }
+    this.closeBranchPicker();
+  }
+
+  prevPage() {
+    if (this.branchesPage() > 0) {
+      this.branchesPage.set(this.branchesPage() - 1);
+    }
+  }
+
+  nextPage() {
+    if ((this.branchesPage() + 1) < (this.branchesTotalPages() || 1)) {
+      this.branchesPage.set(this.branchesPage() + 1);
+    }
+  }
+
+  trackBranch = (_: number, b: BankBranchDto) => b.branchCode;
+
+  private loadBranches() {
+    if (!this.branchPickerOpen()) return; // only load when picker visible
+    this.branchesLoading.set(true);
+    const f = this.branchFilters.value;
+    this.bankService.getBankBranches({
+      page: this.branchesPage(),
+      size: 10
+    }, f.bankCode || undefined, f.bankName || undefined, f.branchCode || undefined, undefined, f.countryCode || undefined, undefined, f.branchCity || undefined, f.zipCode || undefined)
+      .subscribe({
+        next: (page: PageBankBranchDto) => {
+          this.branches.set(page.content || []);
+          const total = (page as any).totalPages || (page as any).page?.totalPages || 1;
+          this.branchesTotalPages.set(total);
+        },
+        error: err => {
+          console.error('Failed to load branches', err);
+          this.branches.set([]);
+          this.branchesTotalPages.set(1);
+        },
+        complete: () => this.branchesLoading.set(false)
+      });
   }
 
   private buildUsername(first: string, last: string): string {
@@ -213,7 +341,7 @@ export class OnboardingStartComponent implements OnInit {
   onSubmit() {
     this.submitted.set(true);
     this.error.set(null);
-    if (this.form.invalid) return;
+    if (this.form.invalid || !this.selectedBranch()) return;
 
     const v = this.form.value;
     const first = v.firstName?.trim() || '';
@@ -223,7 +351,7 @@ export class OnboardingStartComponent implements OnInit {
     const companyId = this.showCompanyId() ? (v.companyId?.trim() || '') : 'public-company';
 
     if (this.showCompanyId() && !companyId) {
-      this.error.set('Company ID required for operator role');
+      this.error.set('Company ID required for advisor role');
       return;
     }
 
@@ -236,10 +364,10 @@ export class OnboardingStartComponent implements OnInit {
       email,
       companyId,
       roles: [mappedRole]
+      // future: include branch selection when backend supports it
     }).subscribe({
       next: () => {
         this.auth.setUsername(username);
-        // Start onboarding flow -> first step
         const target = this.progress.pathFor(0 as any);
         void this.router.navigateByUrl(target).catch(() => {
         });

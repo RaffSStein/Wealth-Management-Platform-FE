@@ -30,9 +30,9 @@ function withLogging(target) {
     onProxyReq(proxyReq, req) {
       try {
         const url = req.originalUrl || req.url;
-        // Stampo anche l'header Authentication se presente (solo presenza, non valore completo)
-        const hasAuth = !!req.headers['authentication'];
-        console.log(`[PROXY][REQ] ${req.method} ${url} -> ${target}${req.url}${hasAuth ? ' [Authentication]' : ''}`);
+        // print Authentication header presence (not value) for security
+        const hasAuth = !!req.headers['Authorization'];
+        console.log(`[PROXY][REQ] ${req.method} ${url} -> ${target}${req.url}${hasAuth ? ' [Authorization]' : ''}`);
       } catch {}
     },
     onProxyRes(proxyRes, req) {
@@ -62,5 +62,8 @@ module.exports = {
   '/document-service': withLogging('http://localhost:8091'),
 
   // Customer service BE Application
-  '/customer-service': withLogging('http://localhost:8090')
+  '/customer-service': withLogging('http://localhost:8090'),
+
+  // Bank service BE Application
+  '/bank-service': withLogging('http://localhost:8089')
 };

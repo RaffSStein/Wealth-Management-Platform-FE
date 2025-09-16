@@ -1,0 +1,258 @@
+openapi: 3.1.0
+info:
+  title: Bank Apis
+  version: 1.0.0
+  description: API for managing bank information.
+
+paths:
+  /bank/branches:
+    post:
+      tags:
+        - Bank
+      summary: Create a new bank branch
+      operationId: createBankBranch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BankBranchDto'
+      responses:
+        '201':
+          description: Bank branch created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BankBranchDto'
+        '400':
+          description: Invalid input
+    get:
+      tags:
+        - Bank
+      summary: Get bank branches (paged & optionally filtered)
+      description: >-
+        Returns a paged list of bank branches. Optional query parameters allow filtering
+        by multiple attributes. Filters are combined with logical AND. Pagination is zero-based.
+      operationId: getBankBranches
+      parameters:
+        - name: pageable
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/Pageable'
+        - name: bankCode
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Exact bank code filter.
+          example: "B001"
+        - name: bankName
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Bank name.
+          example: "International Bank"
+        - name: branchCode
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Exact branch code filter.
+          example: "BR123"
+        - name: swiftCode
+          in: query
+          required: false
+          schema:
+            type: string
+          description: SWIFT code filter.
+          example: "INTLUS33"
+        - name: countryCode
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 2
+          description: ISO 3166-1 alpha-2 country code.
+          example: "US"
+        - name: bankType
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Bank type/category filter.
+          example: "RETAIL"
+        - name: branchCity
+          in: query
+          required: false
+          schema:
+            type: string
+          description: City where the branch is located (partial or exact depending on implementation).
+          example: "New York"
+        - name: zipCode
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Postal/ZIP code filter.
+          example: "10001"
+      responses:
+        '200':
+          description: Paged list of bank branches
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageBankBranchDto'
+        '400':
+          description: Invalid filter combination or parameter format
+
+  /bank/branches/{branchCode}:
+    get:
+      tags:
+        - Bank
+      summary: Get a bank branch by branchCode
+      operationId: getBankBranchByCode
+      parameters:
+        - name: branchCode
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Bank branch found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BankBranchDto'
+        '404':
+          description: Bank branch not found
+    put:
+      tags:
+        - Bank
+      summary: Update a bank branch by branchCode
+      operationId: updateBankBranch
+      parameters:
+        - name: branchCode
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BankBranchDto'
+      responses:
+        '200':
+          description: Bank branch updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BankBranchDto'
+        '404':
+          description: Bank branch not found
+    delete:
+      tags:
+        - Bank
+      summary: Delete a bank branch by branchCode
+      operationId: deleteBankBranch
+      parameters:
+        - name: branchCode
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Bank branch deleted
+        '404':
+          description: Bank branch not found
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    BankBranchDto:
+      type: object
+      properties:
+        bankCode:
+          type: string
+        bankName:
+          type: string
+        branchCode:
+          type: string
+        branchName:
+          type: string
+        swiftCode:
+          type: string
+        countryCode:
+          type: string
+        bankType:
+          type: string
+        status:
+          type: string
+        bankDescription:
+          type: string
+        branchDescription:
+          type: string
+        branchCity:
+          type: string
+        address:
+          type: string
+        zipCode:
+          type: string
+        phoneNumber:
+          type: string
+        email:
+          type: string
+      required:
+        - bankCode
+        - branchCode
+        - branchName
+        - countryCode
+
+    PageBankBranchDto:
+      type: object
+      description: Paged result wrapper for BankBranchDto.
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          properties:
+            content:
+              type: array
+              items:
+                $ref: '#/components/schemas/BankBranchDto'
+
+    Pageable:
+      description: Pageable query parameters
+      type: object
+      properties:
+        page:
+          type: integer
+        size:
+          type: integer
+        sort:
+          type: string
+          description: "Sorting criteria in the format: property,asc|desc. Default sort order is ascending. Multiple sort criteria are supported."
+          example: "branchName,desc"
+        totalElements:
+          type: integer
+        totalPages:
+          type: integer
+
+    Page:
+      description: Page response without content property
+      type: object
+      properties:
+        number:
+          type: integer
+        size:
+          type: integer
