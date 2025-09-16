@@ -7,6 +7,7 @@ import {UserService} from '../../api/user-service';
 import {AuthService} from '../../core/services/auth.service';
 import {BankService, BankBranchDto, PageBankBranchDto} from '../../api/bank-service';
 import {debounceTime} from 'rxjs';
+import {finalize} from 'rxjs/operators';
 
 // Validator for matching passwords
 function matchPassword(group: AbstractControl): ValidationErrors | null {
@@ -170,7 +171,8 @@ function matchPassword(group: AbstractControl): ValidationErrors | null {
                   @for (b of branches(); track b.branchCode) {
                     <div class="result-row" role="option"
                          [attr.aria-selected]="b.branchCode === tentativeSelection()?.branchCode"
-                         (click)="selectTentative(b)" [class.active]="b.branchCode === tentativeSelection()?.branchCode">
+                         (click)="selectTentative(b)"
+                         [class.active]="b.branchCode === tentativeSelection()?.branchCode">
                       <div>
                         <strong>{{ b.branchName }}</strong><br>
                         <span>{{ b.bankName || b.bankCode }} • {{ b.countryCode }} • {{ b.branchCity }}</span>
@@ -183,12 +185,12 @@ function matchPassword(group: AbstractControl): ValidationErrors | null {
             </div>
             <footer>
               <div class="pagination">
-                <button type="button" class="button-secondary" (click)="prevPage()"
+                <button type="button" class="pager-btn pager-btn--prev" (click)="prevPage()"
                         [disabled]="branchesPage() === 0 || branchesLoading()">Prev
                 </button>
                 <span style="font-size:0.7rem; opacity:.8;">Page {{ branchesPage() + 1 }}
                   / {{ branchesTotalPages() || 1 }}</span>
-                <button type="button" class="button-secondary" (click)="nextPage()"
+                <button type="button" class="pager-btn pager-btn--next" (click)="nextPage()"
                         [disabled]="(branchesPage()+1) >= (branchesTotalPages()||1) || branchesLoading()">Next
                 </button>
               </div>
@@ -253,6 +255,45 @@ function matchPassword(group: AbstractControl): ValidationErrors | null {
     .error-banner .retry {
       height: 30px;
       font-size: .65rem;
+    }
+    .pager-btn {
+      background:none;
+      border:none;
+      color:var(--color-primary);
+      font-size:.65rem;
+      font-weight:600;
+      padding:.25rem .4rem;
+      line-height:1.1;
+      cursor:pointer;
+      position:relative;
+    }
+    .pager-btn:hover:not(:disabled) {
+      text-decoration:underline;
+      color:var(--color-primary);
+    }
+    .pager-btn:disabled {
+      opacity:.4;
+      cursor:not-allowed;
+      color:var(--color-primary);
+    }
+    .pager-btn:focus-visible {
+      outline:2px solid var(--color-primary);
+      outline-offset:2px;
+      border-radius:2px;
+      color:var(--color-primary);
+    }
+    .pager-btn--prev::before {
+      content:'←';
+      font-size:.75rem;
+      margin-right:4px;
+    }
+    .pager-btn--next::after {
+      content:'→';
+      font-size:.75rem;
+      margin-left:4px;
+    }
+    .pager-btn:disabled::before, .pager-btn:disabled::after {
+      opacity:.5;
     }
   `]
 })
@@ -364,10 +405,10 @@ export class OnboardingStartComponent {
     this.branchesLoading.set(true);
     this.branchLoadError.set(null);
     const f = this.branchFilters.value;
-    this.bankService.getBankBranches({
-      page: this.branchesPage(),
-      size: 10
-    }, f.bankCode || undefined, f.bankName || undefined, f.branchCode || undefined, undefined, f.countryCode || undefined, undefined, f.branchCity || undefined, f.zipCode || undefined)
+    this.bankService.getBankBranches({page: this.branchesPage(), size: 10},
+      f.bankCode || undefined, f.bankName || undefined, f.branchCode || undefined, undefined,
+      f.countryCode || undefined, undefined, f.branchCity || undefined, f.zipCode || undefined)
+      .pipe(finalize(() => this.branchesLoading.set(false)))
       .subscribe({
         next: (page: PageBankBranchDto) => {
           this.branches.set(page.content || []);
@@ -378,9 +419,8 @@ export class OnboardingStartComponent {
           console.error('Failed to load branches', err);
           this.branches.set([]);
           this.branchesTotalPages.set(1);
-          this.branchLoadError.set('Errore nel caricamento delle filiali. Riprova.');
-        },
-        complete: () => this.branchesLoading.set(false)
+          this.branchLoadError.set('Failed to load branches. Please retry.');
+        }
       });
   }
 
