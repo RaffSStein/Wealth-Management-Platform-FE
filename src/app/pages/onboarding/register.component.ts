@@ -152,20 +152,32 @@ function matchPassword(group: AbstractControl): ValidationErrors | null {
             </div>
             <div class="results" role="listbox" aria-label="Bank branches results">
               @if (branchesLoading()) {
-                <div class="empty">Loading branches…</div>
+                <div class="loading-block">
+                  <div class="spinner" aria-label="Loading"></div>
+                </div>
               } @else {
+                @if (branchLoadError()) {
+                  <div class="error-banner">
+                    <span>{{ branchLoadError() }}</span>
+                    <button type="button" class="button-secondary retry" (click)="retryLoadBranches()"
+                            [disabled]="branchesLoading()">Retry
+                    </button>
+                  </div>
+                }
                 @if (branches().length === 0) {
                   <div class="empty">No branches found</div>
                 } @else {
-                  <div *ngFor="let b of branches(); trackBy: trackBranch" class="result-row" role="option"
-                       [attr.aria-selected]="b.branchCode === tentativeSelection()?.branchCode"
-                       (click)="selectTentative(b)" [class.active]="b.branchCode === tentativeSelection()?.branchCode">
-                    <div>
-                      <strong>{{ b.branchName }}</strong><br>
-                      <span>{{ b.bankName || b.bankCode }} • {{ b.countryCode }} • {{ b.branchCity }}</span>
+                  @for (b of branches(); track b.branchCode) {
+                    <div class="result-row" role="option"
+                         [attr.aria-selected]="b.branchCode === tentativeSelection()?.branchCode"
+                         (click)="selectTentative(b)" [class.active]="b.branchCode === tentativeSelection()?.branchCode">
+                      <div>
+                        <strong>{{ b.branchName }}</strong><br>
+                        <span>{{ b.bankName || b.bankCode }} • {{ b.countryCode }} • {{ b.branchCity }}</span>
+                      </div>
+                      <span>{{ b.branchCode }}</span>
                     </div>
-                    <span>{{ b.branchCode }}</span>
-                  </div>
+                  }
                 }
               }
             </div>
@@ -204,6 +216,44 @@ function matchPassword(group: AbstractControl): ValidationErrors | null {
     .register-submit {
       margin-top: 0.4rem;
     }
+
+    .loading-block {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.25rem;
+    }
+
+    .spinner {
+      width: 28px;
+      height: 28px;
+      border: 3px solid var(--color-border);
+      border-top-color: var(--color-primary);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .error-banner {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      padding: .6rem .75rem;
+      background: #ffecec;
+      border: 1px solid #f5b5b5;
+      color: #b30000;
+      font-size: .7rem;
+    }
+
+    .error-banner .retry {
+      height: 30px;
+      font-size: .65rem;
+    }
   `]
 })
 export class OnboardingStartComponent {
@@ -225,6 +275,7 @@ export class OnboardingStartComponent {
   branchesTotalPages = signal(0);
   tentativeSelection = signal<BankBranchDto | null>(null);
   selectedBranch = signal<BankBranchDto | null>(null);
+  branchLoadError = signal<string | null>(null);
 
   branchFilters = this.fb.group({
     bankCode: [''], bankName: [''], branchCode: [''], countryCode: [''], branchCity: [''], zipCode: ['']
@@ -308,11 +359,10 @@ export class OnboardingStartComponent {
     }
   }
 
-  trackBranch = (_: number, b: BankBranchDto) => b.branchCode;
-
   private loadBranches() {
     if (!this.branchPickerOpen()) return; // only load when picker visible
     this.branchesLoading.set(true);
+    this.branchLoadError.set(null);
     const f = this.branchFilters.value;
     this.bankService.getBankBranches({
       page: this.branchesPage(),
@@ -328,9 +378,14 @@ export class OnboardingStartComponent {
           console.error('Failed to load branches', err);
           this.branches.set([]);
           this.branchesTotalPages.set(1);
+          this.branchLoadError.set('Errore nel caricamento delle filiali. Riprova.');
         },
         complete: () => this.branchesLoading.set(false)
       });
+  }
+
+  retryLoadBranches() {
+    this.loadBranches();
   }
 
   private buildUsername(first: string, last: string): string {
