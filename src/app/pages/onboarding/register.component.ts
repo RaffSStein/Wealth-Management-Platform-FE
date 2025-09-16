@@ -8,6 +8,7 @@ import {AuthService} from '../../core/services/auth.service';
 import {BankService, BankBranchDto, PageBankBranchDto} from '../../api/bank-service';
 import {debounceTime} from 'rxjs';
 import {finalize} from 'rxjs/operators';
+import { PasswordStrengthFieldComponent } from '../../shared/components/password-strength-field/password-strength-field.component';
 
 // Validator for matching passwords
 function matchPassword(group: AbstractControl): ValidationErrors | null {
@@ -17,10 +18,21 @@ function matchPassword(group: AbstractControl): ValidationErrors | null {
   return pwd === rep ? null : {passwordMismatch: true};
 }
 
+// Password complexity validator
+function passwordComplexity(control: AbstractControl): ValidationErrors | null {
+  const v = control.value as string;
+  if (!v) return null; // required gestito da Validators.required
+  const errors: any = {};
+  if (!/[A-Z]/.test(v)) errors.missingUppercase = true;
+  if (!/\d/.test(v)) errors.missingNumber = true;
+  if (!/[^A-Za-z0-9]/.test(v)) errors.missingSymbol = true;
+  return Object.keys(errors).length ? errors : null;
+}
+
 @Component({
   selector: 'app-onboarding-start',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink, PasswordStrengthFieldComponent],
   template: `
     <section class="auth-shell">
       <div class="card form-card form-card--md">
@@ -88,23 +100,7 @@ function matchPassword(group: AbstractControl): ValidationErrors | null {
             }
           </div>
 
-          <div formGroupName="passwords" class="two-cols">
-            <div class="field">
-              <label for="password">Password *</label>
-              <input id="password" type="password" formControlName="password" autocomplete="new-password"/>
-              @if (submitted() && passwords.controls.password.invalid) {
-                <small class="error">Minimum 8 characters</small>
-              }
-            </div>
-            <div class="field">
-              <label for="confirmPassword">Confirm *</label>
-              <input id="confirmPassword" type="password" formControlName="confirmPassword"
-                     autocomplete="new-password"/>
-              @if (submitted() && passwords.errors?.passwordMismatch) {
-                <small class="error">Passwords do not match</small>
-              }
-            </div>
-          </div>
+          <app-password-strength-field [group]="passwords" [submitted]="submitted()"></app-password-strength-field>
 
           <button class="primary btn--lg register-submit" type="submit"
                   [disabled]="loading()">{{ loading() ? 'Signing up…' : 'Create account' }}
@@ -256,45 +252,54 @@ function matchPassword(group: AbstractControl): ValidationErrors | null {
       height: 30px;
       font-size: .65rem;
     }
+
     .pager-btn {
-      background:none;
-      border:none;
-      color:var(--color-primary);
-      font-size:.65rem;
-      font-weight:600;
-      padding:.25rem .4rem;
-      line-height:1.1;
-      cursor:pointer;
-      position:relative;
+      background: none;
+      border: none;
+      color: var(--color-primary);
+      font-size: .65rem;
+      font-weight: 600;
+      padding: .25rem .4rem;
+      line-height: 1.1;
+      cursor: pointer;
+      position: relative;
     }
+
     .pager-btn:hover:not(:disabled) {
-      text-decoration:underline;
-      color:var(--color-primary);
+      text-decoration: underline;
+      color: var(--color-primary);
     }
+
     .pager-btn:disabled {
-      opacity:.4;
-      cursor:not-allowed;
-      color:var(--color-primary);
+      opacity: .4;
+      cursor: not-allowed;
+      color: var(--color-primary);
     }
+
     .pager-btn:focus-visible {
-      outline:2px solid var(--color-primary);
-      outline-offset:2px;
-      border-radius:2px;
-      color:var(--color-primary);
+      outline: 2px solid var(--color-primary);
+      outline-offset: 2px;
+      border-radius: 2px;
+      color: var(--color-primary);
     }
+
     .pager-btn--prev::before {
-      content:'←';
-      font-size:.75rem;
-      margin-right:4px;
+      content: '←';
+      font-size: .75rem;
+      margin-right: 4px;
     }
+
     .pager-btn--next::after {
-      content:'→';
-      font-size:.75rem;
-      margin-left:4px;
+      content: '→';
+      font-size: .75rem;
+      margin-left: 4px;
     }
+
     .pager-btn:disabled::before, .pager-btn:disabled::after {
-      opacity:.5;
+      opacity: .5;
     }
+
+    /* Password strength styles now encapsulated in the reusable component */
   `]
 })
 export class OnboardingStartComponent {
@@ -330,7 +335,7 @@ export class OnboardingStartComponent {
     companyId: this.fb.control('', {validators: []}),
     bankBranchCode: this.fb.control('', {validators: [Validators.required]}),
     passwords: this.fb.group({
-      password: this.fb.control('', {validators: [Validators.required, Validators.minLength(8)]}),
+      password: this.fb.control('', {validators: [Validators.required, Validators.minLength(8), passwordComplexity]}),
       confirmPassword: this.fb.control('', {validators: [Validators.required]})
     }, {validators: [matchPassword]})
   });
