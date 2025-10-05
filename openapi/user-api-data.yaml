@@ -62,7 +62,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateUserRequest'
+              $ref: '#/components/schemas/UserDTO'
       responses:
         '200':
           description: User updated
@@ -86,7 +86,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateUserRequest'
+              $ref: '#/components/schemas/UserDTO'
       responses:
         '201':
           description: User created
@@ -152,63 +152,49 @@ components:
           type: string
           description: JWT token issued by external Identity Provider
 
-
-
     UserDTO:
       type: object
       properties:
         id:
           type: string
-          format: uuid
-        username:
+        firstName:
+          type: string
+        lastName:
           type: string
         email:
           type: string
           format: email
-        isActive:
-          type: boolean
-        createdAt:
+        phoneNumber:
           type: string
-          format: date-time
-
-    CreateUserRequest:
-      type: object
-      required:
-        - username
-        - email
-        - companyId
-        - roles
-      properties:
-        username:
+        country:
           type: string
-        email:
+        city:
           type: string
-          format: email
-        companyId:
+        address:
           type: string
-          format: uuid
-        roles:
+        gender:
+          type: string
+        birthDate:
+          type: string
+        userBranchRoles:
           type: array
           items:
-            type: string
+            $ref: '#/components/schemas/UserBranchRoleDTO'
+        userSettings:
+          $ref: '#/components/schemas/UserSettingsDTO'
 
-    UpdateUserRequest:
+    UserBranchRoleDTO:
       type: object
-      required:
-        - username
-        - email
-        - companyId
-        - roles
       properties:
-        username:
+        bankCode:
           type: string
-        email:
+        role:
           type: string
-          format: email
-        companyId:
+
+    UserSettingsDTO:
+      type: object
+      properties:
+        language:
           type: string
-          format: uuid
-        roles:
-          type: array
-          items:
-            type: string
+        theme:
+          type: string
