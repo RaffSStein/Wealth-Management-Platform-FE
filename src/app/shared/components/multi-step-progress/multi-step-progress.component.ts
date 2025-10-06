@@ -13,21 +13,25 @@ import {CommonModule} from '@angular/common';
         </div>
       </div>
       <ul class="steps" role="list">
-        <li *ngFor="let label of steps; let i=index"
-            (click)="onClick(i)"
-            [class.completed]="i < currentIndex"
-            [class.current]="i === currentIndex"
-            [class.locked]="i > currentIndex"
-            [attr.aria-current]="i === currentIndex ? 'step' : null"
-            [attr.aria-disabled]="i > currentIndex ? 'true' : null"
-            [attr.tabindex]="i <= currentIndex ? 0 : -1"
-            (keydown.enter)="onKey(i)" (keydown.space)="onKey(i)">
-          <div class="dot">
-            <span class="dot-label" *ngIf="!(i < currentIndex && i !== currentIndex)">{{ i + 1 }}</span>
-            <span class="dot-check" *ngIf="i < currentIndex && i !== currentIndex">✓</span>
-          </div>
-          <div class="label">{{ label }}</div>
-        </li>
+        @for (label of steps; track $index; let i = $index) {
+          <li (click)="onClick(i)"
+              [class.completed]="i < currentIndex"
+              [class.current]="i === currentIndex"
+              [class.locked]="i > currentIndex"
+              [attr.aria-current]="i === currentIndex ? 'step' : null"
+              [attr.aria-disabled]="i > currentIndex ? 'true' : null"
+              [attr.tabindex]="i <= currentIndex ? 0 : -1"
+              (keydown.enter)="onKey(i)" (keydown.space)="onKey(i)">
+            <div class="dot">
+              @if (i < currentIndex) {
+                <span class="dot-check">✓</span>
+              } @else {
+                <span class="dot-label">{{ i + 1 }}</span>
+              }
+            </div>
+            <div class="label">{{ label }}</div>
+          </li>
+        }
       </ul>
     </nav>
   `,
@@ -210,4 +214,3 @@ export class MultiStepProgressComponent {
     this.onClick(i);
   }
 }
-
