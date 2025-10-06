@@ -1,6 +1,5 @@
 import {Component, inject, signal, effect} from '@angular/core';
 import {Router, RouterLink} from '@angular/router';
-import {OnboardingProgressService} from '../../core/services/onboarding-progress.service';
 import {CommonModule} from '@angular/common';
 import {
   FormBuilder,
@@ -19,6 +18,7 @@ import {
   PasswordStrengthFieldComponent
 } from '../../shared/components/password-strength-field/password-strength-field.component';
 import {MultiStepProgressComponent} from '../../shared/components/multi-step-progress/multi-step-progress.component';
+import {RegistrationStateService} from '../../core/services/registration-state.service';
 
 // Validator for matching passwords
 function matchPassword(group: AbstractControl): ValidationErrors | null {
@@ -336,12 +336,12 @@ export class OnboardingStartComponent {
   private readonly router = inject(Router);
   private readonly userService = inject(UserService);
   private readonly auth = inject(AuthService);
-  private readonly progress: OnboardingProgressService = inject(OnboardingProgressService);
   private readonly bankService = inject(BankService);
+  private readonly registrationState = inject(RegistrationStateService);
 
-  // Stato
+  // State
   currentStep = signal(0);
-  finalStep = 2; // index dell'ultimo step
+  finalStep = 2; // last step index
   readonly stepLabels = ['Account', 'Personal Info', 'Bank & Access'];
   stepSubmitted = signal(false);
 
@@ -387,7 +387,7 @@ export class OnboardingStartComponent {
 
   passwords: FormGroup = this.form.get('access.passwords') as FormGroup;
 
-  // Controlli per validazione step
+  // validation step checks
   private readonly stepControlPaths: string[][] = [
     ['account.firstName', 'account.lastName', 'account.email', 'account.gender', 'account.birthDate'],
     ['profile.phoneNumber', 'profile.country', 'profile.city', 'profile.address'],
@@ -438,14 +438,12 @@ export class OnboardingStartComponent {
 
   goToStep(i: number) {
     if (i < 0) return;
-    // Consenti solo tornare indietro (no skip avanti)
+    // only turn back (no moving forward)
     if (i < this.currentStep()) {
       this.currentStep.set(i);
       this.stepSubmitted.set(false);
     }
   }
-
-  trackByBranch = (_: number, b: BankBranchDto) => b.branchCode;
 
   openBranchPicker() {
     if (this.currentStep() !== 2) return;
@@ -577,8 +575,8 @@ export class OnboardingStartComponent {
     this.userService.createUser(payload).subscribe({
       next: () => {
         this.auth.setUsername(email);
-        const target = this.progress.pathFor(0 as any);
-        void this.router.navigateByUrl(target).catch(() => {
+        this.registrationState.setEmail(email);
+        void this.router.navigate(['auth/registration-success']).catch(() => {
         });
       },
       error: (err) => {

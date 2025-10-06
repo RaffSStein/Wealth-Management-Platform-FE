@@ -10,6 +10,10 @@ export const routes: Routes = [
     path: 'auth/forgot-password',
     loadComponent: () => import('./pages/auth/forgot-password.component').then(m => m.ForgotPasswordComponent)
   },
+  {
+    path: 'auth/registration-success',
+    loadComponent: () => import('./pages/auth/registration-success.component').then(m => m.RegistrationSuccessComponent)
+  },
   // Registration route redirects to sign-in for now
   {path: 'auth/sign-up', redirectTo: 'auth/sign-in', pathMatch: 'full'},
   // legacy login route redirects to new auth path
