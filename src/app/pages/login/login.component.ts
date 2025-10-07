@@ -52,7 +52,11 @@ import {AuthService} from '../../core/services/auth.service';
             {{ loading() ? 'Signing in…' : 'Login' }}
           </button>
         </form>
-
+        <div class="dev-shortcut">
+          <button type="button" class="shortcut-btn" (click)="devEnterApp()" aria-label="Developer shortcut: go to app">
+            Enter App (dev shortcut)
+          </button>
+        </div>
         <p class="signup-hint">Not a customer yet? <a routerLink="/onboarding/start">Start building your portfolio
           now</a></p>
       </div>
@@ -172,6 +176,27 @@ import {AuthService} from '../../core/services/auth.service';
     .back-link:hover {
       text-decoration: underline;
     }
+
+    .dev-shortcut {
+      margin-top: .75rem;
+      text-align: center;
+    }
+
+    .shortcut-btn {
+      background: var(--color-surface-alt);
+      border: 1px dashed var(--color-border);
+      color: var(--color-text);
+      padding: .55rem 1rem;
+      font-size: .7rem;
+      border-radius: var(--radius);
+      cursor: pointer;
+    }
+
+    .shortcut-btn:hover {
+      background: var(--color-primary);
+      color: var(--color-primary-contrast);
+      border-style: solid;
+    }
   `]
 })
 export class LoginComponent {
@@ -211,5 +236,13 @@ export class LoginComponent {
   onSocial(provider: 'google' | 'apple') {
     // Placeholder: future implementation with an SSO provider
     console.log('Social login not yet implemented:', provider);
+  }
+
+  devEnterApp() {
+    if (!this.auth.username()) {
+      this.auth.setUsername('demo');
+    }
+    void this.router.navigateByUrl('/app/home').catch(() => {
+    });
   }
 }
