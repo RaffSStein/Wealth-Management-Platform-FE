@@ -1,4 +1,4 @@
-import {Component, signal, computed} from '@angular/core';
+import {Component, signal, computed, ViewChild, ElementRef, afterNextRender} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import {FinancialService, FinancialTypeDTO} from '../../api/customer-service';
 import {AuthService} from '../../core/services/auth.service';
@@ -27,22 +27,55 @@ import {RouterModule} from '@angular/router';
           </div>
           <div class="kpi" [class.positive]="gainLoss() >= 0" [class.negative]="gainLoss() < 0">
             <span class="label">Gain/Loss</span>
-            <span class="value">{{ gainLoss() >= 0 ? '+' : ''}}{{ gainLoss() | number:'1.0-0' }} €</span>
+            <span class="value">{{ gainLoss() >= 0 ? '+' : '' }}{{ gainLoss() | number:'1.0-0' }} €</span>
             <span class="muted small">({{ gainLossPerc() | number:'1.1-2' }}%)</span>
           </div>
           <div class="kpi">
             <span class="label">Available Cash</span>
-            <span class="value">{{ cash() | number:'1.0-0' }} €</span>
+            <span class="value">{{ segmentValue('cash') | number:'1.0-0' }} €</span>
           </div>
         </div>
         <div class="allocation">
-          <div class="donut" role="img" [attr.aria-label]="'Allocation: Portfolio ' + (portfolioPerc() | number:'1.0-0') + ' percent, Cash ' + (cashPerc() | number:'1.0-0') + ' percent'" [style.--portfolio]="portfolioPerc()">
-            <div class="center">{{ portfolioPerc() | number:'1.0-0' }}%</div>
+          <div class="donut-wrapper" #donutWrapper (mouseleave)="clearHover()">
+            <svg viewBox="0 0 42 42" class="donut-svg" role="img" aria-label="Asset allocation interactive donut">
+              <title>Asset Allocation</title>
+              <circle class="ring" cx="21" cy="21" r="15.915" />
+              <ng-container *ngFor="let seg of segmentsWithLayout(); trackBy: segTrack">
+                <circle
+                  class="segment"
+                  [class.dimmed]="hovered() && hovered()!==seg.key"
+                  [attr.data-key]="seg.key"
+                  cx="21" cy="21" r="15.915"
+                  [attr.stroke-dasharray]="(donutReady()? seg.percent : 0) + ' ' + (100 - (donutReady()? seg.percent : 0))"
+                  [attr.stroke-dashoffset]="-25 - seg.start"
+                  [attr.stroke]="seg.color"
+                  (mouseenter)="hover(seg.key)"
+                  (focus)="hover(seg.key)"
+                  (mousemove)="onSegmentMove($event)"
+                  tabindex="0"
+                  role="listitem"
+                  [attr.aria-label]="seg.label + ' ' + (seg.percent | number:'1.0-0') + ' percent, value ' + (seg.value | number:'1.0-0') + ' euro'"
+                  />
+              </ng-container>
+              <g class="center-group" aria-hidden="true">
+                <text x="21" y="19.2" text-anchor="middle" class="center-label__small">Account</text>
+                <text x="21" y="25" text-anchor="middle" class="center-label__acct">{{ accountNumberShort() }}</text>
+              </g>
+            </svg>
+            <div class="tooltip" *ngIf="hovered() as hk" [style.left.px]="tooltipX()" [style.top.px]="tooltipY()" role="tooltip">
+              <div class="tooltip__inner">
+                <strong>{{ segmentLabel(hk) }}</strong>
+                <div class="line">Value: {{ segmentValue(hk) | number:'1.0-0'}} €</div>
+                <div class="line">Percent: {{ segmentPercent(hk) | number:'1.0-0'}}%</div>
+              </div>
+            </div>
           </div>
-          <ul class="legend">
-            <li><span class="swatch portfolio"></span> Portfolio ({{ portfolioValue() | number:'1.0-0' }} €)</li>
-            <li><span class="swatch cash"></span> Cash ({{ cash() | number:'1.0-0' }} €)</li>
-          </ul>
+          <div class="legend-boxes" (mouseleave)="clearHover()">
+            <div class="legend-box" *ngFor="let seg of segments(); trackBy: segTrack" (mouseenter)="hover(seg.key, true)" (focus)="hover(seg.key, true)" tabindex="0" [attr.aria-label]="'Show '+seg.label+' details'" [class.is-active]="hovered()===seg.key">
+              <span class="color" [style.background]="seg.color" [style.borderColor]="seg.color"></span>
+              <span class="lbl">{{ seg.label }}</span>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -54,7 +87,7 @@ import {RouterModule} from '@angular/router';
             <span class="name">{{ idx.name }}</span>
             <span class="val" [class.positive]="idx.change >= 0" [class.negative]="idx.change < 0">
               {{ idx.value | number:'1.2-2' }}
-              <span class="delta">{{ idx.change >= 0 ? '+' : ''}}{{ idx.change | number:'1.2-2' }}%</span>
+              <span class="delta">{{ idx.change >= 0 ? '+' : '' }}{{ idx.change | number:'1.2-2' }}%</span>
             </span>
           </li>
         </ul>
@@ -151,161 +184,232 @@ import {RouterModule} from '@angular/router';
     /* Allocation donut chart */
     .allocation {
       display: flex;
-      gap: 1.5rem;
+      gap: 2rem;
       flex-wrap: wrap;
       align-items: center;
     }
 
-    .donut {
-      --size: 180px;
-      width: var(--size);
-      height: var(--size);
-      border-radius: 50%;
+    .donut-wrapper {
       position: relative;
-      background: conic-gradient(
-        var(--color-primary) 0 calc(var(--portfolio) * 1%),
-        var(--color-secondary) calc(var(--portfolio) * 1%) 100%
-      );
-      box-shadow: var(--shadow);
-      display: grid;
-      place-items: center;
-      font-size: .8rem;
-      font-weight: 600;
-      color: var(--color-heading);
+      width: 200px;
+      height: 200px;
     }
 
-    .donut::after {
-      content: "";
-      position: absolute;
-      inset: 14%;
-      background: var(--color-surface);
-      border-radius: 50%;
-      box-shadow: inset 0 0 0 1px var(--color-border);
+    .donut-svg {
+      width: 100%;
+      height: 100%;
     }
 
-    .donut .center {
-      position: relative;
-      z-index: 1;
+    .ring {
+      fill: none;
+      stroke: var(--color-border);
+      stroke-width: 3;
+      opacity: .35;
     }
 
-    /* Reuse legend styles */
-    .legend {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      display: grid;
-      gap: .35rem;
-      font-size: .75rem;
+    .segment {
+      fill:none;
+      stroke-width:10;
+      stroke-linecap:round;
+      transition: stroke-dasharray .8s ease-out, opacity .25s ease;
     }
 
-    .legend li {
+    .segment.portfolio {
+      stroke: var(--color-primary);
+    }
+
+    .segment.cash {
+      stroke: var(--color-secondary);
+    }
+
+    .segment.dimmed {
+      opacity: .35;
+    }
+
+    .center-group { pointer-events:none; }
+    .center-label__small { font-size:2.4px; font-weight:400; letter-spacing:.6px; text-transform:uppercase; fill:var(--color-text-muted); }
+    .center-label__acct { font-size:5px; font-weight:600; fill:var(--color-heading); }
+
+    /* Legend boxes */
+    .legend-boxes {
+      display: flex;
+      flex-direction: column;
+      gap: .55rem;
+    }
+
+    .legend-box {
       display: flex;
       align-items: center;
-      gap: .4rem;
-    }
-
-    .swatch {
-      width: 14px;
-      height: 14px;
-      border-radius: 4px;
-      display: inline-block;
+      gap: .55rem;
+      font-size: .7rem;
+      cursor: pointer;
+      user-select: none;
+      padding: .4rem .55rem;
       border: 1px solid var(--color-border);
+      border-radius: 6px;
+      background: var(--color-surface-alt);
+      transition: background .2s ease, border-color .2s ease;
     }
 
-    .swatch.portfolio {
+    .legend-box:hover, .legend-box.is-active {
+      background: var(--color-surface);
+      border-color: var(--color-primary);
+    }
+
+    .legend-box:focus {
+      outline: none;
+      box-shadow: var(--ring);
+    }
+
+    .legend-box .color {
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+      border: 1px solid var(--color-border);
+      display: inline-block;
+    }
+
+    .legend-box .color.portfolio {
       background: var(--color-primary);
     }
 
-    .swatch.cash {
+    .legend-box .color.cash {
       background: var(--color-secondary);
     }
 
-    /* Index list */
-    .indices-list {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      display: grid;
-      gap: .5rem;
-    }
-
-    .indices-list li {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      font-size: .85rem;
-    }
-
-    .indices-list .name {
+    .legend-box .lbl {
       font-weight: 500;
+      letter-spacing: .3px;
     }
 
-    .indices-list .val {
-      display: flex;
-      gap: .35rem;
-      align-items: baseline;
+    /* Tooltip */
+    .tooltip {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      z-index: 20;
     }
 
-    .delta {
+    .tooltip__inner {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      padding: .45rem .6rem;
+      border-radius: 6px;
+      box-shadow: var(--shadow);
       font-size: .65rem;
-      padding: .15rem .35rem;
-      border-radius: 999px;
-      background: var(--color-surface-alt);
-    }
-
-    /* Placeholder areas */
-    .placeholder {
-      min-height: 110px;
       display: grid;
-      place-items: center;
-      border: 2px dashed var(--color-border);
-      border-radius: var(--radius);
+      gap: .15rem;
+      min-width: 120px;
     }
 
-    .muted {
-      color: var(--color-text-muted);
+    .tooltip__inner strong {
+      font-size: .7rem;
+    }
+
+    .tooltip__inner:after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 100%;
+      transform: translateX(-50%);
+      width: 10px;
+      height: 8px;
+      background: inherit;
+      clip-path: polygon(50% 100%, 0 0, 100% 0);
+      border-left: 1px solid var(--color-border);
+      border-right: 1px solid var(--color-border);
+      border-bottom: 1px solid var(--color-border);
+      filter: drop-shadow(var(--shadow));
     }
   `]
 })
 export class HomeComponent {
-  constructor(
-    private readonly financialApi: FinancialService,
-    private readonly auth: AuthService
-  ) {
-    this.username.set(this.auth.username());
+  @ViewChild('donutWrapper') donutWrapper?: ElementRef<HTMLElement>;
+
+  // Segment model
+  private baseSegments = signal<ReadonlyArray<{key:string; label:string; value:number; color:string}>>([
+    {key:'portfolio', label:'Portfolio', value:35000, color:'var(--color-primary)'},
+    {key:'cash', label:'Cash', value:15000, color:'var(--color-secondary)'}
+  ]);
+  segments = computed(()=> this.baseSegments());
+  total = computed(()=> this.segments().reduce((s,a)=>s+a.value,0));
+  // Percent layout (ensure sum=100 adjusting last)
+  segmentsWithLayout = computed(()=> {
+    const segs = this.segments();
+    let cumulative = 0; const result: {key:string; label:string; value:number; color:string; percent:number; start:number}[] = [];
+    segs.forEach((s,i)=>{
+      let raw = this.total()>0 ? (s.value/this.total())*100 : 0;
+      let pct = i===segs.length-1 ? Math.max(0, 100 - result.reduce((x,r)=>x+r.percent,0)) : raw;
+      result.push({ ...s, percent: pct, start: cumulative });
+      cumulative += pct;
+    });
+    return result;
+  });
+  segmentLabel = (k:string)=> this.segments().find(s=>s.key===k)?.label || k;
+  segmentValue = (k:string)=> this.segments().find(s=>s.key===k)?.value || 0;
+  segmentPercent = (k:string)=> this.segmentsWithLayout().find(s=>s.key===k)?.percent || 0;
+  segTrack = (_:any,s:any)=> s.key;
+
+  // Account number mock
+  private fullAccountNumber = signal(this.generateAccountNumber());
+  accountNumberShort = computed(()=> this.fullAccountNumber().slice(-5));
+  private generateAccountNumber(): string {
+    // Pseudo IBAN-like placeholder (not real IBAN validation)
+    const rand = (n:number)=> Array.from({length:n}, ()=> Math.floor(Math.random()*10)).join('');
+    return 'IT60X' + rand(10) + rand(10); // simplified
   }
 
-  // User
-  username = signal<string | null>(null);
-
-  // (Legacy) API financial types (currently unused in UI, retained for future use)
-  loading = signal(false);
-  error = signal<string | null>(null);
-  financialTypes = signal<FinancialTypeDTO[]>([]);
-
-  // Static mock data (replace with API when ready)
-  cash = signal(15000);
-  portfolioValue = signal(35000);
+  // Existing gain/loss signals reuse total()
   gainLoss = signal(1200);
   gainLossPerc = computed(() => this.gainLoss() / (this.total() - this.gainLoss()) * 100);
-  total = computed(() => this.cash() + this.portfolioValue());
-  portfolioPerc = computed(() => this.portfolioValue() / this.total() * 100);
-  cashPerc = computed(() => this.cash() / this.total() * 100);
 
-  favoriteIndexes = signal<{name: string; value: number; change: number}[]>([
-    {name: 'FTSE MIB', value: 34450.12, change: 0.52},
-    {name: 'S&P 500', value: 5834.21, change: -0.18},
-    {name: 'EUR/USD', value: 1.0842, change: 0.07}
-  ]);
+  // Favorite indexes unchanged
+  favoriteIndexes = signal([{name: 'FTSE MIB', value: 34450.12, change: 0.52},{name: 'S&P 500', value: 5834.21, change: -0.18},{name: 'EUR/USD', value: 1.0842, change: 0.07}]);
 
-  refresh() {
-    if (this.loading()) return;
-    this.loading.set(true);
-    this.error.set(null);
-    this.financialApi.getAllFinancialTypes().subscribe({
-      next: (list) => this.financialTypes.set(list ?? []),
-      error: () => this.error.set('Error loading financial types'),
-      complete: () => this.loading.set(false)
-    });
+  hovered = signal<string | null>(null);
+  donutReady = signal(false);
+
+  constructor(private readonly financialApi: FinancialService, private readonly auth: AuthService){
+    this.username.set(this.auth.username());
+    afterNextRender(()=> setTimeout(()=> this.donutReady.set(true), 20));
+  }
+
+  username = signal<string | null>(null);
+  error = signal<string | null>(null);
+
+  hover(k: string, fromLegend=false){
+    this.hovered.set(k);
+    if(fromLegend) this.computeTooltipMidpoint();
+  }
+  onSegmentMove(ev: MouseEvent){
+    if(!this.hovered()) return;
+    const rect = this.donutWrapper?.nativeElement.getBoundingClientRect();
+    if(!rect) return;
+    const x = ev.clientX - rect.left; const y = ev.clientY - rect.top;
+    this.setTooltipClamped(x,y,rect.width,rect.height);
+  }
+  clearHover(){ this.hovered.set(null); }
+
+  private readonly donutSize = 200; // px reference for midpoint calc
+  private readonly radius = 200/2 * 0.62;
+  tooltipX = signal(100); tooltipY = signal(100);
+
+  private computeTooltipMidpoint(){
+    const key = this.hovered(); if(!key) return;
+    const seg = this.segmentsWithLayout().find(s=>s.key===key); if(!seg) return;
+    const mid = seg.start + seg.percent/2; // percent
+    const angleDeg = -90 + mid*3.6;
+    const rad = angleDeg * Math.PI / 180;
+    const cx = this.donutSize/2; const cy = this.donutSize/2;
+    const x = cx + this.radius * Math.cos(rad);
+    const y = cy + this.radius * Math.sin(rad);
+    this.setTooltipClamped(x,y,this.donutSize,this.donutSize);
+  }
+
+  private setTooltipClamped(x:number,y:number,w:number,h:number){
+    const m = 10; // margin
+    const clampedX = Math.min(w - m, Math.max(m, x));
+    const clampedY = Math.min(h - m, Math.max(m, y));
+    this.tooltipX.set(clampedX); this.tooltipY.set(clampedY);
   }
 }
