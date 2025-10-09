@@ -27,17 +27,17 @@ import {AuthService} from '../../core/services/auth.service';
           <div class="field">
             <label for="username">Username <span class="req" aria-hidden="true">*</span></label>
             <input id="username" type="text" formControlName="username" autocomplete="username" required/>
-            <small class="error" *ngIf="form.controls.username.touched && form.controls.username.invalid">
-              Please enter a username.
-            </small>
+            @if (form.controls.username.touched && form.controls.username.invalid) {
+              <small class="error">Please enter a username.</small>
+            }
           </div>
 
           <div class="field">
             <label for="password">Password <span class="req" aria-hidden="true">*</span></label>
             <input id="password" type="password" formControlName="password" autocomplete="current-password" required/>
-            <small class="error" *ngIf="form.controls.password.touched && form.controls.password.invalid">
-              Please enter a password.
-            </small>
+            @if (form.controls.password.touched && form.controls.password.invalid) {
+              <small class="error">Please enter a password.</small>
+            }
           </div>
 
           <div class="form-extras">

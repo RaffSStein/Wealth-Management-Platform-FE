@@ -24,19 +24,25 @@ interface ViewStep {
         </div>
       </div>
       <ul class="steps" role="list">
-        <li *ngFor="let s of viewSteps"
+        @for (s of viewSteps; track s.index) {
+          <li
             (click)="go(s)"
             [class.completed]="s.completed"
             [class.current]="s.current"
             [class.locked]="s.locked"
             [attr.aria-current]="s.current ? 'step' : null"
             [attr.aria-disabled]="s.locked ? 'true' : null">
-          <div class="dot">
-            <span class="dot-label" *ngIf="!s.completed || s.current">{{ s.index + 1 }}</span>
-            <span class="dot-check" *ngIf="s.completed && !s.current">✓</span>
-          </div>
-          <div class="label">{{ s.label }}</div>
-        </li>
+            <div class="dot">
+              @if (!s.completed || s.current) {
+                <span class="dot-label">{{ s.index + 1 }}</span>
+              }
+              @if (s.completed && !s.current) {
+                <span class="dot-check">✓</span>
+              }
+            </div>
+            <div class="label">{{ s.label }}</div>
+          </li>
+        }
       </ul>
     </nav>
   `,
@@ -239,4 +245,4 @@ export class OnboardingNavigatorComponent {
   }
 }
 
-export {OnboardingStep};
+export {OnboardingStep} from '../../../core/services/onboarding-progress.service';

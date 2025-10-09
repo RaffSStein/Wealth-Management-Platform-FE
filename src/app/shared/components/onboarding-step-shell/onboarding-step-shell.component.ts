@@ -14,7 +14,9 @@ import {OnboardingStep} from '../../../core/services/onboarding-progress.service
           <span class="step-badge">{{ stepIndex + 1 }}</span>
           {{ title }}
         </h1>
-        <p class="muted" *ngIf="subtitle">{{ subtitle }}</p>
+        @if (subtitle) {
+          <p class="muted">{{ subtitle }}</p>
+        }
         <app-onboarding-navigator [currentStep]="stepIndex"></app-onboarding-navigator>
         <ng-content/>
       </div>
@@ -98,4 +100,3 @@ export class OnboardingStepShellComponent {
   @Input({required: true}) title!: string;
   @Input() subtitle: string | null = null;
 }
-

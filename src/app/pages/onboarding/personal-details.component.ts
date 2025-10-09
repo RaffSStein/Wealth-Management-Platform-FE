@@ -24,17 +24,23 @@ import {Subscription} from 'rxjs';
           <div class="field field--compact required">
             <label for="firstName">First name</label>
             <input id="firstName" type="text" formControlName="firstName"/>
-            <small class="error--inline" *ngIf="showError('firstName')">First name is required</small>
+            @if (showError('firstName')) {
+              <small class="error--inline">First name is required</small>
+            }
           </div>
           <div class="field field--compact required">
             <label for="lastName">Last name</label>
             <input id="lastName" type="text" formControlName="lastName"/>
-            <small class="error--inline" *ngIf="showError('lastName')">Last name is required</small>
+            @if (showError('lastName')) {
+              <small class="error--inline">Last name is required</small>
+            }
           </div>
           <div class="field field--compact required">
             <label for="dateOfBirth">Date of birth</label>
             <input id="dateOfBirth" type="date" formControlName="dateOfBirth"/>
-            <small class="error--inline" *ngIf="showError('dateOfBirth')">Date of birth is required</small>
+            @if (showError('dateOfBirth')) {
+              <small class="error--inline">Date of birth is required</small>
+            }
           </div>
           <div class="field field--compact">
             <label for="gender">Gender</label>
@@ -48,12 +54,16 @@ import {Subscription} from 'rxjs';
           <div class="field field--compact required">
             <label for="taxId">Tax ID</label>
             <input id="taxId" type="text" formControlName="taxId"/>
-            <small class="error--inline" *ngIf="showError('taxId')">Tax ID is required</small>
+            @if (showError('taxId')) {
+              <small class="error--inline">Tax ID is required</small>
+            }
           </div>
           <div class="field field--compact required">
             <label for="userId">User ID (UUID)</label>
             <input id="userId" type="text" formControlName="userId" placeholder="00000000-0000-0000-0000-000000000000"/>
-            <small class="error--inline" *ngIf="showError('userId')">Valid UUID required</small>
+            @if (showError('userId')) {
+              <small class="error--inline">Valid UUID required</small>
+            }
           </div>
           <div class="field field--compact">
             <label for="nationality">Nationality (ISO 2)</label>
@@ -98,7 +108,9 @@ import {Subscription} from 'rxjs';
             {{ loading ? 'Saving...' : (progress.isStepCompleted(step) ? 'Step completed' : 'Save & continue') }}
           </button>
         </div>
-        <p class="form-error-global" *ngIf="errorMsg">{{ errorMsg }}</p>
+        @if (errorMsg) {
+          <p class="form-error-global">{{ errorMsg }}</p>
+        }
       </form>
     </app-onboarding-step-shell>
   `,
@@ -139,10 +151,6 @@ export class PersonalDetailsComponent implements OnDestroy {
   });
 
   constructor() {
-  }
-
-  isIndividual(): boolean {
-    return true;
   }
 
   showError(controlName: string): boolean {

@@ -7,17 +7,18 @@ import {NavigationHistoryService} from '../../../core/services/navigation-histor
   standalone: true,
   imports: [CommonModule],
   template: `
-    <button type="button"
-            class="back-btn"
-            (click)="onClick()"
-            *ngIf="history.canGoBack$ | async"
-            [attr.aria-label]="ariaLabel"
-            [title]="ariaLabel">
-      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-        <path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
-      </svg>
-      <span class="text" *ngIf="showLabel">{{ label }}</span>
-    </button>
+    @if (history.canGoBack$ | async) {
+      <button type="button"
+              class="back-btn"
+              (click)="onClick()"
+              [attr.aria-label]="ariaLabel"
+              [title]="ariaLabel">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
+        </svg>
+        @if (showLabel) { <span class="text">{{ label }}</span> }
+      </button>
+    }
   `,
   styles: [`
     .back-btn {

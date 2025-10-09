@@ -1,6 +1,6 @@
 import {Component, signal, computed, ViewChild, ElementRef, afterNextRender} from '@angular/core';
 import {CommonModule} from '@angular/common';
-import {FinancialService, FinancialTypeDTO} from '../../api/customer-service';
+import {FinancialService} from '../../api/customer-service';
 import {AuthService} from '../../core/services/auth.service';
 import {RouterModule} from '@angular/router';
 
@@ -39,8 +39,8 @@ import {RouterModule} from '@angular/router';
           <div class="donut-wrapper" #donutWrapper (mouseleave)="clearHover()">
             <svg viewBox="0 0 42 42" class="donut-svg" role="img" aria-label="Asset allocation interactive donut">
               <title>Asset Allocation</title>
-              <circle class="ring" cx="21" cy="21" r="15.915" />
-              <ng-container *ngFor="let seg of segmentsWithLayout(); trackBy: segTrack">
+              <circle class="ring" cx="21" cy="21" r="15.915"/>
+              @for (seg of segmentsWithLayout(); track segTrack($index, seg)) {
                 <circle
                   class="segment"
                   [class.dimmed]="hovered() && hovered()!==seg.key"
@@ -55,26 +55,31 @@ import {RouterModule} from '@angular/router';
                   tabindex="0"
                   role="listitem"
                   [attr.aria-label]="seg.label + ' ' + (seg.percent | number:'1.0-0') + ' percent, value ' + (seg.value | number:'1.0-0') + ' euro'"
-                  />
-              </ng-container>
+                />
+              }
               <g class="center-group" aria-hidden="true">
-                <text x="21" y="19.2" text-anchor="middle" class="center-label__small">Account</text>
-                <text x="21" y="25" text-anchor="middle" class="center-label__acct">{{ accountNumberShort() }}</text>
+                <text x="21" y="18" text-anchor="middle" class="center-label__small">Account</text>
+                <text x="21" y="23.5" text-anchor="middle" class="center-label__acct">{{ accountNumberShort() }}</text>
               </g>
             </svg>
-            <div class="tooltip" *ngIf="hovered() as hk" [style.left.px]="tooltipX()" [style.top.px]="tooltipY()" role="tooltip">
-              <div class="tooltip__inner">
-                <strong>{{ segmentLabel(hk) }}</strong>
-                <div class="line">Value: {{ segmentValue(hk) | number:'1.0-0'}} €</div>
-                <div class="line">Percent: {{ segmentPercent(hk) | number:'1.0-0'}}%</div>
+            @if (hovered(); as hk) {
+              <div class="tooltip" [style.left.px]="tooltipX()" [style.top.px]="tooltipY()" role="tooltip">
+                <div class="tooltip__inner">
+                  <strong>{{ segmentLabel(hk) }}</strong>
+                  <div class="line">Value: {{ segmentValue(hk) | number:'1.0-0' }} €</div>
+                  <div class="line">Percent: {{ segmentPercent(hk) | number:'1.0-0' }}%</div>
+                </div>
               </div>
-            </div>
+            }
           </div>
           <div class="legend-boxes" (mouseleave)="clearHover()">
-            <div class="legend-box" *ngFor="let seg of segments(); trackBy: segTrack" (mouseenter)="hover(seg.key, true)" (focus)="hover(seg.key, true)" tabindex="0" [attr.aria-label]="'Show '+seg.label+' details'" [class.is-active]="hovered()===seg.key">
-              <span class="color" [style.background]="seg.color" [style.borderColor]="seg.color"></span>
-              <span class="lbl">{{ seg.label }}</span>
-            </div>
+            @for (seg of segments(); track segTrack($index, seg)) {
+              <div class="legend-box" (mouseenter)="hover(seg.key, true)" (focus)="hover(seg.key, true)" tabindex="0"
+                   [attr.aria-label]="'Show '+seg.label+' details'" [class.is-active]="hovered()===seg.key">
+                <span class="color" [style.background]="seg.color" [style.border-color]="seg.color"></span>
+                <span class="lbl">{{ seg.label }}</span>
+              </div>
+            }
           </div>
         </div>
       </section>
@@ -83,15 +88,19 @@ import {RouterModule} from '@angular/router';
       <section class="card indexes" aria-labelledby="indexes-title">
         <h2 id="indexes-title">Favorite Indexes</h2>
         <ul class="indices-list">
-          <li *ngFor="let idx of favoriteIndexes()">
-            <span class="name">{{ idx.name }}</span>
-            <span class="val" [class.positive]="idx.change >= 0" [class.negative]="idx.change < 0">
-              {{ idx.value | number:'1.2-2' }}
-              <span class="delta">{{ idx.change >= 0 ? '+' : '' }}{{ idx.change | number:'1.2-2' }}%</span>
-            </span>
-          </li>
+          @for (idx of favoriteIndexes(); track $index) {
+            <li>
+              <span class="name">{{ idx.name }}</span>
+              <span class="val" [class.positive]="idx.change >= 0" [class.negative]="idx.change < 0">
+                {{ idx.value | number:'1.2-2' }}
+                <span class="delta">{{ idx.change >= 0 ? '+' : '' }}{{ idx.change | number:'1.2-2' }}%</span>
+              </span>
+            </li>
+          }
         </ul>
-        <p *ngIf="!favoriteIndexes().length" class="muted">No indexes configured.</p>
+        @if (!favoriteIndexes().length) {
+          <p class="muted">No indexes configured.</p>
+        }
       </section>
 
       <!-- Daily News -->
@@ -208,9 +217,9 @@ import {RouterModule} from '@angular/router';
     }
 
     .segment {
-      fill:none;
-      stroke-width:10;
-      stroke-linecap:round;
+      fill: none;
+      stroke-width: 10;
+      stroke-linecap: round;
       transition: stroke-dasharray .8s ease-out, opacity .25s ease;
     }
 
@@ -226,9 +235,23 @@ import {RouterModule} from '@angular/router';
       opacity: .35;
     }
 
-    .center-group { pointer-events:none; }
-    .center-label__small { font-size:2.4px; font-weight:400; letter-spacing:.6px; text-transform:uppercase; fill:var(--color-text-muted); }
-    .center-label__acct { font-size:5px; font-weight:600; fill:var(--color-heading); }
+    .center-group {
+      pointer-events: none;
+    }
+
+    .center-label__small {
+      font-size: 2.4px;
+      font-weight: 400;
+      letter-spacing: .6px;
+      text-transform: uppercase;
+      fill: var(--color-text-muted);
+    }
+
+    .center-label__acct {
+      font-size: 5px;
+      font-weight: 600;
+      fill: var(--color-heading);
+    }
 
     /* Legend boxes */
     .legend-boxes {
@@ -319,7 +342,6 @@ import {RouterModule} from '@angular/router';
       border-left: 1px solid var(--color-border);
       border-right: 1px solid var(--color-border);
       border-bottom: 1px solid var(--color-border);
-      filter: drop-shadow(var(--shadow));
     }
   `]
 })
@@ -327,35 +349,39 @@ export class HomeComponent {
   @ViewChild('donutWrapper') donutWrapper?: ElementRef<HTMLElement>;
 
   // Segment model
-  private baseSegments = signal<ReadonlyArray<{key:string; label:string; value:number; color:string}>>([
-    {key:'portfolio', label:'Portfolio', value:35000, color:'var(--color-primary)'},
-    {key:'cash', label:'Cash', value:15000, color:'var(--color-secondary)'}
+  private readonly baseSegments = signal<ReadonlyArray<{ key: string; label: string; value: number; color: string }>>([
+    {key: 'portfolio', label: 'Portfolio', value: 35000, color: 'var(--color-primary)'},
+    {key: 'cash', label: 'Cash', value: 15000, color: 'var(--color-secondary)'}
   ]);
-  segments = computed(()=> this.baseSegments());
-  total = computed(()=> this.segments().reduce((s,a)=>s+a.value,0));
+  segments = computed(() => this.baseSegments());
+  total = computed(() => this.segments().reduce((s, a) => s + a.value, 0));
   // Percent layout (ensure sum=100 adjusting last)
-  segmentsWithLayout = computed(()=> {
+  segmentsWithLayout = computed(() => {
     const segs = this.segments();
-    let cumulative = 0; const result: {key:string; label:string; value:number; color:string; percent:number; start:number}[] = [];
-    segs.forEach((s,i)=>{
-      let raw = this.total()>0 ? (s.value/this.total())*100 : 0;
-      let pct = i===segs.length-1 ? Math.max(0, 100 - result.reduce((x,r)=>x+r.percent,0)) : raw;
-      result.push({ ...s, percent: pct, start: cumulative });
+    let cumulative = 0;
+    const result: { key: string; label: string; value: number; color: string; percent: number; start: number }[] = [];
+    let i = 0;
+    for (const s of segs) {
+      const raw = this.total() > 0 ? (s.value / this.total()) * 100 : 0;
+      const pct = i === segs.length - 1 ? Math.max(0, 100 - result.reduce((x, r) => x + r.percent, 0)) : raw;
+      result.push({...s, percent: pct, start: cumulative});
       cumulative += pct;
-    });
+      i++;
+    }
     return result;
   });
-  segmentLabel = (k:string)=> this.segments().find(s=>s.key===k)?.label || k;
-  segmentValue = (k:string)=> this.segments().find(s=>s.key===k)?.value || 0;
-  segmentPercent = (k:string)=> this.segmentsWithLayout().find(s=>s.key===k)?.percent || 0;
-  segTrack = (_:any,s:any)=> s.key;
+  segmentLabel = (k: string) => this.segments().find(s => s.key === k)?.label || k;
+  segmentValue = (k: string) => this.segments().find(s => s.key === k)?.value || 0;
+  segmentPercent = (k: string) => this.segmentsWithLayout().find(s => s.key === k)?.percent || 0;
+  segTrack = (_: any, s: any) => s.key;
 
   // Account number mock
-  private fullAccountNumber = signal(this.generateAccountNumber());
-  accountNumberShort = computed(()=> this.fullAccountNumber().slice(-5));
+  private readonly fullAccountNumber = signal(this.generateAccountNumber());
+  accountNumberShort = computed(() => this.fullAccountNumber().slice(-5));
+
   private generateAccountNumber(): string {
     // Pseudo IBAN-like placeholder (not real IBAN validation)
-    const rand = (n:number)=> Array.from({length:n}, ()=> Math.floor(Math.random()*10)).join('');
+    const rand = (n: number) => Array.from({length: n}, () => Math.floor(Math.random() * 10)).join('');
     return 'IT60X' + rand(10) + rand(10); // simplified
   }
 
@@ -364,52 +390,78 @@ export class HomeComponent {
   gainLossPerc = computed(() => this.gainLoss() / (this.total() - this.gainLoss()) * 100);
 
   // Favorite indexes unchanged
-  favoriteIndexes = signal([{name: 'FTSE MIB', value: 34450.12, change: 0.52},{name: 'S&P 500', value: 5834.21, change: -0.18},{name: 'EUR/USD', value: 1.0842, change: 0.07}]);
+  favoriteIndexes = signal([
+    {
+      name: 'FTSE MIB',
+      value: 34450.12,
+      change: 0.52
+    },
+    {
+      name: 'S&P 500',
+      value: 5834.21,
+      change: -0.18
+    },
+    {
+      name: 'EUR/USD',
+      value: 1.0842,
+      change: 0.07
+    }
+  ]);
 
   hovered = signal<string | null>(null);
   donutReady = signal(false);
 
-  constructor(private readonly financialApi: FinancialService, private readonly auth: AuthService){
+  constructor(private readonly financialApi: FinancialService, private readonly auth: AuthService) {
     this.username.set(this.auth.username());
-    afterNextRender(()=> setTimeout(()=> this.donutReady.set(true), 20));
+    afterNextRender(() => setTimeout(() => this.donutReady.set(true), 20));
   }
 
   username = signal<string | null>(null);
   error = signal<string | null>(null);
 
-  hover(k: string, fromLegend=false){
+  hover(k: string, fromLegend = false) {
     this.hovered.set(k);
-    if(fromLegend) this.computeTooltipMidpoint();
+    if (fromLegend) this.computeTooltipMidpoint();
   }
-  onSegmentMove(ev: MouseEvent){
-    if(!this.hovered()) return;
+
+  onSegmentMove(ev: MouseEvent) {
+    if (!this.hovered()) return;
     const rect = this.donutWrapper?.nativeElement.getBoundingClientRect();
-    if(!rect) return;
-    const x = ev.clientX - rect.left; const y = ev.clientY - rect.top;
-    this.setTooltipClamped(x,y,rect.width,rect.height);
+    if (!rect) return;
+    const x = ev.clientX - rect.left;
+    const y = ev.clientY - rect.top;
+    this.setTooltipClamped(x, y, rect.width, rect.height);
   }
-  clearHover(){ this.hovered.set(null); }
+
+  clearHover() {
+    this.hovered.set(null);
+  }
 
   private readonly donutSize = 200; // px reference for midpoint calc
-  private readonly radius = 200/2 * 0.62;
-  tooltipX = signal(100); tooltipY = signal(100);
+  private readonly radius = 200 / 2 * 0.62;
+  tooltipX = signal(100);
+  tooltipY = signal(100);
 
-  private computeTooltipMidpoint(){
-    const key = this.hovered(); if(!key) return;
-    const seg = this.segmentsWithLayout().find(s=>s.key===key); if(!seg) return;
-    const mid = seg.start + seg.percent/2; // percent
-    const angleDeg = -90 + mid*3.6;
+  private computeTooltipMidpoint() {
+    const key = this.hovered();
+    if (!key) return;
+    const seg = this.segmentsWithLayout().find(s => s.key === key);
+    if (!seg) return;
+    const mid = seg.start + seg.percent / 2; // percent
+    const angleDeg = -90 + mid * 3.6;
     const rad = angleDeg * Math.PI / 180;
-    const cx = this.donutSize/2; const cy = this.donutSize/2;
+    const cx = this.donutSize / 2;
+    const cy = this.donutSize / 2;
     const x = cx + this.radius * Math.cos(rad);
     const y = cy + this.radius * Math.sin(rad);
-    this.setTooltipClamped(x,y,this.donutSize,this.donutSize);
+    this.setTooltipClamped(x, y, this.donutSize, this.donutSize);
   }
 
-  private setTooltipClamped(x:number,y:number,w:number,h:number){
+  private setTooltipClamped(x: number, y: number, w: number, h: number) {
     const m = 10; // margin
     const clampedX = Math.min(w - m, Math.max(m, x));
     const clampedY = Math.min(h - m, Math.max(m, y));
-    this.tooltipX.set(clampedX); this.tooltipY.set(clampedY);
+    this.tooltipX.set(clampedX);
+    this.tooltipY.set(clampedY);
   }
 }

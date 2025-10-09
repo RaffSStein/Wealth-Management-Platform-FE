@@ -37,46 +37,33 @@ type SectionKey = 'account' | 'investments' | 'news-markets';
         <div class="spacer"></div>
       </header>
       <aside class="sidebar" aria-label="Section navigation">
-        <nav class="side-nav" *ngIf="currentSidebar().length; else emptySidebar">
-          <a *ngFor="let item of currentSidebar()" [routerLink]="item.path" routerLinkActive="active"
-             [routerLinkActiveOptions]="{exact: item.exact !== false}" (click)="onNavClick(item)">
-            <span class="material-symbols-outlined icon" aria-hidden="true">{{ item.icon }}</span>
-            <span class="label">{{ item.label }}</span>
-          </a>
-          <button type="button" class="logout-item" (click)="logout()">
-            <span class="material-symbols-outlined icon" aria-hidden="true">logout</span>
-            <span class="label">Logout</span>
-          </button>
-        </nav>
-        <ng-template #emptySidebar>
+        @if (currentSidebar().length) {
+          <nav class="side-nav">
+            @for (item of currentSidebar(); track item.path) {
+              <a [routerLink]="item.path" routerLinkActive="active"
+                 [routerLinkActiveOptions]="{exact: item.exact !== false}" (click)="onNavClick(item)">
+                <span class="material-symbols-outlined icon" aria-hidden="true">{{ item.icon }}</span>
+                <span class="label">{{ item.label }}</span>
+              </a>
+            }
+            <button type="button" class="logout-item" (click)="logout()">
+              <span class="material-symbols-outlined icon" aria-hidden="true">logout</span>
+              <span class="label">Logout</span>
+            </button>
+          </nav>
+        } @else {
           <div class="empty">No navigation</div>
-        </ng-template>
+        }
       </aside>
       <main class="content" role="main">
         <router-outlet/>
       </main>
     </div>
   `,
-  styles: [`
-    :host {
-      display: contents;
-    }
+  styles: [
+    `:host { display: contents; }
 
-    .material-symbols-outlined {
-      font-family: 'Material Symbols Outlined';
-      font-weight: normal;
-      font-style: normal;
-      font-size: 20px;
-      line-height: 1;
-      letter-spacing: normal;
-      text-transform: none;
-      display: inline-block;
-      white-space: nowrap;
-      word-wrap: normal;
-      direction: ltr;
-      -webkit-font-feature-settings: 'liga';
-      -webkit-font-smoothing: antialiased;
-    }
+    .material-symbols-outlined { font-family: 'Material Symbols Outlined', sans-serif; font-weight: normal; font-style: normal; font-size: 20px; line-height: 1; letter-spacing: normal; text-transform: none; display: inline-block; white-space: nowrap; word-wrap: normal; direction: ltr; -webkit-font-feature-settings: 'liga'; -webkit-font-smoothing: antialiased; }
 
     .app-shell {
       --header-h: 56px;
@@ -235,13 +222,13 @@ type SectionKey = 'account' | 'investments' | 'news-markets';
         z-index: 60;
       }
     }
-  `]
+    `]
 })
 export class AppShellComponent {
   private readonly currentUrl = signal<string>('');
   topSection = signal<SectionKey>('account');
 
-  constructor(private readonly router: Router, private auth: AuthService) {
+  constructor(private readonly router: Router, private readonly auth: AuthService) {
     // Initialize and react to route changes
     effect(() => {
       const url = this.router.url;
@@ -302,12 +289,15 @@ export class AppShellComponent {
     this.topSection.set(section);
   }
 
-  onNavClick(_item: SideNavItem) { /* future analytics hook */
+  onNavClick(item: SideNavItem) {
+    if (item.path) {
+      // deliberate: routerLink handles navigation; method can be expanded for analytics
+    }
   }
 
   private deriveTopSection(url: string): SectionKey {
-    if (url.includes('/app/investments')) return 'investments';
-    if (url.includes('/app/news-markets')) return 'news-markets';
+    if (url.startsWith('/app/investments')) return 'investments';
+    if (url.startsWith('/app/news-markets')) return 'news-markets';
     return 'account';
   }
 }
