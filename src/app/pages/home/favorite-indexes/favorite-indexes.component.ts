@@ -115,7 +115,7 @@ export interface FavoriteIndex {
       grid-template-columns: repeat(4, 1fr);
       align-items: stretch;
       gap: .8rem;
-      margin: 20px 20px .25rem;
+      margin: 20px 20px 20px;
     }
 
     .idx-wrap {
