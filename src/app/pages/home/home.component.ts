@@ -1,8 +1,8 @@
 import {Component, signal, computed, ViewChild, ElementRef, afterNextRender} from '@angular/core';
 import {CommonModule} from '@angular/common';
-import {FinancialService} from '../../api/customer-service';
 import {AuthService} from '../../core/services/auth.service';
 import {RouterModule} from '@angular/router';
+import {FavoriteIndexesComponent} from '../../shared/components/favorite-indexes/favorite-indexes.component';
 
 /**
  * Home (Dashboard) Component
@@ -15,7 +15,7 @@ import {RouterModule} from '@angular/router';
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, FavoriteIndexesComponent],
   template: `
     <div class="dashboard-grid">
       <section class="card assets-overview" aria-labelledby="assets-title">
@@ -85,23 +85,7 @@ import {RouterModule} from '@angular/router';
       </section>
 
       <!-- Favorite Indexes -->
-      <section class="card indexes" aria-labelledby="indexes-title">
-        <h2 id="indexes-title">Favorite Indexes</h2>
-        <ul class="indices-list">
-          @for (idx of favoriteIndexes(); track $index) {
-            <li>
-              <span class="name">{{ idx.name }}</span>
-              <span class="val" [class.positive]="idx.change >= 0" [class.negative]="idx.change < 0">
-                {{ idx.value | number:'1.2-2' }}
-                <span class="delta">{{ idx.change >= 0 ? '+' : '' }}{{ idx.change | number:'1.2-2' }}%</span>
-              </span>
-            </li>
-          }
-        </ul>
-        @if (!favoriteIndexes().length) {
-          <p class="muted">No indexes configured.</p>
-        }
-      </section>
+      <app-favorite-indexes [indexes]="favoriteIndexes()" />
 
       <!-- Daily News -->
       <section class="card news" aria-labelledby="news-title">
@@ -391,27 +375,19 @@ export class HomeComponent {
 
   // Favorite indexes unchanged
   favoriteIndexes = signal([
-    {
-      name: 'FTSE MIB',
-      value: 34450.12,
-      change: 0.52
-    },
-    {
-      name: 'S&P 500',
-      value: 5834.21,
-      change: -0.18
-    },
-    {
-      name: 'EUR/USD',
-      value: 1.0842,
-      change: 0.07
-    }
+    { name: 'FTSE MIB', value: 34450.12, change: 0.52 },
+    { name: 'S&P 500', value: 5834.21, change: -0.18 },
+    { name: 'EUR/USD', value: 1.0842, change: 0.07 },
+    { name: 'NASDAQ 100', value: 18520.45, change: 0.36 },
+    { name: 'DAX', value: 18240.11, change: -0.22 },
+    { name: 'NIKKEI 225', value: 39210.88, change: 0.15 },
+    { name: 'BTC/USD', value: 64250.73, change: 1.25 }
   ]);
 
   hovered = signal<string | null>(null);
   donutReady = signal(false);
 
-  constructor(private readonly financialApi: FinancialService, private readonly auth: AuthService) {
+  constructor(private readonly auth: AuthService) {
     this.username.set(this.auth.username());
     afterNextRender(() => setTimeout(() => this.donutReady.set(true), 20));
   }
