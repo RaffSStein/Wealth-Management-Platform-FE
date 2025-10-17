@@ -3,6 +3,7 @@ import {CommonModule} from '@angular/common';
 import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
 import {Router, RouterLink} from '@angular/router';
 import {AuthService} from '../../core/services/auth.service';
+import {UserSessionService} from '../../core/services/user-session.service';
 
 @Component({
   selector: 'app-login',
@@ -60,6 +61,20 @@ import {AuthService} from '../../core/services/auth.service';
         <p class="signup-hint">Not a customer yet? <a routerLink="/onboarding/start">Start building your portfolio
           now</a></p>
       </div>
+
+      <!-- Error modal shown when /me fails -->
+      @if (errorOpen()) {
+        <div class="modal-backdrop" role="presentation"></div>
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="login-error-title">
+          <div class="modal__content">
+            <h2 id="login-error-title">Login error</h2>
+            <p>An error occurred while retrieving your user information. Please go back to login and try again.</p>
+            <div class="modal__actions">
+              <button type="button" class="primary" (click)="goBackToLogin()">Back to login</button>
+            </div>
+          </div>
+        </div>
+      }
     </section>
   `,
   styles: [`
@@ -197,14 +212,48 @@ import {AuthService} from '../../core/services/auth.service';
       color: var(--color-primary-contrast);
       border-style: solid;
     }
+
+    /* Lightweight modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .3);
+      z-index: 50;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      z-index: 60;
+    }
+
+    .modal__content {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1rem 1.25rem;
+      max-width: 420px;
+    }
+
+    .modal__actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: .5rem;
+      margin-top: .75rem;
+    }
   `]
 })
 export class LoginComponent {
   private readonly fb = inject(FormBuilder);
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
+  private readonly userSession = inject(UserSessionService);
 
   loading = signal(false);
+  errorOpen = signal(false);
 
   greeting = computed(() => {
     const u = this.auth.username();
@@ -218,19 +267,29 @@ export class LoginComponent {
     rememberMe: this.fb.control(true)
   });
 
-  onSubmit() {
+  async onSubmit() {
     if (this.form.invalid || this.loading()) return;
     this.loading.set(true);
     const username = this.form.controls.username.value?.trim() || '';
     const remember = !!this.form.controls.rememberMe.value;
+
+    // Persist username preference
     if (remember) {
       this.auth.setUsername(username);
     } else {
       this.auth.clear();
     }
-    void this.router.navigateByUrl('/home').catch(() => {
-    });
-    this.loading.set(false);
+
+    try {
+      // Fetch and cache current user profile for the session
+      await this.userSession.ensureLoaded(true);
+      await this.router.navigateByUrl('/app/home');
+    } catch (err) {
+      // Show error modal with a way back to login
+      this.errorOpen.set(true);
+    } finally {
+      this.loading.set(false);
+    }
   }
 
   onSocial(provider: 'google' | 'apple') {
@@ -238,11 +297,22 @@ export class LoginComponent {
     console.log('Social login not yet implemented:', provider);
   }
 
-  devEnterApp() {
+  async devEnterApp() {
     if (!this.auth.username()) {
       this.auth.setUsername('demo');
     }
-    void this.router.navigateByUrl('/app/home').catch(() => {
+    try {
+      await this.userSession.ensureLoaded(true);
+      await this.router.navigateByUrl('/app/home');
+    } catch {
+      this.errorOpen.set(true);
+    }
+  }
+
+  goBackToLogin() {
+    // Close modal and ensure we are on the login route
+    this.errorOpen.set(false);
+    void this.router.navigateByUrl('/auth/sign-in').catch(() => {
     });
   }
 }
