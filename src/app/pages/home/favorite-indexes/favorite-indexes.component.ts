@@ -124,6 +124,7 @@ export interface FavoriteIndex {
 
     .idx-box {
       width: 100%;
+      height: 100%;
       border: 1px solid var(--color-border);
       border-radius: 10px;
       background: var(--color-surface);
