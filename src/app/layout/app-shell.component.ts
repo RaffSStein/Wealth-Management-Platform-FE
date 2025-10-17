@@ -2,6 +2,7 @@ import {Component, signal, computed, effect} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import {Router, RouterModule, NavigationEnd} from '@angular/router';
 import {AuthService} from '../core/services/auth.service';
+import {NotificationBellComponent} from '../shared/components/notification-bell/notification-bell.component';
 
 interface SideNavItem {
   label: string;
@@ -20,7 +21,7 @@ type SectionKey = 'account' | 'investments' | 'news-markets';
 @Component({
   standalone: true,
   selector: 'app-shell',
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, NotificationBellComponent],
   template: `
     <div class="app-shell">
       <!-- Top Header -->
@@ -35,6 +36,7 @@ type SectionKey = 'account' | 'investments' | 'news-markets';
             Markets</a>
         </nav>
         <div class="spacer"></div>
+        <app-notification-bell/>
       </header>
       <aside class="sidebar" aria-label="Section navigation">
         @if (currentSidebar().length) {
@@ -61,9 +63,25 @@ type SectionKey = 'account' | 'investments' | 'news-markets';
     </div>
   `,
   styles: [
-    `:host { display: contents; }
+    `:host {
+      display: contents;
+    }
 
-    .material-symbols-outlined { font-family: 'Material Symbols Outlined', sans-serif; font-weight: normal; font-style: normal; font-size: 20px; line-height: 1; letter-spacing: normal; text-transform: none; display: inline-block; white-space: nowrap; word-wrap: normal; direction: ltr; -webkit-font-feature-settings: 'liga'; -webkit-font-smoothing: antialiased; }
+    .material-symbols-outlined {
+      font-family: 'Material Symbols Outlined', sans-serif;
+      font-weight: normal;
+      font-style: normal;
+      font-size: 20px;
+      line-height: 1;
+      letter-spacing: normal;
+      text-transform: none;
+      display: inline-block;
+      white-space: nowrap;
+      word-wrap: normal;
+      direction: ltr;
+      -webkit-font-feature-settings: 'liga';
+      -webkit-font-smoothing: antialiased;
+    }
 
     .app-shell {
       --header-h: 56px;
