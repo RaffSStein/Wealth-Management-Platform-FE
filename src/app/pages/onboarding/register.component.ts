@@ -9,8 +9,8 @@ import {
   ValidationErrors,
   FormGroup
 } from '@angular/forms';
-import {UserService, UserDTO, UserBranchRoleDTO} from '../../api/user-service';
-import {AuthService} from '../../core/services/auth.service';
+import {AuthService as CoreAuthService} from '../../core/services/auth.service';
+import {AuthService as ApiAuthService, RegisterRequestDTO, BranchRoleDTO} from '../../api/user-service';
 import {BankService, BankBranchDto, PageBankBranchDto} from '../../api/bank-service';
 import {debounceTime} from 'rxjs';
 import {finalize} from 'rxjs/operators';
@@ -18,7 +18,7 @@ import {
   PasswordStrengthFieldComponent
 } from '../../shared/components/password-strength-field/password-strength-field.component';
 import {MultiStepProgressComponent} from '../../shared/components/multi-step-progress/multi-step-progress.component';
-import {RegistrationStateService} from '../../core/services/registration-state.service';
+import {UserSessionService} from '../../core/services/user-session.service';
 
 // Validator for matching passwords
 function matchPassword(group: AbstractControl): ValidationErrors | null {
@@ -334,10 +334,10 @@ function passwordComplexity(control: AbstractControl): ValidationErrors | null {
 export class OnboardingStartComponent {
   private readonly fb = inject(FormBuilder);
   private readonly router = inject(Router);
-  private readonly userService = inject(UserService);
-  private readonly auth = inject(AuthService);
+  private readonly auth = inject(CoreAuthService);
+  private readonly apiAuth = inject(ApiAuthService);
   private readonly bankService = inject(BankService);
-  private readonly registrationState = inject(RegistrationStateService);
+  private readonly userSession = inject(UserSessionService);
 
   // State
   currentStep = signal(0);
@@ -523,7 +523,6 @@ export class OnboardingStartComponent {
     this.error.set(null);
     this.stepSubmitted.set(true);
 
-    // Se non siamo all'ultimo step, proviamo ad avanzare
     if (this.currentStep() < this.finalStep) {
       if (!this.validateCurrentStep()) return;
       this.currentStep.set(this.currentStep() + 1);
@@ -531,9 +530,7 @@ export class OnboardingStartComponent {
       return;
     }
 
-    // Ultimo step: validazione totale
     if (!this.validateCurrentStep()) return;
-
     if (this.form.invalid || !this.selectedBranch()) return;
 
     const acc = this.form.value.account as any;
@@ -543,48 +540,53 @@ export class OnboardingStartComponent {
     const firstName = acc.firstName?.trim() || '';
     const lastName = acc.lastName?.trim() || '';
     const email = acc.email?.trim() || '';
-    const gender = acc.gender || '';
-    const birthDate = acc.birthDate || '';
 
     const phoneNumber = prof.phoneNumber?.trim() || '';
-    const country = prof.country?.trim() || '';
-    const city = prof.city?.trim() || '';
-    const address = prof.address?.trim() || '';
 
+    const password = access.passwords?.password || '';
     const role = access.role || 'customer';
     const branch = this.selectedBranch();
     if (!branch) return;
 
+    // Mappatura ruolo verso API
     const mappedRole = role === 'advisor' ? 'ADVISOR' : 'CUSTOMER';
-    const userBranchRoles: UserBranchRoleDTO[] = [{bankCode: branch.bankCode, role: mappedRole}];
 
-    const payload: UserDTO = {
+    // BranchRoles per la richiesta di registrazione
+    const branchRoles: BranchRoleDTO[] = [{ bankCode: branch.bankCode, bankId: branch.bankCode, role: mappedRole } as any];
+
+    const payload: RegisterRequestDTO = {
+      email,
       firstName,
       lastName,
-      email,
-      gender,
-      birthDate,
       phoneNumber,
-      country,
-      city,
-      address,
-      userBranchRoles
-    };
+      password,
+      branchRoles
+    } as any;
 
     this.loading.set(true);
-    this.userService.createUser(payload).subscribe({
-      next: () => {
-        this.auth.setUsername(email);
-        this.registrationState.setEmail(email);
-        void this.router.navigate(['auth/registration-success']).catch(() => {
-        });
+
+    // 1) Chiamata /auth/register -> AuthResponseDTO (token)
+    this.apiAuth.registerUser(payload).subscribe({
+      next: async (resp) => {
+        try {
+          if (resp?.token) this.auth.setToken(resp.token);
+          this.auth.setUsername(email);
+          // carica profilo
+          await this.userSession.ensureLoaded(true);
+          await this.router.navigate(['app/home']);
+        } catch (e) {
+          console.error('Post-registration flow failed', e);
+          this.error.set('Registration completed but profile loading failed. Please login.');
+          await this.router.navigate(['auth/sign-in']);
+        } finally {
+          this.loading.set(false);
+        }
       },
       error: (err) => {
         console.error(err);
         this.error.set('Sign up failed. Please try again later.');
         this.loading.set(false);
-      },
-      complete: () => this.loading.set(false)
+      }
     });
   }
 }

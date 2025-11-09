@@ -2,8 +2,10 @@ import {Component, inject, signal, computed} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
 import {Router, RouterLink} from '@angular/router';
-import {AuthService} from '../../core/services/auth.service';
+import {AuthService as CoreAuthService} from '../../core/services/auth.service';
+import {AuthService as ApiAuthService, LoginCredentialsDTO} from '../../api/user-service';
 import {UserSessionService} from '../../core/services/user-session.service';
+import { firstValueFrom } from 'rxjs';
 
 @Component({
   selector: 'app-login',
@@ -38,6 +40,14 @@ import {UserSessionService} from '../../core/services/user-session.service';
             <input id="password" type="password" formControlName="password" autocomplete="current-password" required/>
             @if (form.controls.password.touched && form.controls.password.invalid) {
               <small class="error">Please enter a password.</small>
+            }
+          </div>
+
+          <div class="field">
+            <label for="bankCode">Bank Code <span class="req" aria-hidden="true">*</span></label>
+            <input id="bankCode" type="text" formControlName="bankCode" autocomplete="off" required/>
+            @if (form.controls.bankCode.touched && form.controls.bankCode.invalid) {
+              <small class="error">Please enter a bank code.</small>
             }
           </div>
 
@@ -249,7 +259,8 @@ import {UserSessionService} from '../../core/services/user-session.service';
 export class LoginComponent {
   private readonly fb = inject(FormBuilder);
   private readonly router = inject(Router);
-  private readonly auth = inject(AuthService);
+  private readonly auth = inject(CoreAuthService);
+  private readonly apiAuth = inject(ApiAuthService);
   private readonly userSession = inject(UserSessionService);
 
   loading = signal(false);
@@ -264,28 +275,27 @@ export class LoginComponent {
   form = this.fb.group({
     username: this.fb.control('', {validators: [Validators.required]}),
     password: this.fb.control('', {validators: [Validators.required]}),
-    rememberMe: this.fb.control(true)
+    rememberMe: this.fb.control(true),
+    bankCode: this.fb.control('', {validators: [Validators.required]})
   });
 
   async onSubmit() {
     if (this.form.invalid || this.loading()) return;
     this.loading.set(true);
     const username = this.form.controls.username.value?.trim() || '';
+    const password = this.form.controls.password.value?.trim() || '';
+    const bankCode = this.form.controls.bankCode.value?.trim() || '';
     const remember = !!this.form.controls.rememberMe.value;
 
-    // Persist username preference
-    if (remember) {
-      this.auth.setUsername(username);
-    } else {
-      this.auth.clear();
-    }
+    if (remember) this.auth.setUsername(username); else this.auth.setUsername('');
 
     try {
-      // Fetch and cache current user profile for the session
+      const credentials: LoginCredentialsDTO = { email: username, password, bankCode };
+      const authResp = await firstValueFrom(this.apiAuth.loginUser(credentials));
+      if (authResp?.token) this.auth.setToken(authResp.token);
       await this.userSession.ensureLoaded(true);
       await this.router.navigateByUrl('/app/home');
-    } catch (err) {
-      // Show error modal with a way back to login
+    } catch {
       this.errorOpen.set(true);
     } finally {
       this.loading.set(false);

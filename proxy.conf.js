@@ -20,9 +20,9 @@
 
 /** @type {import('http-proxy-middleware').Options | Record<string, import('http-proxy-middleware').Options>} */
 
-// Helper per aggiungere logging verboso agli handler del proxy
-function withLogging(target) {
+function makeProxy(context, target) {
   return {
+    context: [context],
     target,
     changeOrigin: true,
     secure: false,
@@ -50,20 +50,10 @@ function withLogging(target) {
   };
 }
 
-module.exports = {
-
-  // User service BE Application
-  '/user-service': withLogging('http://localhost:8083'),
-
-  // Order service BE Application
-  '/order-service': withLogging('http://localhost:8082'),
-
-  // Document service BE Application
-  '/document-service': withLogging('http://localhost:8091'),
-
-  // Customer service BE Application
-  '/customer-service': withLogging('http://localhost:8090'),
-
-  // Bank service BE Application
-  '/bank-service': withLogging('http://localhost:8089')
-};
+module.exports = [
+  makeProxy('/user-service', 'http://localhost:8083'),
+  makeProxy('/order-service', 'http://localhost:8082'),
+  makeProxy('/document-service', 'http://localhost:8091'),
+  makeProxy('/customer-service', 'http://localhost:8090'),
+  makeProxy('/bank-service', 'http://localhost:8089')
+];

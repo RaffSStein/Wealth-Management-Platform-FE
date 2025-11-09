@@ -4,8 +4,53 @@ info:
   version: 1.0.0
   description: API for managing user information.
 
-
 paths:
+
+  /auth/register:
+    post:
+      summary: Self-signup registration (public)
+      operationId: registerUser
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequestDTO'
+      responses:
+        '200':
+          description: Registration succeeded; returns JWT auth response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponseDTO'
+        '400':
+          description: Invalid input
+        '409':
+          description: Email already registered
+
+  /auth/login:
+    post:
+      summary: User login (public)
+      operationId: loginUser
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginCredentialsDTO'
+      responses:
+        '200':
+          description: Login succeeded; returns JWT auth response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponseDTO'
+        '401':
+          description: Invalid credentials
 
   /me:
     get:
@@ -13,6 +58,8 @@ paths:
       operationId: getCurrentUser
       tags:
         - User
+      security:
+        - bearerAuth: []
       responses:
         '200':
           description: Current user data
@@ -29,6 +76,8 @@ paths:
       operationId: getUserById
       tags:
         - User
+      security:
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
@@ -50,6 +99,8 @@ paths:
       operationId: updateUserById
       tags:
         - User
+      security:
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
@@ -77,10 +128,13 @@ paths:
 
   /user:
     post:
-      summary: Create a new user
+      summary: Create a new user (administrative)
+      description: Administrative creation; requires appropriate role (e.g. ROLE_ADMIN).
       operationId: createUser
       tags:
         - User
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -96,6 +150,8 @@ paths:
                 $ref: '#/components/schemas/UserDTO'
         '400':
           description: Invalid input
+        '403':
+          description: Forbidden
 
   /user/{id}/disable:
     post:
@@ -103,6 +159,8 @@ paths:
       operationId: disableUser
       tags:
         - User
+      security:
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
@@ -115,6 +173,8 @@ paths:
           description: User disabled
         '404':
           description: User not found
+        '403':
+          description: Forbidden
 
   /user/{id}/enable:
     post:
@@ -122,6 +182,8 @@ paths:
       operationId: enableUser
       tags:
         - User
+      security:
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
@@ -134,6 +196,8 @@ paths:
           description: User enabled
         '404':
           description: User not found
+        '403':
+          description: Forbidden
 
 components:
   securitySchemes:
@@ -143,14 +207,70 @@ components:
       bearerFormat: JWT
 
   schemas:
-    LoginRequest:
+    LoginCredentialsDTO:
       type: object
       required:
-        - token
+        - email
+        - password
+        - bankCode
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        bankCode:
+          type: string
+
+    RegisterRequestDTO:
+      type: object
+      required:
+        - email
+        - firstName
+        - lastName
+        - phoneNumber
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        firstName:
+          type: string
+        lastName:
+          type: string
+        phoneNumber:
+          type: string
+        password:
+          type: string
+        branchRoles:
+          type: array
+          items:
+            $ref: '#/components/schemas/BranchRoleDTO'
+
+    BranchRoleDTO:
+      type: object
+      required:
+        - bankCode
+        - bankId
+        - role
+      properties:
+        bankCode:
+          type: string
+        bankId:
+          type: string
+        role:
+          type: string
+
+    AuthResponseDTO:
+      type: object
       properties:
         token:
           type: string
-          description: JWT token issued by external Identity Provider
+        tokenType:
+          type: string
+        expiresIn:
+          type: integer
+          format: int64
 
     UserDTO:
       type: object
