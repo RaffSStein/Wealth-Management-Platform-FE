@@ -19,12 +19,8 @@ paths:
             schema:
               $ref: '#/components/schemas/RegisterRequestDTO'
       responses:
-        '200':
-          description: Registration succeeded; returns JWT auth response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuthResponseDTO'
+        '201':
+          description: User created
         '400':
           description: Invalid input
         '409':
@@ -229,7 +225,6 @@ components:
         - firstName
         - lastName
         - phoneNumber
-        - password
       properties:
         email:
           type: string
@@ -239,8 +234,6 @@ components:
         lastName:
           type: string
         phoneNumber:
-          type: string
-        password:
           type: string
         branchRoles:
           type: array
