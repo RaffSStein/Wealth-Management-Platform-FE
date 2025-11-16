@@ -5,6 +5,7 @@ import {Router, RouterLink} from '@angular/router';
 import {AuthService as CoreAuthService} from '../../core/services/auth.service';
 import {AuthService as ApiAuthService, LoginCredentialsDTO} from '../../api/user-service';
 import {UserSessionService} from '../../core/services/user-session.service';
+import {ToastService} from '../../shared/services/toast.service';
 import { firstValueFrom } from 'rxjs';
 
 @Component({
@@ -262,6 +263,7 @@ export class LoginComponent {
   private readonly auth = inject(CoreAuthService);
   private readonly apiAuth = inject(ApiAuthService);
   private readonly userSession = inject(UserSessionService);
+  private readonly toast = inject(ToastService);
 
   loading = signal(false);
   errorOpen = signal(false);
@@ -278,6 +280,18 @@ export class LoginComponent {
     rememberMe: this.fb.control(true),
     bankCode: this.fb.control('', {validators: [Validators.required]})
   });
+
+  constructor() {
+    const nav = this.router.currentNavigation();
+    const state = (nav?.extras?.state ?? {}) as { registrationSucceeded?: boolean; registeredEmail?: string };
+    if (state.registrationSucceeded) {
+      const email = state.registeredEmail ?? '';
+      const msg = email
+        ? `Registration successful for ${email}. Please check your inbox to complete the activation.`
+        : 'Registration successful. Please check your email inbox to complete the activation.';
+      this.toast.success(msg, 6000);
+    }
+  }
 
   async onSubmit() {
     if (this.form.invalid || this.loading()) return;
