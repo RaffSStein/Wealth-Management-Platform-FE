@@ -14,6 +14,8 @@ export const routes: Routes = [
     path: 'auth/registration-success',
     loadComponent: () => import('./pages/auth/registration-success.component').then(m => m.RegistrationSuccessComponent)
   },
+  // NEW: set password via one-time link
+  { path: 'auth/set-password', loadComponent: () => import('./pages/auth/set-password.component').then(m => m.SetPasswordComponent) },
   // Registration route redirects to sign-in for now
   {path: 'auth/sign-up', redirectTo: 'auth/sign-in', pathMatch: 'full'},
   // legacy login route redirects to new auth path
