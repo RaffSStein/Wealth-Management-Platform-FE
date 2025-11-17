@@ -13,7 +13,7 @@ These guidelines help Copilot generate suggestions consistent with this project.
 
 ## Language policy (important)
 - Always write code, identifiers (class/function/variable names), comments, and inline developer-facing documentation in English, regardless of the user prompt language.
-- End-user UI copy/messages should follow product requirements; if unspecified, default to Italian. However, keep code and comments strictly in English.
+- End-user UI copy/messages should follow product requirements; if unspecified, default to English. However, keep code and comments strictly in English.
 
 ## Project conventions
 - Prefer standalone components with local `imports`; avoid NgModules.
