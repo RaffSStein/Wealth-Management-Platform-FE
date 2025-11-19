@@ -30,6 +30,7 @@ These guidelines help Copilot generate suggestions consistent with this project.
 - Code style:
   - Keep imports minimal and ordered; avoid dead code and leftover TODOs.
   - Avoid large-scale reformatting; follow the existing style.
+  - Maintain the code formatting when it comes to css files and code blocks.
 
 ## OpenAPI client integration
 - Import from service barrels: `import { AuthService as ApiAuthService } from 'src/app/api/user-service';`.
