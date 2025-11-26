@@ -1,6 +1,7 @@
 import { HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { AuthService } from '../services/auth.service';
+import { ONE_TIME_AUTH_TOKEN } from './auth.context';
 
 // BE paths on the back of the proxy
 const PROXY_BASE_PATHS = [
@@ -35,6 +36,13 @@ function isBackendUrl(url: string): boolean {
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   if (!isBackendUrl(req.url)) {
     return next(req);
+  }
+
+  // If a one-time token is provided via HttpContext, prefer it
+  const oneTimeToken = req.context.get(ONE_TIME_AUTH_TOKEN);
+  if (typeof oneTimeToken === 'string' && oneTimeToken.trim() !== '') {
+    const withOneTimeAuth = req.clone({ setHeaders: { Authorization: `Bearer ${oneTimeToken}` } });
+    return next(withOneTimeAuth);
   }
 
   const auth = inject(AuthService);

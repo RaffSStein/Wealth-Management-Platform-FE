@@ -56,6 +56,11 @@ export const routes: Routes = [
     canActivate: [onboardingStepGuard],
     data: {step: 4}
   },
+  {
+    path: 'onboarding/setup-password',
+    loadComponent: () =>
+      import('./pages/onboarding/setup-password.page').then(m => m.SetupPasswordPage),
+  },
 
   // Authenticated application shell
   {

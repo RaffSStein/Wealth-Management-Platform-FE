@@ -195,6 +195,43 @@ paths:
         '403':
           description: Forbidden
 
+
+  /auth/password/setup:
+    post:
+      summary: Initial password setup after registration (public)
+      operationId: setupPassword
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetupPasswordDTO'
+      responses:
+        '200':
+          description: Password set successfully
+        '400':
+          description: Invalid token or password rules violation
+
+  /auth/password/reset:
+    post:
+      summary: Request password reset (public)
+      operationId: requestPasswordReset
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetRequestDTO'
+      responses:
+        '200':
+          description: Password reset email sent if account exists
+        '400':
+          description: Invalid input
+
 components:
   securitySchemes:
     bearerAuth:
@@ -253,6 +290,42 @@ components:
           type: string
         role:
           type: string
+
+
+    SetupPasswordDTO:
+      type: object
+      required:
+        - password
+        - token
+      properties:
+        password:
+          type: string
+          description: "New password (apply server-side validation rules)"
+        token:
+          type: string
+          description: "Token to authenticate the password setup request"
+
+    PasswordResetRequestDTO:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+
+    PasswordResetConfirmDTO:
+      type: object
+      required:
+        - token
+        - password
+      properties:
+        token:
+          type: string
+          description: "Password reset token sent to user's email"
+        password:
+          type: string
+          description: "New password (apply server-side validation rules)"
 
     AuthResponseDTO:
       type: object
