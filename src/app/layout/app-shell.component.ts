@@ -298,8 +298,8 @@ export class AppShellComponent {
     }
   });
 
-  logout() {
-    this.auth.clear();
+  async logout() {
+    await this.auth.logout();
     this.router.navigate(['/auth/sign-in']);
   }
 

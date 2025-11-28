@@ -1,4 +1,6 @@
 import { Injectable, signal } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 
 /**
  * AuthService minimale per gestire l'username dell'utente.
@@ -12,6 +14,8 @@ export class AuthService {
 
   username = signal<string | null>(this.readFromStorage());
   token = signal<string | null>(this.readToken());
+
+  constructor(private readonly http: HttpClient) {}
 
   setUsername(value: string) {
     const v = (value ?? '').trim();
@@ -52,6 +56,15 @@ export class AuthService {
     try {
       localStorage.removeItem(AuthService.STORAGE_KEY);
     } catch {}
+  }
+
+  async logout(): Promise<void> {
+    try {
+      await firstValueFrom(this.http.post('/user-service/auth/logout', {}));
+    } catch {
+      // ignore server errors on logout; proceed to clear client state
+    }
+    this.clear();
   }
 
   private readFromStorage(): string | null {
