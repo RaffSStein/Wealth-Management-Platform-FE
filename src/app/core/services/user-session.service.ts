@@ -52,6 +52,25 @@ export class UserSessionService {
     this.setProfile(null);
   }
 
+  /**
+   * Returns true if the loaded profile contains a non-empty accountId property.
+   * We avoid changing the generated UserDTO interface; backend may add this field later.
+   */
+  hasAccount(): boolean {
+    const p = this._profile();
+    if (!p) return false;
+    const accountId = (p as any).accountId;
+    return typeof accountId === 'string' && accountId.trim().length > 0;
+  }
+
+  /** Convenience accessor for accountId (may be undefined until backend field exists). */
+  getAccountId(): string | undefined {
+    const p = this._profile();
+    if (!p) return undefined;
+    const accountId = (p as any).accountId;
+    return typeof accountId === 'string' ? accountId : undefined;
+  }
+
   private readFromSession(): UserDTO | null {
     try {
       const raw = sessionStorage.getItem(UserSessionService.STORAGE_KEY);
@@ -62,4 +81,3 @@ export class UserSessionService {
     }
   }
 }
-

@@ -308,7 +308,12 @@ export class LoginComponent {
       const authResp = await firstValueFrom(this.apiAuth.loginUser(credentials));
       if (authResp?.token) this.auth.setToken(authResp.token);
       await this.userSession.ensureLoaded(true);
-      await this.router.navigateByUrl('/app/home');
+      // Post-login branching: if user profile lacks accountId we start onboarding instead of entering home.
+      const target = this.userSession.hasAccount() ? '/app/home' : '/onboarding/personal-details';
+      if (target.startsWith('/onboarding')) {
+        this.toast.info('Please complete your onboarding to access the platform.');
+      }
+      await this.router.navigateByUrl(target);
     } catch {
       this.errorOpen.set(true);
     } finally {
@@ -327,7 +332,11 @@ export class LoginComponent {
     }
     try {
       await this.userSession.ensureLoaded(true);
-      await this.router.navigateByUrl('/app/home');
+      const target = this.userSession.hasAccount() ? '/app/home' : '/onboarding/personal-details';
+      if (target.startsWith('/onboarding')) {
+        this.toast.info('Please complete your onboarding to access the platform.');
+      }
+      await this.router.navigateByUrl(target);
     } catch {
       this.errorOpen.set(true);
     }

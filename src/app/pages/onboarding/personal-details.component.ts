@@ -8,6 +8,12 @@ import {Router} from '@angular/router';
 import {FormBuilder, ReactiveFormsModule, Validators, AbstractControl} from '@angular/forms';
 import {CustomerService} from '../../api/customer-service';
 import {Subscription} from 'rxjs';
+import {AuthService} from '../../core/services/auth.service';
+import {UserSessionService} from '../../core/services/user-session.service';
+import {ToastService} from '../../shared/services/toast.service';
+import {OnboardingFormStateService} from '../../core/services/onboarding-form-state.service';
+import {OnboardingService} from '../../api/customer-service';
+import {firstValueFrom} from 'rxjs';
 
 @Component({
   selector: 'app-onboarding-personal-details',
@@ -19,6 +25,9 @@ import {Subscription} from 'rxjs';
       title="Personal Details"
       subtitle="Fill in the required personal information to continue."
     >
+      <div class="step-actions">
+        <button type="button" class="secondary" (click)="onLogout()" aria-label="Logout from onboarding">Logout</button>
+      </div>
       <form class="wm-form" [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
         <div class="form-grid form-grid--max2">
           <div class="field field--compact required">
@@ -56,13 +65,6 @@ import {Subscription} from 'rxjs';
             <input id="taxId" type="text" formControlName="taxId"/>
             @if (showError('taxId')) {
               <small class="error--inline">Tax ID is required</small>
-            }
-          </div>
-          <div class="field field--compact required">
-            <label for="userId">User ID (UUID)</label>
-            <input id="userId" type="text" formControlName="userId" placeholder="00000000-0000-0000-0000-000000000000"/>
-            @if (showError('userId')) {
-              <small class="error--inline">Valid UUID required</small>
             }
           </div>
           <div class="field field--compact">
@@ -118,7 +120,24 @@ import {Subscription} from 'rxjs';
     `:host ::ng-deep .field.required > label::after {
       content: ' *';
       color: var(--color-danger);
-    }`
+    }
+
+    .step-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: .5rem;
+    }
+
+    .step-actions .secondary {
+      background: var(--color-surface-alt);
+      color: var(--color-text);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      padding: .35rem .6rem;
+      font-size: .8rem;
+      cursor: pointer;
+    }
+    `
   ]
 })
 export class PersonalDetailsComponent implements OnDestroy {
@@ -127,6 +146,10 @@ export class PersonalDetailsComponent implements OnDestroy {
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
   private readonly customerApi = inject(CustomerService);
+  private readonly auth = inject(AuthService);
+  private readonly userSession = inject(UserSessionService);
+  private readonly toast = inject(ToastService);
+  private readonly formState = inject(OnboardingFormStateService);
 
   loading = false;
   errorMsg: string | null = null;
@@ -135,7 +158,6 @@ export class PersonalDetailsComponent implements OnDestroy {
   uuidPattern = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/;
 
   form = this.fb.group({
-    userId: this.fb.control<string>('', {validators: [Validators.required, (c: AbstractControl) => this.uuidPattern.test(c.value || '') ? null : {uuid: true}]}),
     taxId: this.fb.control<string>('', {validators: [Validators.required]}),
     firstName: this.fb.control<string>('', {validators: [Validators.required]}),
     lastName: this.fb.control<string>('', {validators: [Validators.required]}),
@@ -151,6 +173,38 @@ export class PersonalDetailsComponent implements OnDestroy {
   });
 
   constructor() {
+    // Ensure the step is not marked as completed when entering this page as onboarding entry.
+    // This prevents the submit button from showing 'Step completed' prematurely.
+    this.progress.clearPersonalDetailsSubmission();
+    // Restore saved form state for this step (if any)
+    const saved = this.formState.load('personal-details');
+    if (saved) {
+      this.form.patchValue(saved);
+    }
+    // Persist form changes during navigation within the session
+    this.form.valueChanges.subscribe(v => this.formState.save('personal-details', v));
+
+    // Refresh /me and active onboarding handled by guard once per session
+    this.redirectToActiveOnboardingIfAny().catch(() => {});
+  }
+
+  private async redirectToActiveOnboardingIfAny() {
+    const customerId = this.userSession.getAccountId?.() || (this.userSession as any).getAccountId?.();
+    if (!customerId) return;
+    const onboardingApi = inject(OnboardingService);
+    try {
+      const active = await firstValueFrom(onboardingApi.getActiveOnboarding(customerId));
+      const steps = active?.steps || [];
+      const firstIncomplete = steps.find(s => (s.status || '').toUpperCase() !== 'COMPLETED');
+      if (firstIncomplete && typeof firstIncomplete.step === 'number') {
+        const path = this.progress.pathFor(firstIncomplete.step as OnboardingStep);
+        if (path !== '/onboarding/personal-details') {
+          await this.router.navigateByUrl(path);
+        }
+      }
+    } catch {
+      // ignore errors, stay on current step
+    }
   }
 
   showError(controlName: string): boolean {
@@ -166,18 +220,32 @@ export class PersonalDetailsComponent implements OnDestroy {
   }
 
   onSubmit() {
-    if (this.progress.isStepCompleted(this.step)) return;
+    if (this.progress.isStepCompleted(this.step)) {
+      // If already submitted and form unchanged, skip re-init
+      const current = this.form.getRawValue();
+      if (!this.formState.isDirty('personal-details', current)) {
+        const next = this.step + 1;
+        const nextPath = this.progress.pathFor(next as OnboardingStep);
+        this.router.navigateByUrl(nextPath).catch(() => {});
+        return;
+      }
+    }
     this.errorMsg = null;
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return;
     }
     const raw = this.form.getRawValue();
+    const userId = this.userSession.profile()?.id; // take id from /me profile
+    if (!userId) {
+      this.errorMsg = 'User profile not loaded. Please try logging in again.';
+      return;
+    }
     const dto: any = {
       customerType: 'INDIVIDUAL',
       taxId: raw.taxId,
       customerStatus: 'DRAFT',
-      userId: raw.userId,
+      userId,
       firstName: raw.firstName,
       lastName: raw.lastName,
       dateOfBirth: raw.dateOfBirth,
@@ -195,6 +263,8 @@ export class PersonalDetailsComponent implements OnDestroy {
       next: () => {
         this.loading = false;
         this.progress.markPersonalDetailsSubmitted();
+        // Save submitted snapshot for dirty-check
+        this.formState.saveSubmitted('personal-details', this.form.getRawValue());
         const next = this.step + 1;
         const nextPath = this.progress.pathFor(next as OnboardingStep);
         this.router.navigateByUrl(nextPath).catch(() => {
@@ -207,7 +277,21 @@ export class PersonalDetailsComponent implements OnDestroy {
     });
   }
 
+  async onLogout() {
+    try {
+      await this.auth.logout();
+    } finally {
+      // Clear client-side session and onboarding progress, then redirect to sign-in
+      this.userSession.clear();
+      this.progress.reset();
+      this.toast.info('You have been logged out.');
+      this.router.navigateByUrl('/auth/sign-in').catch(() => {});
+    }
+  }
+
   ngOnDestroy() {
+    // Persist latest state on destroy (defensive)
+    this.formState.save('personal-details', this.form.getRawValue());
     this.sub?.unsubscribe();
   }
 }

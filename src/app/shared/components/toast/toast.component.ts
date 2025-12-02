@@ -13,7 +13,8 @@ import {ToastService} from '../../services/toast.service';
              [class.toast--success]="t.variant === 'success'"
              [class.toast--error]="t.variant === 'error'"
              [class.toast--info]="t.variant === 'info'"
-             [class.toast--warning]="t.variant === 'warning'">
+             [class.toast--warning]="t.variant === 'warning'"
+             [class.toast--closing]="t.closing === true">
           <button type="button" class="toast__close" (click)="close(t.id)">
             ×
           </button>
@@ -34,13 +35,15 @@ import {ToastService} from '../../services/toast.service';
       align-items: flex-end;
       justify-content: flex-end;
       padding: 1.5rem;
+      /* Stack toasts vertically with spacing */
+      flex-direction: column;
+      gap: 0.5rem;
     }
 
     .toast {
       position: relative;
       min-width: 260px;
       max-width: 360px;
-      margin-top: .5rem;
       padding: .75rem 1rem;
       border-radius: .5rem;
       background: rgba(15, 23, 42, 0.9);
@@ -49,6 +52,12 @@ import {ToastService} from '../../services/toast.service';
       font-size: .875rem;
       pointer-events: auto;
       overflow: hidden;
+      transition: opacity .3s ease, transform .3s ease;
+    }
+
+    .toast--closing {
+      opacity: 0;
+      transform: translateY(6px);
     }
 
     .toast__content {

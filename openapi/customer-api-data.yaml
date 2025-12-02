@@ -286,7 +286,7 @@ paths:
         - Mifid
 
   # Onboarding APIs
-  /customer/{customerId}/onboarding/getActiveOnboarding:
+  /customer/{customerId}/onboarding/active:
     get:
       summary: Get the active onboarding instance for a customer
       description: Returns the current active onboarding instance for the provided customer.
@@ -308,7 +308,7 @@ paths:
       tags:
         - Onboarding
 
-  /customer/{customerId}/onboarding/{onboardingId}:
+  /customer/{customerId}/onboarding/get/{onboardingId}:
     get:
       summary: Get a specific onboarding instance by ID
       description: Returns the onboarding instance by ID for the provided customer.
