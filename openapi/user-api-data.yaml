@@ -259,15 +259,13 @@ components:
       required:
         - email
         - password
-        - bankCode
       properties:
         email:
           type: string
           format: email
         password:
           type: string
-        bankCode:
-          type: string
+
 
     RegisterRequestDTO:
       type: object

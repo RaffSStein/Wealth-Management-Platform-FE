@@ -21,45 +21,49 @@ export const routes: Routes = [
   // legacy login route redirects to new auth path
   {path: 'login', redirectTo: 'auth/sign-in', pathMatch: 'full'},
 
-  // Onboarding flow
+  // Onboarding flow (wrapped with AppShell to reuse sidebar/header)
   {
-    path: 'onboarding/start',
-    loadComponent: () => import('./pages/onboarding/register.component').then(m => m.OnboardingStartComponent)
-  },
-  {
-    path: 'onboarding/personal-details',
-    loadComponent: () => import('./pages/onboarding/personal-details.component').then(m => m.PersonalDetailsComponent),
-    canActivate: [onboardingStepGuard],
-    data: {step: 0}
-  },
-  {
-    path: 'onboarding/financial-information',
-    loadComponent: () => import('./pages/onboarding/financial-information.component').then(m => m.FinancialInformationComponent),
-    canActivate: [onboardingStepGuard],
-    data: {step: 1}
-  },
-  {
-    path: 'onboarding/investment-goals',
-    loadComponent: () => import('./pages/onboarding/investment-goals.component').then(m => m.InvestmentGoalsComponent),
-    canActivate: [onboardingStepGuard],
-    data: {step: 2}
-  },
-  {
-    path: 'onboarding/mifid-questionnaire',
-    loadComponent: () => import('./pages/onboarding/mifid-questionnaire.component').then(m => m.MifidQuestionnaireComponent),
-    canActivate: [onboardingStepGuard],
-    data: {step: 3}
-  },
-  {
-    path: 'onboarding/risk-assessment',
-    loadComponent: () => import('./pages/onboarding/risk-assessment.component').then(m => m.RiskAssessmentComponent),
-    canActivate: [onboardingStepGuard],
-    data: {step: 4}
-  },
-  {
-    path: 'onboarding/setup-password',
-    loadComponent: () =>
-      import('./pages/onboarding/setup-password.page').then(m => m.SetupPasswordPage),
+    path: 'onboarding',
+    loadComponent: () => import('./layout/app-shell.component').then(m => m.AppShellComponent),
+    children: [
+      { path: 'start', loadComponent: () => import('./pages/onboarding/register.component').then(m => m.OnboardingStartComponent) },
+      {
+        path: 'personal-details',
+        loadComponent: () => import('./pages/onboarding/personal-details.component').then(m => m.PersonalDetailsComponent),
+        canActivate: [onboardingStepGuard],
+        data: {step: 0}
+      },
+      {
+        path: 'financial-information',
+        loadComponent: () => import('./pages/onboarding/financial-information.component').then(m => m.FinancialInformationComponent),
+        canActivate: [onboardingStepGuard],
+        data: {step: 1}
+      },
+      {
+        path: 'investment-goals',
+        loadComponent: () => import('./pages/onboarding/investment-goals.component').then(m => m.InvestmentGoalsComponent),
+        canActivate: [onboardingStepGuard],
+        data: {step: 2}
+      },
+      {
+        path: 'mifid-questionnaire',
+        loadComponent: () => import('./pages/onboarding/mifid-questionnaire.component').then(m => m.MifidQuestionnaireComponent),
+        canActivate: [onboardingStepGuard],
+        data: {step: 3}
+      },
+      {
+        path: 'risk-assessment',
+        loadComponent: () => import('./pages/onboarding/risk-assessment.component').then(m => m.RiskAssessmentComponent),
+        canActivate: [onboardingStepGuard],
+        data: {step: 4}
+      },
+      {
+        path: 'setup-password',
+        loadComponent: () => import('./pages/onboarding/setup-password.page').then(m => m.SetupPasswordPage)
+      },
+      { path: 'disambiguation', loadComponent: () => import('./pages/onboarding/disambiguation.component').then(m => m.CustomerDisambiguationComponent) },
+      { path: '', pathMatch: 'full', redirectTo: 'personal-details' }
+    ]
   },
 
   // Authenticated application shell

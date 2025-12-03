@@ -44,14 +44,6 @@ import { firstValueFrom } from 'rxjs';
             }
           </div>
 
-          <div class="field">
-            <label for="bankCode">Bank Code <span class="req" aria-hidden="true">*</span></label>
-            <input id="bankCode" type="text" formControlName="bankCode" autocomplete="off" required/>
-            @if (form.controls.bankCode.touched && form.controls.bankCode.invalid) {
-              <small class="error">Please enter a bank code.</small>
-            }
-          </div>
-
           <div class="form-extras">
             <label class="remember">
               <input type="checkbox" formControlName="rememberMe"/>
@@ -277,8 +269,7 @@ export class LoginComponent {
   form = this.fb.group({
     username: this.fb.control('', {validators: [Validators.required]}),
     password: this.fb.control('', {validators: [Validators.required]}),
-    rememberMe: this.fb.control(true),
-    bankCode: this.fb.control('', {validators: [Validators.required]})
+    rememberMe: this.fb.control(true)
   });
 
   constructor() {
@@ -298,22 +289,22 @@ export class LoginComponent {
     this.loading.set(true);
     const username = this.form.controls.username.value?.trim() || '';
     const password = this.form.controls.password.value?.trim() || '';
-    const bankCode = this.form.controls.bankCode.value?.trim() || '';
     const remember = !!this.form.controls.rememberMe.value;
 
     if (remember) this.auth.setUsername(username); else this.auth.setUsername('');
 
     try {
-      const credentials: LoginCredentialsDTO = { email: username, password, bankCode };
+      const credentials: LoginCredentialsDTO = { email: username, password } as any;
       const authResp = await firstValueFrom(this.apiAuth.loginUser(credentials));
       if (authResp?.token) this.auth.setToken(authResp.token);
-      await this.userSession.ensureLoaded(true);
-      // Post-login branching: if user profile lacks accountId we start onboarding instead of entering home.
-      const target = this.userSession.hasAccount() ? '/app/home' : '/onboarding/personal-details';
-      if (target.startsWith('/onboarding')) {
-        this.toast.info('Please complete your onboarding to access the platform.');
+      const me = await this.userSession.ensureLoaded(true);
+      const userId = (me?.id ?? '').toString();
+      if (!userId) {
+        this.errorOpen.set(true);
+        return;
       }
-      await this.router.navigateByUrl(target);
+      // Load customer disambiguation list and navigate to selection page
+      await this.router.navigateByUrl('/onboarding/disambiguation');
     } catch {
       this.errorOpen.set(true);
     } finally {
@@ -323,7 +314,7 @@ export class LoginComponent {
 
   onSocial(provider: 'google' | 'apple') {
     // Placeholder: future implementation with an SSO provider
-    console.log('Social login not yet implemented:', provider);
+    this.toast.info(`Social login with ${provider} is not yet available.`);
   }
 
   async devEnterApp() {
@@ -331,21 +322,20 @@ export class LoginComponent {
       this.auth.setUsername('demo');
     }
     try {
-      await this.userSession.ensureLoaded(true);
-      const target = this.userSession.hasAccount() ? '/app/home' : '/onboarding/personal-details';
-      if (target.startsWith('/onboarding')) {
-        this.toast.info('Please complete your onboarding to access the platform.');
+      const me = await this.userSession.ensureLoaded(true);
+      const userId = (me?.id ?? '').toString();
+      if (!userId) {
+        this.errorOpen.set(true);
+        return;
       }
-      await this.router.navigateByUrl(target);
+      await this.router.navigateByUrl('/onboarding/disambiguation');
     } catch {
       this.errorOpen.set(true);
     }
   }
 
   goBackToLogin() {
-    // Close modal and ensure we are on the login route
     this.errorOpen.set(false);
-    void this.router.navigateByUrl('/auth/sign-in').catch(() => {
-    });
+    void this.router.navigateByUrl('/auth/sign-in').catch(() => {});
   }
 }

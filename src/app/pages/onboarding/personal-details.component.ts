@@ -5,7 +5,7 @@ import {
   OnboardingStepShellComponent
 } from '../../shared/components/onboarding-step-shell/onboarding-step-shell.component';
 import {Router} from '@angular/router';
-import {FormBuilder, ReactiveFormsModule, Validators, AbstractControl} from '@angular/forms';
+import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
 import {CustomerService} from '../../api/customer-service';
 import {Subscription} from 'rxjs';
 import {AuthService} from '../../core/services/auth.service';
@@ -25,9 +25,6 @@ import {firstValueFrom} from 'rxjs';
       title="Personal Details"
       subtitle="Fill in the required personal information to continue."
     >
-      <div class="step-actions">
-        <button type="button" class="secondary" (click)="onLogout()" aria-label="Logout from onboarding">Logout</button>
-      </div>
       <form class="wm-form" [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
         <div class="form-grid form-grid--max2">
           <div class="field field--compact required">
@@ -106,8 +103,8 @@ import {firstValueFrom} from 'rxjs';
         </div>
 
         <div class="form-actions">
-          <button class="primary" type="submit" [disabled]="loading || form.invalid || progress.isStepCompleted(step)">
-            {{ loading ? 'Saving...' : (progress.isStepCompleted(step) ? 'Step completed' : 'Save & continue') }}
+          <button class="primary" type="submit" [disabled]="loading || form.invalid">
+            {{ loading ? 'Saving...' : 'Save & continue' }}
           </button>
         </div>
         @if (errorMsg) {
@@ -155,8 +152,6 @@ export class PersonalDetailsComponent implements OnDestroy {
   errorMsg: string | null = null;
   private readonly sub?: Subscription;
 
-  uuidPattern = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/;
-
   form = this.fb.group({
     taxId: this.fb.control<string>('', {validators: [Validators.required]}),
     firstName: this.fb.control<string>('', {validators: [Validators.required]}),
@@ -173,18 +168,13 @@ export class PersonalDetailsComponent implements OnDestroy {
   });
 
   constructor() {
-    // Ensure the step is not marked as completed when entering this page as onboarding entry.
-    // This prevents the submit button from showing 'Step completed' prematurely.
-    this.progress.clearPersonalDetailsSubmission();
     // Restore saved form state for this step (if any)
     const saved = this.formState.load('personal-details');
     if (saved) {
       this.form.patchValue(saved);
     }
-    // Persist form changes during navigation within the session
     this.form.valueChanges.subscribe(v => this.formState.save('personal-details', v));
 
-    // Refresh /me and active onboarding handled by guard once per session
     this.redirectToActiveOnboardingIfAny().catch(() => {});
   }
 
@@ -217,6 +207,21 @@ export class PersonalDetailsComponent implements OnDestroy {
     const v = (input.value || '').toUpperCase();
     input.value = v;
     this.form.get(control)?.setValue(v, {emitEvent: false});
+  }
+
+  // Lightweight navigation without enforcing submit
+  onPrev() {
+    const prev = this.step - 1;
+    if (prev >= OnboardingStep.PersonalDetails) {
+      const path = this.progress.pathFor(prev as OnboardingStep);
+      this.router.navigateByUrl(path).catch(() => {});
+    }
+  }
+
+  onNext() {
+    const next = this.step + 1;
+    const path = this.progress.pathFor(next as OnboardingStep);
+    this.router.navigateByUrl(path).catch(() => {});
   }
 
   onSubmit() {

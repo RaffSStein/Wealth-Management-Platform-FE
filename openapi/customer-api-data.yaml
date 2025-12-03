@@ -54,6 +54,32 @@ paths:
       tags:
         - Customer
 
+  /customer/disambiguation/{userId}:
+    get:
+      summary: Get a list of customers for this userId
+      description: Returns the customer list associated with the specified userId.
+      operationId: getCustomersByUserId
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Customers found
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CustomerDTO'
+        '404':
+          description: Customer not found
+      tags:
+        - Customer
+
   # Financial and Goal Types
   /financial/types:
     get:

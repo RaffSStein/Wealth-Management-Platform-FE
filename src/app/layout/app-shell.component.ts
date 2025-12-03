@@ -27,34 +27,45 @@ type SectionKey = 'account' | 'investments' | 'news-markets';
       <!-- Top Header -->
       <header class="topbar" role="banner">
         <div class="brand" routerLink="/app/home" aria-label="Go to Account Home">Wealth<span>Portal</span></div>
-        <nav class="primary-nav" aria-label="Primary navigation">
-          <a routerLink="/app/home" (click)="setTopSection('account')" routerLinkActive="active"
-             [routerLinkActiveOptions]="{exact:true}">Account</a>
-          <a routerLink="/app/investments" (click)="setTopSection('investments')"
-             routerLinkActive="active">Investments</a>
-          <a routerLink="/app/news-markets" (click)="setTopSection('news-markets')" routerLinkActive="active">News /
-            Markets</a>
-        </nav>
+        @if (!isOnboarding()) {
+          <nav class="primary-nav" aria-label="Primary navigation">
+            <a routerLink="/app/home" (click)="setTopSection('account')" routerLinkActive="active"
+               [routerLinkActiveOptions]="{exact:true}">Account</a>
+            <a routerLink="/app/investments" (click)="setTopSection('investments')"
+               routerLinkActive="active">Investments</a>
+            <a routerLink="/app/news-markets" (click)="setTopSection('news-markets')" routerLinkActive="active">News /
+              Markets</a>
+          </nav>
+        }
         <div class="spacer"></div>
         <app-notification-bell/>
       </header>
       <aside class="sidebar" aria-label="Section navigation">
-        @if (currentSidebar().length) {
-          <nav class="side-nav">
-            @for (item of currentSidebar(); track item.path) {
-              <a [routerLink]="item.path" routerLinkActive="active"
-                 [routerLinkActiveOptions]="{exact: item.exact !== false}" (click)="onNavClick(item)">
-                <span class="material-symbols-outlined icon" aria-hidden="true">{{ item.icon }}</span>
-                <span class="label">{{ item.label }}</span>
-              </a>
-            }
+        @if (isOnboarding()) {
+          <div class="side-nav">
             <button type="button" class="logout-item" (click)="logout()">
               <span class="material-symbols-outlined icon" aria-hidden="true">logout</span>
               <span class="label">Logout</span>
             </button>
-          </nav>
+          </div>
         } @else {
-          <div class="empty">No navigation</div>
+          @if (currentSidebar().length) {
+            <nav class="side-nav">
+              @for (item of currentSidebar(); track item.path) {
+                <a [routerLink]="item.path" routerLinkActive="active"
+                   [routerLinkActiveOptions]="{exact: item.exact !== false}" (click)="onNavClick(item)">
+                  <span class="material-symbols-outlined icon" aria-hidden="true">{{ item.icon }}</span>
+                  <span class="label">{{ item.label }}</span>
+                </a>
+              }
+              <button type="button" class="logout-item" (click)="logout()">
+                <span class="material-symbols-outlined icon" aria-hidden="true">logout</span>
+                <span class="label">Logout</span>
+              </button>
+            </nav>
+          } @else {
+            <div class="empty">No navigation</div>
+          }
         }
       </aside>
       <main class="content" role="main">
@@ -245,6 +256,7 @@ type SectionKey = 'account' | 'investments' | 'news-markets';
 export class AppShellComponent {
   private readonly currentUrl = signal<string>('');
   topSection = signal<SectionKey>('account');
+  isOnboarding = computed(() => this.currentUrl().startsWith('/onboarding'));
 
   constructor(private readonly router: Router, private readonly auth: AuthService) {
     // Initialize and react to route changes

@@ -239,9 +239,14 @@ export class OnboardingNavigatorComponent {
   }
 
   go(s: ViewStep) {
+    // Allow backward navigation regardless of completion/lock
+    if (s.index < this.currentStep) {
+      if (s.path) this.router.navigateByUrl(s.path).catch(() => {});
+      return;
+    }
+    // Forward navigation respects locking rules
     if (s.locked) return;
-    if (s.path) this.router.navigateByUrl(s.path).catch(() => {
-    });
+    if (s.path) this.router.navigateByUrl(s.path).catch(() => {});
   }
 }
 

@@ -1,12 +1,15 @@
-import {Component, Input} from '@angular/core';
+import {Component, Input, inject} from '@angular/core';
 import {CommonModule} from '@angular/common';
+import {RouterModule} from '@angular/router';
 import {OnboardingNavigatorComponent} from '../onboarding-navigator/onboarding-navigator.component';
 import {OnboardingStep} from '../../../core/services/onboarding-progress.service';
+import {AuthService} from '../../../core/services/auth.service';
+import {Router} from '@angular/router';
 
 @Component({
   selector: 'app-onboarding-step-shell',
   standalone: true,
-  imports: [CommonModule, OnboardingNavigatorComponent],
+  imports: [CommonModule, RouterModule, OnboardingNavigatorComponent],
   template: `
     <section class="onb-shell">
       <div class="panel">
@@ -22,8 +25,8 @@ import {OnboardingStep} from '../../../core/services/onboarding-progress.service
       </div>
     </section>
   `,
-  styles: [`
-    .onb-shell {
+  styles: [
+    `.onb-shell {
       min-height: 100dvh;
       padding: 2rem;
       background: var(--color-bg);
@@ -92,11 +95,19 @@ import {OnboardingStep} from '../../../core/services/onboarding-progress.service
     ::ng-deep .primary[disabled] {
       opacity: .6;
       cursor: default;
-    }
-  `]
+    }`
+  ]
 })
 export class OnboardingStepShellComponent {
   @Input({required: true}) stepIndex!: OnboardingStep;
   @Input({required: true}) title!: string;
   @Input() subtitle: string | null = null;
+
+  private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
+
+  async logout() {
+    await this.auth.logout();
+    await this.router.navigateByUrl('/auth/sign-in');
+  }
 }
