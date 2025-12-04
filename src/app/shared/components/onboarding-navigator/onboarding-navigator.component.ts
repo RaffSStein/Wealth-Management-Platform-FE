@@ -231,11 +231,16 @@ export class OnboardingNavigatorComponent {
     const steps = this.viewSteps;
     const total = steps.length - 1;
     if (total <= 0) return 0;
-    // Consider only completed steps (exclude current if not completed) so the bar mostra l'ultimo step effettivamente completato.
-    const completed = steps.filter(s => s.completed).map(s => s.index);
-    if (!completed.length) return 0;
-    const last = Math.max(...completed);
-    return Math.min(100, Math.max(0, (last / total) * 100));
+
+    const completedIndexes = steps.filter(s => s.completed).map(s => s.index);
+    const lastCompleted = completedIndexes.length ? Math.max(...completedIndexes) : 0;
+
+    // Move the arrow up to the furthest between last completed step and current step,
+    // so that when the user is working on a later step the arrow tracks their position.
+    const currentIndex = steps.find(s => s.current)?.index ?? lastCompleted;
+    const logicalLast = Math.max(lastCompleted, currentIndex);
+
+    return Math.min(100, Math.max(0, (logicalLast / total) * 100));
   }
 
   go(s: ViewStep) {

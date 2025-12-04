@@ -7,13 +7,13 @@ import {
 import {Router} from '@angular/router';
 import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
 import {CustomerService} from '../../api/customer-service';
-import {Subscription} from 'rxjs';
+import {Subscription, firstValueFrom} from 'rxjs';
 import {AuthService} from '../../core/services/auth.service';
 import {UserSessionService} from '../../core/services/user-session.service';
 import {ToastService} from '../../shared/services/toast.service';
 import {OnboardingFormStateService} from '../../core/services/onboarding-form-state.service';
 import {OnboardingService} from '../../api/customer-service';
-import {firstValueFrom} from 'rxjs';
+import {CustomerSessionService} from '../../core/services/customer-session.service';
 
 @Component({
   selector: 'app-onboarding-personal-details',
@@ -23,7 +23,7 @@ import {firstValueFrom} from 'rxjs';
     <app-onboarding-step-shell
       [stepIndex]="step"
       title="Personal Details"
-      subtitle="Fill in the required personal information to continue."
+      subtitle="Please provide your basic information to continue with the onboarding process."
     >
       <form class="wm-form" [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
         <div class="form-grid form-grid--max2">
@@ -147,6 +147,7 @@ export class PersonalDetailsComponent implements OnDestroy {
   private readonly userSession = inject(UserSessionService);
   private readonly toast = inject(ToastService);
   private readonly formState = inject(OnboardingFormStateService);
+  private readonly customerSession = inject(CustomerSessionService);
 
   loading = false;
   errorMsg: string | null = null;
@@ -179,7 +180,8 @@ export class PersonalDetailsComponent implements OnDestroy {
   }
 
   private async redirectToActiveOnboardingIfAny() {
-    const customerId = this.userSession.getAccountId?.() || (this.userSession as any).getAccountId?.();
+    const customer = this.customerSession.customer();
+    const customerId = customer?.id;
     if (!customerId) return;
     const onboardingApi = inject(OnboardingService);
     try {
