@@ -16,8 +16,18 @@ import {firstValueFrom} from 'rxjs';
   template: `
     <section class="onb-shell onb-shell--disamb">
       <div class="panel">
-        <h1 class="title">Customer selection</h1>
-        <p class="muted">Select which customer you want to operate as.</p>
+        <div class="panel-head">
+          <div>
+            <h1 class="title">Customer selection</h1>
+            <p class="muted">Select which customer you want to operate as.</p>
+          </div>
+          <div class="panel-head__actions">
+            <button type="button" class="primary" (click)="startNewCustomerOnboarding()" [disabled]="startingNewCustomer || loading">
+              {{ startingNewCustomer ? 'Starting…' : 'Create new customer' }}
+            </button>
+          </div>
+        </div>
+
         @if (loading) {
           <p class="placeholder">Loading customer profiles…</p>
         }
@@ -72,6 +82,25 @@ import {firstValueFrom} from 'rxjs';
     `
       .onb-shell.onb-shell--disamb {
         margin: 1rem;
+      }
+
+      .panel-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1rem;
+      }
+
+      .panel-head__actions {
+        display: flex;
+        justify-content: flex-end;
+        flex: 0 0 auto;
+      }
+
+      .panel-head__actions button[disabled] {
+        opacity: .6;
+        cursor: not-allowed;
       }
 
       .disamb-list {
@@ -202,6 +231,7 @@ export class CustomerDisambiguationComponent {
   loading = true;
   items: Array<DisambiguationItem & { id?: string; firstName?: string; lastName?: string; customerType?: string; customerStatus?: string }> = [];
   expandedIndex = signal<number | null>(null);
+  startingNewCustomer = false;
 
   constructor() {
     const userId = this.userSession.profile()?.id;
@@ -253,7 +283,7 @@ export class CustomerDisambiguationComponent {
           const steps = (active?.steps || []) as Array<any>;
           const firstIncomplete = steps.find(s => (s.status || '').toUpperCase() !== 'COMPLETED');
           if (firstIncomplete) {
-            const rawStep = (firstIncomplete.step as any);
+            const rawStep = firstIncomplete.step;
             const idx: number = typeof rawStep === 'number' ? rawStep : Number.parseInt(String(rawStep), 10);
             const target = Number.isNaN(idx) ? this.progress.firstIncompleteIndex() : idx;
             const path = this.progress.pathFor(target as OnboardingStep);
@@ -269,6 +299,33 @@ export class CustomerDisambiguationComponent {
       await this.router.navigateByUrl('/app/home');
     } catch {
       this.toast.error('Unable to load selected customer.');
+    }
+  }
+
+  async startNewCustomerOnboarding() {
+    if (this.startingNewCustomer) return;
+
+    const userId = this.userSession.profile()?.id;
+    if (!userId) {
+      this.toast.error('User profile not loaded.');
+      return;
+    }
+
+    try {
+      this.startingNewCustomer = true;
+
+      // For a brand-new onboarding we reset the local progress tracker.
+      // The first step route is defined in app.routes.ts (step 0).
+      this.progress.reset();
+
+      // Ensure we don't keep a previously-selected customer in memory.
+      this.customerSession.setCustomer(null as any);
+
+      await this.router.navigateByUrl('/onboarding/personal-details');
+    } catch {
+      this.toast.error('Unable to start onboarding. Please try again later.');
+    } finally {
+      this.startingNewCustomer = false;
     }
   }
 }
