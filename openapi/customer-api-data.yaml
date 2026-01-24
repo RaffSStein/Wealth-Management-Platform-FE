@@ -80,6 +80,39 @@ paths:
       tags:
         - Customer
 
+  # (Onboarding) Personal Details
+  /customer/{customerId}/personal-details:
+    post:
+      summary: Update personal details for a customer
+      description: Updates the personal details for the specified customer.
+      operationId: updateCustomerPersonalDetails
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerPersonalDetailsDTO'
+      responses:
+        '200':
+          description: Customer onboarding initialized successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerDTO'
+        '400':
+          description: Invalid input data
+        '500':
+          description: Internal server error
+      tags:
+        - Customer
+
   # Financial and Goal Types
   /financial/types:
     get:
@@ -116,6 +149,7 @@ paths:
       tags:
         - Goal
 
+  # (Onboarding) Financial and Goal Types
   /customer/{customerId}/financials:
     post:
       summary: Add financial data for a customer
@@ -543,6 +577,45 @@ components:
             - LONG_TERM
           description: Duration of the goal in months or years
 
+    CustomerPersonalDetailsDTO:
+      type: object
+      required:
+        - firstName
+        - lastName
+        - dateOfBirth
+        - gender
+        - taxId
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        dateOfBirth:
+          type: string
+          format: date
+        gender:
+          $ref: '#/components/schemas/Gender'
+        taxId:
+          type: string
+        nationality:
+          type: string
+          description: ISO 3166-1 alpha-2
+          maxLength: 2
+        phoneNumber:
+          type: string
+        country:
+          type: string
+          description: ISO 3166-1 alpha-2
+          maxLength: 2
+        addressLine1:
+          type: string
+        addressLine2:
+          type: string
+        city:
+          type: string
+        zipCode:
+          type: string
+
     MifidQuestionnaireConfigDTO:
       type: object
       properties:
@@ -745,6 +818,7 @@ components:
       type: string
       enum:
         - INIT
+        - PERSONAL_DETAILS
         - DOCUMENTS
         - FINANCIALS
         - GOALS
