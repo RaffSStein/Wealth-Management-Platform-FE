@@ -16,6 +16,13 @@ function withAlpha(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+/*
+ * TradingView Lightweight Charts™
+ * Copyright (c) 2025 TradingView, Inc. https://www.tradingview.com/
+ * Attribution notice required by the library licence. The on-chart logo is disabled; the licence's visible
+ * link to tradingview.com is the credit line rendered under the chart instead.
+ */
+
 /**
  * Single-series portfolio value area chart (lightweight-charts) with a crosshair tooltip.
  * Colours come from the theme tokens and are re-applied when the theme changes.
@@ -32,6 +39,7 @@ function withAlpha(hex: string, alpha: number): string {
         </div>
       }
     </div>
+    <p class="credit">Chart by <a href="https://www.tradingview.com/" target="_blank" rel="noopener">TradingView</a></p>
   `,
   styles: [`
     :host { display: block; }
@@ -43,6 +51,8 @@ function withAlpha(hex: string, alpha: number): string {
       color: var(--wmp-text);
     }
     .tip__date { color: var(--wmp-text-muted); font-size: .75rem; }
+    .credit { margin: .25rem 0 0; text-align: right; font-size: .7rem; color: var(--wmp-text-muted); }
+    .credit a { color: inherit; text-decoration: underline; }
   `]
 })
 export class ValueChartComponent {
@@ -59,6 +69,7 @@ export class ValueChartComponent {
     afterNextRender(() => {
       this.chart = createChart(this.host().nativeElement, {
         autoSize: true,
+        layout: {attributionLogo: false},
         handleScroll: false,
         handleScale: false,
         crosshair: {mode: CrosshairMode.Magnet},

@@ -21,6 +21,9 @@
 .wmp-field > legend { margin-bottom: .4rem; }
 .wmp-field .p-inputtext, .wmp-field .p-select, .wmp-field .p-inputnumber, .wmp-field .p-datepicker,
 .wmp-field .p-password { width: 100%; }
+// Selects size to their label by default: let them shrink inside grid cells and truncate the label instead
+.wmp-field .p-select { min-width: 0; max-width: 100%; }
+.wmp-field .p-select-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wmp-field__hint { font-size: .8rem; color: var(--wmp-text-muted); }
 .wmp-field__error { font-size: .8rem; color: var(--wmp-danger); }
 .wmp-req { color: var(--wmp-danger); margin-left: .15rem; }
