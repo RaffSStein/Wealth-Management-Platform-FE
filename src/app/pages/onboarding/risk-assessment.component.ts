@@ -1,4 +1,4 @@
-import {Component, computed, inject, signal} from '@angular/core';
+import {Component, DestroyRef, computed, inject, signal} from '@angular/core';
 import {Router} from '@angular/router';
 import {firstValueFrom} from 'rxjs';
 import {Button} from 'primeng/button';
@@ -6,7 +6,7 @@ import {Message} from 'primeng/message';
 import {CustomerRiskProfileDTO, CustomerService, MifidQuestionnaireConfigDTO, MifidService} from '../../api/customer-service';
 import {OnboardingProgressService, OnboardingStep} from '../../core/services/onboarding-progress.service';
 import {CustomerSessionService} from '../../core/services/customer-session.service';
-import {MifidQuestionnaireService, riskBands} from '../../core/services/mifid-questionnaire.service';
+import {findBand, MifidQuestionnaireService, profileDisplay, riskBands} from '../../core/services/mifid-questionnaire.service';
 import {WorkspaceContextService} from '../../core/services/workspace-context.service';
 import {OnboardingLayoutComponent} from '../../shared/components/onboarding-layout/onboarding-layout.component';
 
@@ -57,6 +57,14 @@ interface BandView {
           }
         </section>
 
+        <div class="verify" role="status" aria-live="polite">
+          @switch (verification()) {
+            @case ('pending') { <span class="material-symbols-outlined spin" aria-hidden="true">progress_activity</span> Verifying the account (anti-money-laundering check)… }
+            @case ('active') { <span class="material-symbols-outlined ok" aria-hidden="true">verified</span> Account verified and active. }
+            @case ('rejected') { <span class="material-symbols-outlined err" aria-hidden="true">block</span> The account could not be verified. Your advisor will contact you. }
+            @case ('timeout') { <span class="material-symbols-outlined" aria-hidden="true">schedule</span> Verification is taking longer than usual. You can continue; the status updates automatically. }
+          }
+        </div>
         <p class="note">Your advisor reviews this profile with you. You can retake the questionnaire if your situation changes.</p>
       } @else {
         <p-message severity="info">No investor profile yet. Complete the MiFID questionnaire to calculate it.</p-message>
@@ -65,7 +73,7 @@ interface BandView {
       <div actions class="wmp-actions">
         <p-button label="Back to questionnaire" severity="secondary" [outlined]="true" (onClick)="back()"/>
         <div class="wmp-actions__end">
-          <p-button label="Finish onboarding" [disabled]="!profile()" (onClick)="finish()"/>
+          <p-button label="Finish onboarding" [disabled]="!profile() || verification() === 'pending'" (onClick)="finish()"/>
         </div>
       </div>
     </app-onboarding-layout>
@@ -88,6 +96,13 @@ interface BandView {
     .legend li { display: grid; gap: .1rem; padding: .5rem .65rem; border: 1px solid var(--wmp-border); border-radius: var(--wmp-radius-md); font-size: .8rem; color: var(--wmp-text-muted); }
     .legend li.is-active { border-color: var(--wmp-primary); color: var(--wmp-text); background: var(--wmp-primary-soft); }
     .legend__label { font-weight: 500; }
+    .verify { display: flex; align-items: center; gap: .5rem; margin-top: 1rem; font-size: .9rem; color: var(--wmp-text-muted); }
+    .verify .material-symbols-outlined { font-size: 20px; }
+    .verify .ok { color: var(--wmp-gain); }
+    .verify .err { color: var(--wmp-danger); }
+    .spin { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
     .note { margin: 1rem 0 0; color: var(--wmp-text-muted); font-size: .9rem; }
   `]
 })
@@ -102,6 +117,8 @@ export class RiskAssessmentComponent {
   private readonly workspace = inject(WorkspaceContextService);
 
   protected readonly loading = signal(true);
+  /** Onboarding lifecycle after submit: PENDING_VERIFICATION -> ACTIVE | REJECTED (async AML check on the BE). */
+  protected readonly verification = signal<'none' | 'pending' | 'active' | 'rejected' | 'timeout'>('none');
   protected readonly profile = signal<CustomerRiskProfileDTO | null>(this.mifid.result());
   private readonly config = signal<MifidQuestionnaireConfigDTO | null>(this.mifid.config());
 
@@ -114,7 +131,7 @@ export class RiskAssessmentComponent {
   private readonly activeBand = computed(() => {
     const p = this.profile();
     const bands = this.sortedBands();
-    return bands.find(b => b.profileCode === p?.profile)
+    return findBand(this.config(), p?.profile)
       ?? bands.find(b => p?.score != null && p.score >= (b.minScore ?? 0) && p.score <= (b.maxScore ?? 0));
   });
 
@@ -122,9 +139,7 @@ export class RiskAssessmentComponent {
   protected readonly profileLabel = computed(() => {
     const band = this.activeBand();
     if (band?.profileLabel) return band.profileLabel;
-    const code = this.profile()?.profile ?? '';
-    if (!code || code.toUpperCase() === 'UNDEFINED') return 'Pending review';
-    return code.charAt(0) + code.slice(1).toLowerCase().replace(/_/g, ' ');
+    return profileDisplay(this.config(), this.profile()?.profile) || 'Pending review';
   });
 
   protected readonly bands = computed<BandView[]>(() => {
@@ -150,7 +165,10 @@ export class RiskAssessmentComponent {
     return Math.min(100, Math.max(0, ((score - min) / span) * 100));
   });
 
+  private destroyed = false;
+
   constructor() {
+    inject(DestroyRef).onDestroy(() => (this.destroyed = true));
     void this.load();
   }
 
@@ -172,6 +190,32 @@ export class RiskAssessmentComponent {
       }
     }
     this.loading.set(false);
+    if (customerId) void this.pollVerification(customerId);
+  }
+
+  /** Polls the customer status until it leaves PENDING_VERIFICATION (interval 1.5 s, timeout 20 s). */
+  private async pollVerification(customerId: string): Promise<void> {
+    const deadline = Date.now() + 20000;
+    // Right after a submit the status may still read DRAFT for a moment: keep polling in that case
+    const justSubmitted = !!this.mifid.result();
+    while (!this.destroyed) {
+      let status: string | undefined;
+      try {
+        const customer = await firstValueFrom(this.customerApi.getCustomerById(customerId));
+        status = customer?.customerStatus;
+        if (customer) this.customerSession.setCustomer(customer);
+        if (!this.profile() && customer?.riskProfile) this.profile.set(customer.riskProfile);
+      } catch {
+        // transient error: keep polling until the deadline
+      }
+      if (status === 'ACTIVE') { this.verification.set('active'); return; }
+      if (status === 'REJECTED') { this.verification.set('rejected'); return; }
+      const waiting = status === undefined || status === 'PENDING_VERIFICATION' || (justSubmitted && status === 'DRAFT');
+      if (!waiting) { this.verification.set('none'); return; }
+      if (Date.now() > deadline) { this.verification.set('timeout'); return; }
+      this.verification.set('pending');
+      await new Promise(resolve => setTimeout(resolve, 1500));
+    }
   }
 
   protected back(): void {

@@ -39,6 +39,20 @@ export function riskBands(config: MifidQuestionnaireConfigDTO | null): RiskProfi
   return [...(config?.riskProfileConfigurations ?? [])].sort((a, b) => (a.minScore ?? 0) - (b.minScore ?? 0));
 }
 
+/** The configured band for a customer profile. The BE returns either the profile code or its configured label. */
+export function findBand(config: MifidQuestionnaireConfigDTO | null, profile: string | null | undefined): RiskProfileConfigurationDTO | undefined {
+  if (!profile) return undefined;
+  return riskBands(config).find(b => b.profileCode === profile || b.profileLabel === profile);
+}
+
+/** Display text for a profile: the configured label when known, else a readable version of the raw value. */
+export function profileDisplay(config: MifidQuestionnaireConfigDTO | null, profile: string | null | undefined): string {
+  if (!profile || profile.toUpperCase() === 'UNDEFINED') return '';
+  const band = findBand(config, profile);
+  if (band?.profileLabel) return band.profileLabel;
+  return /^[A-Z_]+$/.test(profile) ? profile.charAt(0) + profile.slice(1).toLowerCase().replace(/_/g, ' ') : profile;
+}
+
 export function isAnswered(question: MifidQuestionDTO, answer: MifidAnswer | undefined): boolean {
   if (!answer) return false;
   return question.questionType === 'NUMERIC' ? answer.numericValue != null : answer.optionId != null;

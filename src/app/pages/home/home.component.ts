@@ -10,7 +10,7 @@ import {FormsModule} from '@angular/forms';
 import {CustomerDTO, CustomerService, MifidQuestionnaireConfigDTO, MifidService} from '../../api/customer-service';
 import {CustomerSessionService} from '../../core/services/customer-session.service';
 import {UserSessionService} from '../../core/services/user-session.service';
-import {riskBands} from '../../core/services/mifid-questionnaire.service';
+import {profileDisplay} from '../../core/services/mifid-questionnaire.service';
 import {financialSnapshot, goalHorizon} from '../../core/services/dashboard-stats';
 import {AllocationSlice, PORTFOLIO_DATA, PortfolioSummary, Position, Quote, ValuePoint, ValueRange} from '../../core/services/portfolio-data';
 import {ValueChartComponent} from '../../shared/components/dashboard/value-chart.component';
@@ -226,11 +226,7 @@ export class HomeComponent {
     const p = this.customer()?.riskProfile;
     return p?.profile && p.profile.toUpperCase() !== 'UNDEFINED' ? p : null;
   });
-  protected readonly profileLabel = computed(() => {
-    const code = this.profile()?.profile ?? '';
-    const band = riskBands(this.config()).find(b => b.profileCode === code);
-    return band?.profileLabel ?? (code.charAt(0) + code.slice(1).toLowerCase().replace(/_/g, ' '));
-  });
+  protected readonly profileLabel = computed(() => profileDisplay(this.config(), this.profile()?.profile));
   protected readonly goals = computed(() => this.customer()?.customerGoals ?? []);
   protected readonly snapshot = computed(() => financialSnapshot(this.customer()?.customerFinancials));
   protected readonly horizon = goalHorizon;

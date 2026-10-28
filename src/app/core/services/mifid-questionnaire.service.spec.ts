@@ -1,4 +1,4 @@
-import { answersFromFilling, orderedSections, riskBands, toMifidFilling } from './mifid-questionnaire.service';
+import { answersFromFilling, findBand, orderedSections, profileDisplay, riskBands, toMifidFilling } from './mifid-questionnaire.service';
 
 describe('MiFID questionnaire mapping', () => {
   const config: any = {
@@ -63,6 +63,15 @@ describe('MiFID questionnaire mapping', () => {
     const filling = toMifidFilling(config, { 4: { numericValue: 1 }, 5: { optionId: 13 } }, { fillingId: 9, responseIds: { 5: 77 } });
     expect(filling.responses.find(r => r.question.id === 5)!.id).toBe(77);
     expect('id' in filling.responses.find(r => r.question.id === 4)!).toBeFalse();
+  });
+
+  it('matches a profile by code or by configured label', () => {
+    const cfg: any = { riskProfileConfigurations: [{ profileCode: 'BALANCED', profileLabel: 'Balanced Profile', minScore: 96, maxScore: 112 }] };
+    expect(findBand(cfg, 'BALANCED')?.profileLabel).toBe('Balanced Profile');
+    expect(findBand(cfg, 'Balanced Profile')?.profileCode).toBe('BALANCED');
+    expect(profileDisplay(cfg, 'Balanced Profile')).toBe('Balanced Profile');
+    expect(profileDisplay(null, 'MODERATELY_AGGRESSIVE')).toBe('Moderately aggressive');
+    expect(profileDisplay(cfg, 'UNDEFINED')).toBe('');
   });
 
   it('restores answers from a saved filling', () => {

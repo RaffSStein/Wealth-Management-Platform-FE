@@ -94,9 +94,13 @@ docs/                       functional docs (process + diagrams), mirrored from 
   validated with the dataviz palette checker. Re-run it if the colours change.
 - `CustomerSelectionService.open(id)` is the single way to switch the working customer (it resumes onboarding for
   DRAFT customers). Used by customer selection and the advisor workspace.
-- BE gaps (reported 2026-10-28): the MiFID submit result isn't persisted to `CustomerDTO.riskProfile`, the onboarding
-  `steps` list stays empty, and customers never leave DRAFT. So the dashboards show "No investor profile yet" and
-  "0 active" until that's fixed.
+- Onboarding lifecycle (BE, 2026-10-28): MiFID submit sets PENDING_VERIFICATION, then an async AML check (Kafka) sets ACTIVE
+  (onboarding DONE) or REJECTED (FAILED). There is no "finish" call: the risk step polls GET /customer/{id} (1.5 s,
+  20 s timeout). `riskProfile.profile` is the configured **label**, so match bands with `findBand` / `profileDisplay`
+  (code or label). `onboarding/active` returns ordered steps (DONE/REJECTED).
+- Unbuilt sections (investments, markets, account sub-pages, advisor clients/reviews/proposals/orders) use the shared
+  work-in-progress page (`wip()` in app.routes.ts). **No sample data there.** Their concepts and data/API needs live
+  in the design canvas row "Future sections": https://claude.ai/artifact/RAG8XaL8fkESVMKvt1F2AA
 
 ### Roles, workspace and shell
 - Roles: `UserSessionService.roles()` / `isAdvisor()` come from `/me` → `userBranchRoles[].role` (BE `WmpRole`:

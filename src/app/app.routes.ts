@@ -1,8 +1,38 @@
 import {inject} from '@angular/core';
-import {Router, Routes} from '@angular/router';
+import {Route, Router, Routes} from '@angular/router';
 import {onboardingStepGuard} from './core/guards/onboarding-step.guard';
 import {authGuard} from './core/guards/auth.guard';
 import {roleGuard} from './core/guards/role.guard';
+
+/**
+ * Sections not built yet. They show the shared work-in-progress page instead of sample data. Concepts for them
+ * (screens + data/API needs) live in the design canvas (row "Future sections").
+ */
+function wip(path: string, title: string, description: string): Route {
+  return {
+    path,
+    loadComponent: () => import('./shared/components/page-placeholder.component').then(m => m.PagePlaceholderComponent),
+    data: {title, description}
+  };
+}
+
+const WORK_IN_PROGRESS: Routes = [
+  wip('investments', 'Investments', 'An overview of your investments: performance, allocation and recent activity.'),
+  wip('investments/positions', 'Positions', 'Every instrument you hold, with quantity, price, value and profit/loss.'),
+  wip('investments/orders', 'Orders', 'Place buy and sell orders and follow their execution.'),
+  wip('investments/performance', 'Performance', 'Returns over time, by period and compared with benchmarks.'),
+  wip('investments/allocation', 'Allocation', 'How your portfolio is split across asset classes, regions and currencies.'),
+  wip('news-markets', 'Markets', 'Market overview: indices, currencies, commodities and the news that moves them.'),
+  wip('news-markets/news', 'Market news', 'Curated market and company news.'),
+  wip('news-markets/indices', 'Indices', 'Major equity indices with intraday and historical performance.'),
+  wip('news-markets/currencies', 'Currencies', 'Exchange rates for the main currency pairs.'),
+  wip('news-markets/commodities', 'Commodities', 'Prices for energy, metals and agricultural commodities.'),
+  wip('transactions', 'Transactions', 'The movements on your accounts: trades, transfers, fees and dividends.'),
+  wip('assets', 'Assets', 'Everything you own on the platform, by account and asset type.'),
+  wip('bank-transfers', 'Bank transfers', 'Move money between your WMP account and your bank accounts.'),
+  wip('tax-credits', 'Tax credits', 'Tax credits and capital-loss carry-forwards available to offset future gains.'),
+  wip('securities-transfer', 'Securities transfer', 'Transfer securities from another bank or broker into WMP.')
+];
 
 export const routes: Routes = [
   // Landing public root
@@ -115,63 +145,7 @@ export const routes: Routes = [
           }
         ]
       },
-      {
-        path: 'investments',
-        loadComponent: () => import('./pages/investments/investments.component').then(m => m.InvestmentsComponent)
-      },
-      {
-        path: 'investments/positions',
-        loadComponent: () => import('./pages/investments/investment-positions.component').then(m => m.InvestmentPositionsComponent)
-      },
-      {
-        path: 'investments/orders',
-        loadComponent: () => import('./pages/investments/investment-orders.component').then(m => m.InvestmentOrdersComponent)
-      },
-      {
-        path: 'investments/performance',
-        loadComponent: () => import('./pages/investments/investment-performance.component').then(m => m.InvestmentPerformanceComponent)
-      },
-      {
-        path: 'investments/allocation',
-        loadComponent: () => import('./pages/investments/investment-allocation.component').then(m => m.InvestmentAllocationComponent)
-      },
-      {
-        path: 'news-markets',
-        loadComponent: () => import('./pages/markets/markets.component').then(m => m.MarketsComponent)
-      },
-      {
-        path: 'news-markets/news',
-        loadComponent: () => import('./pages/markets/market-news.component').then(m => m.MarketNewsComponent)
-      },
-      {
-        path: 'news-markets/indices',
-        loadComponent: () => import('./pages/markets/market-indices.component').then(m => m.MarketIndicesComponent)
-      },
-      {
-        path: 'news-markets/currencies',
-        loadComponent: () => import('./pages/markets/market-currencies.component').then(m => m.MarketCurrenciesComponent)
-      },
-      {
-        path: 'news-markets/commodities',
-        loadComponent: () => import('./pages/markets/market-commodities.component').then(m => m.MarketCommoditiesComponent)
-      },
-      {
-        path: 'transactions',
-        loadComponent: () => import('./pages/transactions/transactions.component').then(m => m.TransactionsComponent)
-      },
-      {path: 'assets', loadComponent: () => import('./pages/assets/assets.component').then(m => m.AssetsComponent)},
-      {
-        path: 'bank-transfers',
-        loadComponent: () => import('./pages/bank-transfers/bank-transfers.component').then(m => m.BankTransfersComponent)
-      },
-      {
-        path: 'tax-credits',
-        loadComponent: () => import('./pages/tax-credits/tax-credits.component').then(m => m.TaxCreditsComponent)
-      },
-      {
-        path: 'securities-transfer',
-        loadComponent: () => import('./pages/securities-transfer/securities-transfer.component').then(m => m.SecuritiesTransferComponent)
-      },
+      ...WORK_IN_PROGRESS,
       {path: '', pathMatch: 'full', redirectTo: 'home'}
     ]
   },

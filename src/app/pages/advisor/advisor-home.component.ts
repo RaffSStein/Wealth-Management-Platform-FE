@@ -11,7 +11,7 @@ import {CustomerDTO, MifidQuestionnaireConfigDTO, MifidService} from '../../api/
 import {CustomerDisambiguationService} from '../../core/services/customer-disambiguation.service';
 import {CustomerSelectionService} from '../../core/services/customer-selection.service';
 import {UserSessionService} from '../../core/services/user-session.service';
-import {riskBands} from '../../core/services/mifid-questionnaire.service';
+import {profileDisplay, riskBands} from '../../core/services/mifid-questionnaire.service';
 import {advisorStats} from '../../core/services/dashboard-stats';
 import {PORTFOLIO_DATA} from '../../core/services/portfolio-data';
 import {ToastService} from '../../shared/services/toast.service';
@@ -177,9 +177,10 @@ export class AdvisorHomeComponent {
     const counts = this.stats().byProfile;
     const max = Math.max(1, ...Object.values(counts));
     const bands = riskBands(this.config());
-    const known = new Set(bands.map(b => b.profileCode));
-    const bars = bands.map(b => ({code: b.profileCode ?? '', label: b.profileLabel ?? b.profileCode ?? '', count: counts[b.profileCode ?? ''] ?? 0}));
-    for (const code of Object.keys(counts)) if (!known.has(code)) bars.push({code, label: code, count: counts[code]});
+    // Profiles may be stored as code or as configured label
+    const known = new Set(bands.flatMap(b => [b.profileCode, b.profileLabel]));
+    const bars = bands.map(b => ({code: b.profileCode ?? '', label: b.profileLabel ?? b.profileCode ?? '', count: (counts[b.profileCode ?? ''] ?? 0) + (counts[b.profileLabel ?? ''] ?? 0)}));
+    for (const key of Object.keys(counts)) if (!known.has(key)) bars.push({code: key, label: key, count: counts[key]});
     return bars.filter(b => b.count > 0 || bands.length > 0).map(b => ({...b, pct: (b.count / max) * 100}));
   });
 
@@ -211,9 +212,8 @@ export class AdvisorHomeComponent {
     return `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim() || c.companyName || 'Unnamed client';
   }
 
-  protected profileLabel(code?: string): string {
-    if (!code || code.toUpperCase() === 'UNDEFINED') return '—';
-    return riskBands(this.config()).find(b => b.profileCode === code)?.profileLabel ?? code;
+  protected profileLabel(profile?: string): string {
+    return profileDisplay(this.config(), profile) || '—';
   }
 
   protected statusLabel(status?: string): string {
