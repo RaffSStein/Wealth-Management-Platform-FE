@@ -1,34 +1,32 @@
 import { TestBed } from '@angular/core/testing';
+import { MessageService } from 'primeng/api';
 import { ToastService } from './toast.service';
 
 describe('ToastService', () => {
   let service: ToastService;
+  let messages: MessageService;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({ providers: [ToastService] });
+    TestBed.configureTestingModule({ providers: [MessageService] });
     service = TestBed.inject(ToastService);
-    jasmine.clock().install();
+    messages = TestBed.inject(MessageService);
   });
 
-  afterEach(() => {
-    jasmine.clock().uninstall();
+  it('should forward toasts to PrimeNG with the default duration', () => {
+    const add = spyOn(messages, 'add');
+    service.info('Hello');
+    expect(add).toHaveBeenCalledWith({ severity: 'info', detail: 'Hello', life: 10000 });
   });
 
-  it('should auto-dismiss a toast after default duration', () => {
-    const id = service.info('Hello');
-    expect(service.items().length).toBe(1);
-    // advance time by 10s
-    jasmine.clock().tick(10000);
-    expect(service.items().length).toBe(0);
+  it('should map warning to the PrimeNG "warn" severity and respect custom durations', () => {
+    const add = spyOn(messages, 'add');
+    service.warning('Careful', 2000);
+    expect(add).toHaveBeenCalledWith({ severity: 'warn', detail: 'Careful', life: 2000 });
   });
 
-  it('should respect custom duration', () => {
-    const id = service.success('Keep longer', 2000);
-    expect(service.items().length).toBe(1);
-    jasmine.clock().tick(1500);
-    expect(service.items().length).toBe(1);
-    jasmine.clock().tick(500);
-    expect(service.items().length).toBe(0);
+  it('should clear all toasts', () => {
+    const clear = spyOn(messages, 'clear');
+    service.clear();
+    expect(clear).toHaveBeenCalled();
   });
 });
-

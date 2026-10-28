@@ -1,3 +1,6 @@
 <router-outlet></router-outlet>
-<app-toast-host></app-toast-host>
-
+<!-- App-wide toasts, fed by ToastService (PrimeNG MessageService). Deferred to keep PrimeNG's toast/motion code
+     out of the initial bundle; toasts are only raised after user interaction, well after the browser is idle. -->
+@defer (on idle) {
+  <p-toast position="top-right"/>
+}

@@ -1,5 +1,6 @@
 import {Component, Input, signal, computed, DestroyRef, inject} from '@angular/core';
-import {CommonModule} from '@angular/common';
+import {NgClass} from '@angular/common';
+import {Password} from 'primeng/password';
 import {FormGroup, ReactiveFormsModule} from '@angular/forms';
 
 /* Reusable password strength + confirmation + guidelines component
@@ -10,43 +11,43 @@ import {FormGroup, ReactiveFormsModule} from '@angular/forms';
 @Component({
   selector: 'app-password-strength-field',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [NgClass, ReactiveFormsModule, Password],
   template: `
-    <div class="two-cols" [formGroup]="group">
-      <div class="field">
-        <label for="password">Password *</label>
-        <input id="password" type="password" formControlName="password" autocomplete="new-password"/>
+    <div class="wmp-form-grid" [formGroup]="group">
+      <div class="wmp-field">
+        <label for="password">Password<span class="wmp-req" aria-hidden="true">*</span></label>
+        <p-password inputId="password" formControlName="password" [toggleMask]="true" [feedback]="false"
+                    autocomplete="new-password" [fluid]="true"/>
       </div>
-      <div class="field">
-        <label for="confirmPassword">Confirm *</label>
-        <input id="confirmPassword" type="password" formControlName="confirmPassword" autocomplete="new-password"
-               [class.invalid-mismatch]="confirmMismatch()" [attr.aria-invalid]="confirmMismatch() ? 'true' : null" aria-describedby="password-mismatch-error"/>
+      <div class="wmp-field">
+        <label for="confirmPassword">Confirm password<span class="wmp-req" aria-hidden="true">*</span></label>
+        <p-password inputId="confirmPassword" formControlName="confirmPassword" [toggleMask]="true" [feedback]="false"
+                    autocomplete="new-password" [fluid]="true" [class.is-mismatch]="confirmMismatch()"/>
+        @if (showMismatch()) {
+          <small class="wmp-field__error" role="alert" id="password-mismatch-error">Passwords do not match</small>
+        }
       </div>
     </div>
 
-    @if (showMismatch()) {
-      <div class="group-error" role="alert" aria-live="assertive" id="password-mismatch-error"><small class="error">Passwords do not match</small></div>
-    }
-
-    <div class="password-strength-wrapper" aria-live="polite">
-      <div class="pw-strength">
-        <div class="pw-bar" role="progressbar" aria-label="Password strength"
+    <div class="strength" aria-live="polite">
+      <div class="strength__row">
+        <div class="strength__bar" role="progressbar" aria-label="Password strength"
              [attr.aria-valuenow]="strengthPercent()" aria-valuemin="0" aria-valuemax="100"
              [attr.aria-valuetext]="strengthLabel()">
-          <div class="pw-bar__fill" [style.width.%]="strengthPercent()" [ngClass]="strengthClass()"></div>
+          <div class="strength__fill" [style.width.%]="strengthPercent()" [ngClass]="strengthClass()"></div>
         </div>
-        <div class="pw-strength-label">{{ strengthLabel() }}</div>
+        <span class="strength__label">{{ strengthLabel() }}</span>
       </div>
 
-      <ul class="pw-guidelines">
-        <li [class.ok]="hasMinLength()">Minimum 8 characters</li>
-        <li [class.ok]="hasUpper()">At least one uppercase letter</li>
-        <li [class.ok]="hasNumber()">At least one number</li>
-        <li [class.ok]="hasSymbol()">At least one symbol</li>
+      <ul class="rules">
+        <li [class.ok]="hasMinLength()"><span class="material-symbols-outlined" aria-hidden="true">{{ hasMinLength() ? 'check_circle' : 'radio_button_unchecked' }}</span>Minimum 8 characters</li>
+        <li [class.ok]="hasUpper()"><span class="material-symbols-outlined" aria-hidden="true">{{ hasUpper() ? 'check_circle' : 'radio_button_unchecked' }}</span>One uppercase letter</li>
+        <li [class.ok]="hasNumber()"><span class="material-symbols-outlined" aria-hidden="true">{{ hasNumber() ? 'check_circle' : 'radio_button_unchecked' }}</span>One number</li>
+        <li [class.ok]="hasSymbol()"><span class="material-symbols-outlined" aria-hidden="true">{{ hasSymbol() ? 'check_circle' : 'radio_button_unchecked' }}</span>One symbol</li>
       </ul>
 
       @if (submitted && passwordCtrl?.invalid) {
-        <ul class="pw-errors">
+        <ul class="errors">
           @if (passwordCtrl?.errors?.['minlength']) { <li>Minimum length not met</li> }
           @if (passwordCtrl?.errors?.['missingUppercase']) { <li>Missing uppercase letter</li> }
           @if (passwordCtrl?.errors?.['missingNumber']) { <li>Missing number</li> }
@@ -56,80 +57,23 @@ import {FormGroup, ReactiveFormsModule} from '@angular/forms';
     </div>
   `,
   styles: [`
-    .password-strength-wrapper {
-      display: grid;
-      gap: .4rem;
-      margin-top: .75rem;
-    }
-
-    .group-error {
-      margin-top: .35rem;
-      color: var(--color-danger);
-      background: #fee4e2;
-      border: 1px solid #fecdca;
-      padding: 0.4rem 0.5rem;
-      border-radius: var(--radius);
-    }
-
-    .pw-strength {
-      display: flex;
-      align-items: center;
-      gap: .6rem;
-    }
-
-    .pw-bar {
-      flex: 1;
-      height: 6px;
-      background: var(--color-border);
-      border-radius: 4px;
-      overflow: hidden;
-      position: relative;
-    }
-
-    .pw-bar__fill {
-      height: 100%;
-      width: 0;
-      transition: width .35s ease, background-color .35s ease;
-    }
-
-    .pw-bar__fill.pw-weak { background: #dc2626; }
-    .pw-bar__fill.pw-fair { background: #f59e0b; }
-    .pw-bar__fill.pw-good { background: #eab308; }
-    .pw-bar__fill.pw-strong { background: #16a34a; }
-
-    .pw-strength-label {
-      font-size: .65rem;
-      font-weight: 700;
-      letter-spacing: .5px;
-      text-transform: uppercase;
-      color: var(--color-text-muted);
-      min-width: 52px;
-      text-align: right;
-    }
-
-    .pw-guidelines {
-      list-style: none;
-      margin: .35rem 0 .15rem;
-      padding: 0;
-      font-size: .55rem;
-      line-height: 1.2;
-      color: var(--color-text-muted);
-      display: grid;
-      gap: 2px;
-    }
-
-    .pw-guidelines li { position: relative; padding-left: 14px; }
-    .pw-guidelines li::before { content: '•'; position: absolute; left: 0; top: 0; opacity: .5; }
-    .pw-guidelines li.ok { color: var(--color-success, #0f7b3e); }
-    .pw-guidelines li.ok::before { content: '✔'; opacity: 1; font-size: .55rem; top: 1px; }
-
-    .pw-errors { margin: .25rem 0 0; padding-left: 16px; color: var(--color-danger); font-size: .55rem; display: grid; gap: 2px; }
-    .pw-errors li { list-style: disc; }
-
-    .invalid-mismatch { border-color: var(--color-danger) !important; outline: none; }
-    .invalid-mismatch:focus { box-shadow: 0 0 0 1px var(--color-danger); }
-
-    @media (prefers-reduced-motion: reduce) { .pw-bar__fill { transition: none; } }
+    :host { display: grid; gap: .75rem; }
+    .strength { display: grid; gap: .6rem; }
+    .strength__row { display: flex; align-items: center; gap: .75rem; }
+    .strength__bar { flex: 1; height: 6px; background: var(--wmp-surface-raised); border-radius: 3px; overflow: hidden; }
+    .strength__fill { height: 100%; width: 0; transition: width .3s ease, background-color .3s ease; }
+    .strength__fill.pw-weak { background: var(--wmp-danger); }
+    .strength__fill.pw-fair { background: var(--wmp-warning); }
+    .strength__fill.pw-good { background: var(--wmp-primary); }
+    .strength__fill.pw-strong { background: var(--wmp-gain); }
+    .strength__label { min-width: 7rem; text-align: right; font-family: var(--wmp-font-mono); font-size: .75rem; color: var(--wmp-text-muted); }
+    .rules { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .35rem 1rem; font-size: .8rem; color: var(--wmp-text-muted); }
+    .rules li { display: flex; align-items: center; gap: .4rem; }
+    .rules li.ok { color: var(--wmp-gain); }
+    .rules .material-symbols-outlined { font-size: 16px; }
+    .errors { margin: 0; padding-left: 1rem; color: var(--wmp-danger); font-size: .8rem; display: grid; gap: 2px; }
+    :host ::ng-deep .is-mismatch .p-password-input { border-color: var(--wmp-danger); }
+    @media (prefers-reduced-motion: reduce) { .strength__fill { transition: none; } }
   `]
 })
 export class PasswordStrengthFieldComponent {

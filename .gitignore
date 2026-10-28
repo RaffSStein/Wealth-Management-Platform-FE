@@ -19,7 +19,6 @@ testem.log
 
 # Node / package managers
 /node_modules/
-/package-lock.json
 /yarn.lock
 
 # Logs

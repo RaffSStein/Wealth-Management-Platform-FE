@@ -1,157 +1,148 @@
-import {Component, inject, OnDestroy} from '@angular/core';
-import {CommonModule} from '@angular/common';
-import {OnboardingStep, OnboardingProgressService} from '../../core/services/onboarding-progress.service';
-import {
-  OnboardingStepShellComponent
-} from '../../shared/components/onboarding-step-shell/onboarding-step-shell.component';
+import {Component, inject, OnDestroy, signal} from '@angular/core';
 import {Router} from '@angular/router';
 import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
-import {CustomerService} from '../../api/customer-service';
-import {Subscription, firstValueFrom} from 'rxjs';
-import {AuthService} from '../../core/services/auth.service';
+import {firstValueFrom} from 'rxjs';
+import {ButtonDirective, ButtonLabel} from 'primeng/button';
+import {DatePicker} from 'primeng/datepicker';
+import {InputText} from 'primeng/inputtext';
+import {Message} from 'primeng/message';
+import {Select} from 'primeng/select';
+import {CustomerDTO, CustomerService, OnboardingService} from '../../api/customer-service';
+import {OnboardingProgressService, OnboardingStep} from '../../core/services/onboarding-progress.service';
 import {UserSessionService} from '../../core/services/user-session.service';
-import {ToastService} from '../../shared/services/toast.service';
 import {OnboardingFormStateService} from '../../core/services/onboarding-form-state.service';
-import {OnboardingService} from '../../api/customer-service';
 import {CustomerSessionService} from '../../core/services/customer-session.service';
+import {OnboardingLayoutComponent} from '../../shared/components/onboarding-layout/onboarding-layout.component';
+
+const ISO2 = /^[A-Z]{2}$/;
 
 @Component({
   selector: 'app-onboarding-personal-details',
-  standalone: true,
-  imports: [CommonModule, OnboardingStepShellComponent, ReactiveFormsModule],
+  imports: [ReactiveFormsModule, OnboardingLayoutComponent, DatePicker, InputText, Message, Select, ButtonDirective, ButtonLabel],
   template: `
-    <app-onboarding-step-shell
-      [stepIndex]="step"
-      title="Personal Details"
-      subtitle="Please provide your basic information to continue with the onboarding process."
-    >
-      <form class="wm-form" [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
-        <div class="form-grid form-grid--max2">
-          <div class="field field--compact required">
-            <label for="firstName">First name</label>
-            <input id="firstName" type="text" formControlName="firstName"/>
-            @if (showError('firstName')) {
-              <small class="error--inline">First name is required</small>
-            }
+    <app-onboarding-layout [step]="step" title="Personal details"
+                           subtitle="Tell us who the account holder is. We use this to identify the customer and meet our regulatory obligations.">
+      <form id="personal-details-form" class="wmp-form" [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+        <section class="wmp-panel">
+          <h2 class="wmp-panel__title">Identity</h2>
+          <div class="wmp-form-grid">
+            <div class="wmp-field">
+              <label for="firstName">First name<span class="wmp-req" aria-hidden="true">*</span></label>
+              <input pInputText id="firstName" formControlName="firstName" autocomplete="given-name"/>
+              @if (showError('firstName')) { <small class="wmp-field__error">Enter the first name.</small> }
+            </div>
+            <div class="wmp-field">
+              <label for="lastName">Last name<span class="wmp-req" aria-hidden="true">*</span></label>
+              <input pInputText id="lastName" formControlName="lastName" autocomplete="family-name"/>
+              @if (showError('lastName')) { <small class="wmp-field__error">Enter the last name.</small> }
+            </div>
+            <div class="wmp-field">
+              <label for="dateOfBirth">Date of birth<span class="wmp-req" aria-hidden="true">*</span></label>
+              <p-datepicker inputId="dateOfBirth" formControlName="dateOfBirth" dataType="string" dateFormat="yy-mm-dd"
+                            [maxDate]="today" [showIcon]="true" iconDisplay="input" placeholder="YYYY-MM-DD" appendTo="body"/>
+              @if (showError('dateOfBirth')) { <small class="wmp-field__error">Enter the date of birth.</small> }
+            </div>
+            <div class="wmp-field">
+              <label for="gender">Gender</label>
+              <p-select inputId="gender" formControlName="gender" [options]="genders" optionLabel="label" optionValue="value" appendTo="body"/>
+            </div>
+            <div class="wmp-field">
+              <label for="taxId">Tax ID<span class="wmp-req" aria-hidden="true">*</span></label>
+              <input pInputText id="taxId" formControlName="taxId" class="num" autocomplete="off"/>
+              @if (showError('taxId')) { <small class="wmp-field__error">Enter the tax ID.</small> }
+            </div>
+            <div class="wmp-field">
+              <label for="nationality">Nationality</label>
+              <input pInputText id="nationality" formControlName="nationality" maxlength="2" placeholder="IT"
+                     class="num" (input)="uppercase($event, 'nationality')" aria-describedby="nationality-hint"/>
+              @if (showError('nationality')) {
+                <small class="wmp-field__error">Use a 2-letter ISO country code.</small>
+              } @else {
+                <small class="wmp-field__hint" id="nationality-hint">2-letter ISO code, e.g. IT</small>
+              }
+            </div>
           </div>
-          <div class="field field--compact required">
-            <label for="lastName">Last name</label>
-            <input id="lastName" type="text" formControlName="lastName"/>
-            @if (showError('lastName')) {
-              <small class="error--inline">Last name is required</small>
-            }
-          </div>
-          <div class="field field--compact required">
-            <label for="dateOfBirth">Date of birth</label>
-            <input id="dateOfBirth" type="date" formControlName="dateOfBirth"/>
-            @if (showError('dateOfBirth')) {
-              <small class="error--inline">Date of birth is required</small>
-            }
-          </div>
-          <div class="field field--compact">
-            <label for="gender">Gender</label>
-            <select id="gender" formControlName="gender">
-              <option value="NOT_SPECIFIED">Not specified</option>
-              <option value="MALE">Male</option>
-              <option value="FEMALE">Female</option>
-              <option value="OTHER">Other</option>
-            </select>
-          </div>
-          <div class="field field--compact required">
-            <label for="taxId">Tax ID</label>
-            <input id="taxId" type="text" formControlName="taxId"/>
-            @if (showError('taxId')) {
-              <small class="error--inline">Tax ID is required</small>
-            }
-          </div>
-          <div class="field field--compact">
-            <label for="nationality">Nationality (ISO 2)</label>
-            <input id="nationality" maxlength="2" type="text" formControlName="nationality"
-                   (input)="uppercase($event,'nationality')"/>
-          </div>
-          <div class="field field--compact">
-            <label for="country">Country (ISO 2)</label>
-            <input id="country" maxlength="2" type="text" formControlName="country"
-                   (input)="uppercase($event,'country')"/>
-          </div>
-          <div class="field field--compact">
-            <label for="phoneNumber">Phone</label>
-            <input id="phoneNumber" type="tel" formControlName="phoneNumber"/>
-          </div>
-          <div class="field field--compact field--full">
-            <label for="addressLine1">Address line 1</label>
-            <input id="addressLine1" type="text" formControlName="addressLine1"/>
-          </div>
-          <div class="field field--compact field--full">
-            <label for="addressLine2">Address line 2</label>
-            <input id="addressLine2" type="text" formControlName="addressLine2"/>
-          </div>
-          <div class="field field--compact">
-            <label for="city">City</label>
-            <input id="city" type="text" formControlName="city"/>
-          </div>
-          <div class="field field--compact">
-            <label for="zipCode">ZIP</label>
-            <input id="zipCode" type="text" formControlName="zipCode"/>
-          </div>
-        </div>
+        </section>
 
-        <div class="uploader-block">
-          <label class="uploader-label">Identity document (placeholder)</label>
-          <input type="file" disabled aria-disabled="true"/>
-          <small>Document upload will be implemented later.</small>
-        </div>
+        <section class="wmp-panel">
+          <h2 class="wmp-panel__title">Contact &amp; address</h2>
+          <div class="wmp-form-grid">
+            <div class="wmp-field">
+              <label for="phoneNumber">Phone</label>
+              <input pInputText id="phoneNumber" type="tel" formControlName="phoneNumber" autocomplete="tel"/>
+            </div>
+            <div class="wmp-field">
+              <label for="country">Country of residence</label>
+              <input pInputText id="country" formControlName="country" maxlength="2" placeholder="IT"
+                     class="num" (input)="uppercase($event, 'country')"/>
+              @if (showError('country')) { <small class="wmp-field__error">Use a 2-letter ISO country code.</small> }
+            </div>
+            <div class="wmp-field wmp-field--full">
+              <label for="addressLine1">Address line 1</label>
+              <input pInputText id="addressLine1" formControlName="addressLine1" autocomplete="address-line1"/>
+            </div>
+            <div class="wmp-field wmp-field--full">
+              <label for="addressLine2">Address line 2</label>
+              <input pInputText id="addressLine2" formControlName="addressLine2" autocomplete="address-line2"/>
+            </div>
+            <div class="wmp-field">
+              <label for="city">City</label>
+              <input pInputText id="city" formControlName="city" autocomplete="address-level2"/>
+            </div>
+            <div class="wmp-field">
+              <label for="zipCode">ZIP</label>
+              <input pInputText id="zipCode" formControlName="zipCode" autocomplete="postal-code" class="num"/>
+            </div>
+          </div>
+        </section>
 
-        <div class="form-actions">
-          <button class="primary" type="submit" [disabled]="loading || form.invalid">
-            {{ loading ? 'Saving...' : 'Save & continue' }}
-          </button>
-        </div>
-        @if (errorMsg) {
-          <p class="form-error-global">{{ errorMsg }}</p>
+        <section class="wmp-panel doc">
+          <span class="material-symbols-outlined" aria-hidden="true">badge</span>
+          <div>
+            <h2 class="wmp-panel__title">Identity document</h2>
+            <p>Document upload is coming soon. You can continue without it for now.</p>
+          </div>
+        </section>
+
+        @if (errorMsg()) {
+          <p-message severity="error">{{ errorMsg() }}</p-message>
         }
       </form>
-    </app-onboarding-step-shell>
+
+      <div actions class="wmp-actions">
+        <span></span>
+        <div class="wmp-actions__end">
+          <button pButton type="submit" form="personal-details-form" [loading]="loading()"><span pButtonLabel>{{ loading() ? 'Saving…' : 'Save & continue' }}</span></button>
+        </div>
+      </div>
+    </app-onboarding-layout>
   `,
-  styles: [
-    `:host ::ng-deep .field.required > label::after {
-      content: ' *';
-      color: var(--color-danger);
-    }
-
-    .step-actions {
-      display: flex;
-      justify-content: flex-end;
-      margin-bottom: .5rem;
-    }
-
-    .step-actions .secondary {
-      background: var(--color-surface-alt);
-      color: var(--color-text);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius);
-      padding: .35rem .6rem;
-      font-size: .8rem;
-      cursor: pointer;
-    }
-    `
-  ]
+  styles: [`
+    .doc { grid-template-columns: auto 1fr; align-items: start; border-style: dashed; }
+    .doc .material-symbols-outlined { font-size: 28px; color: var(--wmp-text-muted); }
+    .doc p { margin: .25rem 0 0; color: var(--wmp-text-muted); font-size: .9rem; }
+  `]
 })
 export class PersonalDetailsComponent implements OnDestroy {
-  step = OnboardingStep.PersonalDetails;
-  progress: OnboardingProgressService = inject(OnboardingProgressService);
+  protected readonly step = OnboardingStep.PersonalDetails;
+  private readonly progress = inject(OnboardingProgressService);
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
   private readonly customerApi = inject(CustomerService);
-  private readonly auth = inject(AuthService);
+  private readonly onboardingApi = inject(OnboardingService);
   private readonly userSession = inject(UserSessionService);
-  private readonly toast = inject(ToastService);
   private readonly formState = inject(OnboardingFormStateService);
   private readonly customerSession = inject(CustomerSessionService);
 
-  loading = false;
-  errorMsg: string | null = null;
-  private readonly sub?: Subscription;
+  protected readonly loading = signal(false);
+  protected readonly errorMsg = signal<string | null>(null);
+  protected readonly today = new Date();
+  protected readonly genders = [
+    {label: 'Not specified', value: 'NOT_SPECIFIED'},
+    {label: 'Male', value: 'MALE'},
+    {label: 'Female', value: 'FEMALE'},
+    {label: 'Other', value: 'OTHER'}
+  ];
 
   form = this.fb.group({
     taxId: this.fb.control<string>('', {validators: [Validators.required]}),
@@ -159,13 +150,13 @@ export class PersonalDetailsComponent implements OnDestroy {
     lastName: this.fb.control<string>('', {validators: [Validators.required]}),
     dateOfBirth: this.fb.control<string>('', {validators: [Validators.required]}),
     gender: this.fb.control<'MALE' | 'FEMALE' | 'OTHER' | 'NOT_SPECIFIED'>('NOT_SPECIFIED'),
-    nationality: this.fb.control<string>(''),
+    nationality: this.fb.control<string>('', {validators: [Validators.pattern(ISO2)]}),
     phoneNumber: this.fb.control<string>(''),
     addressLine1: this.fb.control<string>(''),
     addressLine2: this.fb.control<string>(''),
     city: this.fb.control<string>(''),
     zipCode: this.fb.control<string>(''),
-    country: this.fb.control<string>('')
+    country: this.fb.control<string>('', {validators: [Validators.pattern(ISO2)]})
   });
 
   constructor() {
@@ -175,27 +166,22 @@ export class PersonalDetailsComponent implements OnDestroy {
       this.form.patchValue(saved);
     }
     this.form.valueChanges.subscribe(v => this.formState.save('personal-details', v));
-
-    this.redirectToActiveOnboardingIfAny().catch(() => {});
+    void this.redirectToActiveOnboardingStep();
   }
 
-  private async redirectToActiveOnboardingIfAny() {
-    const customer = this.customerSession.customer();
-    const customerId = customer?.id;
+  /** If the selected customer already has an onboarding in progress, resume at its first incomplete step. */
+  private async redirectToActiveOnboardingStep(): Promise<void> {
+    const customerId = this.customerSession.customer()?.id;
     if (!customerId) return;
-    const onboardingApi = inject(OnboardingService);
     try {
-      const active = await firstValueFrom(onboardingApi.getActiveOnboarding(customerId));
-      const steps = active?.steps || [];
-      const firstIncomplete = steps.find(s => (s.status || '').toUpperCase() !== 'COMPLETED');
-      if (firstIncomplete && typeof firstIncomplete.step === 'number') {
-        const path = this.progress.pathFor(firstIncomplete.step as OnboardingStep);
-        if (path !== '/onboarding/personal-details') {
-          await this.router.navigateByUrl(path);
-        }
+      const active = await firstValueFrom(this.onboardingApi.getActiveOnboarding(customerId));
+      const firstIncomplete = (active?.steps ?? []).find(s => (s.status || '').toUpperCase() !== 'COMPLETED');
+      const target = this.progress.stepFromBackend(firstIncomplete?.step);
+      if (target !== null && target !== this.step) {
+        await this.router.navigateByUrl(this.progress.pathFor(target));
       }
     } catch {
-      // ignore errors, stay on current step
+      // stay on the current step
     }
   }
 
@@ -208,36 +194,19 @@ export class PersonalDetailsComponent implements OnDestroy {
     const input = evt.target as HTMLInputElement;
     const v = (input.value || '').toUpperCase();
     input.value = v;
-    this.form.get(control)?.setValue(v, {emitEvent: false});
+    this.form.get(control)?.setValue(v);
   }
 
-  // Lightweight navigation without enforcing submit
-  onPrev() {
-    const prev = this.step - 1;
-    if (prev >= OnboardingStep.PersonalDetails) {
-      const path = this.progress.pathFor(prev as OnboardingStep);
-      this.router.navigateByUrl(path).catch(() => {});
-    }
-  }
-
-  onNext() {
-    const next = this.step + 1;
-    const path = this.progress.pathFor(next as OnboardingStep);
-    this.router.navigateByUrl(path).catch(() => {});
-  }
-
-  onSubmit() {
+  async onSubmit(): Promise<void> {
+    const nextPath = this.progress.pathFor(OnboardingStep.FinancialInformation);
     if (this.progress.isStepCompleted(this.step)) {
-      // If already submitted and form unchanged, skip re-init
-      const current = this.form.getRawValue();
-      if (!this.formState.isDirty('personal-details', current)) {
-        const next = this.step + 1;
-        const nextPath = this.progress.pathFor(next as OnboardingStep);
-        this.router.navigateByUrl(nextPath).catch(() => {});
+      // Already submitted and unchanged: skip re-init
+      if (!this.formState.isDirty('personal-details', this.form.getRawValue())) {
+        await this.router.navigateByUrl(nextPath);
         return;
       }
     }
-    this.errorMsg = null;
+    this.errorMsg.set(null);
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return;
@@ -245,10 +214,10 @@ export class PersonalDetailsComponent implements OnDestroy {
     const raw = this.form.getRawValue();
     const userId = this.userSession.profile()?.id; // take id from /me profile
     if (!userId) {
-      this.errorMsg = 'User profile not loaded. Please try logging in again.';
+      this.errorMsg.set('User profile not loaded. Please sign in again.');
       return;
     }
-    const dto: any = {
+    const dto = {
       customerType: 'INDIVIDUAL',
       taxId: raw.taxId,
       customerStatus: 'DRAFT',
@@ -264,41 +233,27 @@ export class PersonalDetailsComponent implements OnDestroy {
       city: raw.city || undefined,
       zipCode: raw.zipCode || undefined,
       country: raw.country || undefined
-    };
-    this.loading = true;
-    this.customerApi.initCustomer(dto).subscribe({
-      next: () => {
-        this.loading = false;
-        this.progress.markPersonalDetailsSubmitted();
-        // Save submitted snapshot for dirty-check
-        this.formState.saveSubmitted('personal-details', this.form.getRawValue());
-        const next = this.step + 1;
-        const nextPath = this.progress.pathFor(next as OnboardingStep);
-        this.router.navigateByUrl(nextPath).catch(() => {
-        });
-      },
-      error: (err) => {
-        this.loading = false;
-        this.errorMsg = (err?.error?.message) || 'Unable to save data';
-      }
-    });
-  }
+    } as CustomerDTO;
 
-  async onLogout() {
+    this.loading.set(true);
     try {
-      await this.auth.logout();
+      const created = await firstValueFrom(this.customerApi.initCustomer(dto));
+      // The next steps operate on the selected customer
+      if (created?.id) this.customerSession.setCustomer(created);
+      this.progress.markPersonalDetailsSubmitted();
+      // Save submitted snapshot for dirty-check
+      this.formState.saveSubmitted('personal-details', this.form.getRawValue());
+      await this.router.navigateByUrl(nextPath);
+    } catch (err: unknown) {
+      const message = (err as { error?: { message?: string } })?.error?.message;
+      this.errorMsg.set(message || 'Unable to save the personal details. Please try again.');
     } finally {
-      // Clear client-side session and onboarding progress, then redirect to sign-in
-      this.userSession.clear();
-      this.progress.reset();
-      this.toast.info('You have been logged out.');
-      this.router.navigateByUrl('/auth/sign-in').catch(() => {});
+      this.loading.set(false);
     }
   }
 
   ngOnDestroy() {
     // Persist latest state on destroy (defensive)
     this.formState.save('personal-details', this.form.getRawValue());
-    this.sub?.unsubscribe();
   }
 }

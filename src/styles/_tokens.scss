@@ -1,0 +1,76 @@
+// WMP design tokens: "Ledger Pro" identity (dark-first).
+// - Source of truth for app-level CSS variables (--wmp-*). Components must use these, never raw hex values.
+// - Colour values mirror the PrimeNG preset in src/app/theme/ledger.preset.ts; keep the two in sync.
+// - Dark theme: <html class="wmp-dark"> (default, set in index.html). Light theme: class removed (ThemeService).
+
+:root {
+  // Typography
+  --wmp-font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --wmp-font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Consolas, monospace;
+
+  // Shape
+  --wmp-radius-sm: 4px; // tags, chips
+  --wmp-radius-md: 6px; // controls, buttons
+  --wmp-radius-lg: 8px; // cards, panels
+
+  // Layout
+  --wmp-header-h: 56px;
+}
+
+// Light theme (used when .wmp-dark is absent)
+:root:not(.wmp-dark) {
+  color-scheme: light;
+  --wmp-bg: #F6F8FA;
+  --wmp-surface: #FFFFFF;
+  --wmp-surface-raised: #EEF1F4;
+  --wmp-border: #DDE2E8;
+  --wmp-text: #0D1117;
+  --wmp-text-muted: #5B6573;
+  --wmp-primary: #0F766E;
+  --wmp-primary-hover: #115E59;
+  --wmp-on-primary: #FFFFFF;
+  --wmp-gain: #047857;
+  --wmp-loss: #C2410C;
+  --wmp-danger: #B91C1C;
+  --wmp-warning: #B45309;
+  --wmp-chart-1: #0D9488;
+  --wmp-chart-2: #2A78D6;
+  --wmp-chart-3: #C98500;
+  --wmp-chart-4: #6250D6;
+  --wmp-shadow: 0 1px 2px rgba(13, 17, 23, .06), 0 6px 20px rgba(13, 17, 23, .06);
+}
+
+// Dark theme (default)
+:root.wmp-dark {
+  color-scheme: dark;
+  --wmp-bg: #0D1117;
+  --wmp-surface: #161B22;
+  --wmp-surface-raised: #1F2630;
+  --wmp-border: #2A323D;
+  --wmp-text: #E6EAF0;
+  --wmp-text-muted: #8B95A3;
+  --wmp-primary: #2DD4BF;
+  --wmp-primary-hover: #5EEAD4;
+  --wmp-on-primary: #04221E;
+  --wmp-gain: #6EE7A8;
+  --wmp-loss: #FB923C;
+  --wmp-danger: #F87171;
+  --wmp-warning: #FBBF24;
+  --wmp-chart-1: #0D9488;
+  --wmp-chart-2: #3987E5;
+  --wmp-chart-3: #C98500;
+  --wmp-chart-4: #9085E9;
+  --wmp-shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .35);
+}
+
+// Chart series (--wmp-chart-1..4): categorical, fixed order; validated with the dataviz palette checker for both
+// themes (lightness band, chroma, CVD + normal-vision separation, contrast vs surface). Re-validate on any change.
+
+// Derived tokens (same formula for both themes)
+:root {
+  --wmp-primary-soft: color-mix(in srgb, var(--wmp-primary), transparent 86%);
+  --wmp-gain-soft: color-mix(in srgb, var(--wmp-gain), transparent 86%);
+  --wmp-loss-soft: color-mix(in srgb, var(--wmp-loss), transparent 86%);
+  --wmp-danger-soft: color-mix(in srgb, var(--wmp-danger), transparent 88%);
+  --wmp-focus-ring: 0 0 0 3px color-mix(in srgb, var(--wmp-primary), transparent 72%);
+}

@@ -1,222 +1,96 @@
-import {Component, inject, signal} from '@angular/core';
-import {CommonModule} from '@angular/common';
+import {Component, computed, inject, signal} from '@angular/core';
 import {Router} from '@angular/router';
-import {CustomerDisambiguationService, DisambiguationItem} from '../../core/services/customer-disambiguation.service';
-import {UserSessionService} from '../../core/services/user-session.service';
-import {CustomerService, OnboardingService} from '../../api/customer-service';
-import {ToastService} from '../../shared/services/toast.service';
-import {CustomerSessionService} from '../../core/services/customer-session.service';
-import {OnboardingProgressService, OnboardingStep} from '../../core/services/onboarding-progress.service';
 import {firstValueFrom} from 'rxjs';
+import {Button} from 'primeng/button';
+import {InputText} from 'primeng/inputtext';
+import {Message} from 'primeng/message';
+import {TableModule} from 'primeng/table';
+import {Tag} from 'primeng/tag';
+import {CustomerDTO} from '../../api/customer-service';
+import {CustomerSelectionService} from '../../core/services/customer-selection.service';
+import {CustomerDisambiguationService} from '../../core/services/customer-disambiguation.service';
+import {UserSessionService} from '../../core/services/user-session.service';
+import {CustomerSessionService} from '../../core/services/customer-session.service';
+import {OnboardingProgressService} from '../../core/services/onboarding-progress.service';
+import {ToastService} from '../../shared/services/toast.service';
 
+type Row = CustomerDTO & { displayName: string };
+
+/**
+ * Customer selection: advisors pick the client to act for; customers pick which of their profiles to use.
+ * Draft customers resume onboarding at their first incomplete step.
+ */
 @Component({
   selector: 'app-customer-disambiguation',
-  standalone: true,
-  imports: [CommonModule],
+  imports: [Button, InputText, Message, TableModule, Tag],
   template: `
-    <section class="onb-shell onb-shell--disamb">
-      <div class="panel">
-        <div class="panel-head">
-          <div>
-            <h1 class="title">Customer selection</h1>
-            <p class="muted">Select which customer you want to operate as.</p>
-          </div>
-          <div class="panel-head__actions">
-            <button type="button" class="primary" (click)="startNewCustomerOnboarding()" [disabled]="startingNewCustomer || loading">
-              {{ startingNewCustomer ? 'Starting…' : 'Create new customer' }}
-            </button>
-          </div>
+    <section class="page">
+      <header class="head">
+        <div>
+          <h1>{{ isAdvisor() ? 'Select a client' : 'Choose a profile' }}</h1>
+          <p>{{ isAdvisor()
+            ? 'Pick the client you want to work on, or onboard a new one.'
+            : 'Choose which customer profile you want to use.' }}</p>
         </div>
+        <p-button [label]="isAdvisor() ? 'Onboard new client' : 'Create new profile'" [loading]="startingNew()"
+                  (onClick)="startNewCustomerOnboarding()"/>
+      </header>
 
-        @if (loading) {
-          <p class="placeholder">Loading customer profiles…</p>
-        }
-        @if (!loading && items.length === 0) {
-          <p class="placeholder">No customer profiles found for your user. Please contact support.</p>
-        }
-        @if (!loading && items.length > 0) {
-          <ul class="disamb-list" role="list">
-            @for (it of items; track (it.customerId || it.id); let i = $index) {
-              <li class="disamb-item">
-                <div class="card card--3cols">
-                  <div class="col col--main">
-                    <div class="info">
-                      <strong class="name">{{ (it.firstName || '') + ' ' + (it.lastName || '') || (it.name || '') }}</strong>
-                      @if (it.status) { <small class="status">Status: {{ it.status }}</small> }
-                      <small class="toggle" (click)="toggle(i)" role="button" [attr.aria-expanded]="isExpanded(i)">
-                        <span class="material-symbols-outlined icon" aria-hidden="true">expand_more</span>
-                        {{ isExpanded(i) ? 'Hide details' : 'Show details' }}
-                      </small>
-                    </div>
-                  </div>
-                  <div class="col col--meta">
-                    <div class="meta-grid">
-                      @if (it.name) {
-                        <div class="meta-row">
-                          <label>Alias</label>
-                          <span>{{ it.name }}</span>
-                        </div>
-                      }
-                    </div>
-                  </div>
-                  <div class="col col--actions">
-                    <button type="button" class="primary" (click)="select(it)">Operate as</button>
-                  </div>
-                  @if (isExpanded(i)) {
-                    <div class="details details--in-card">
-                      <div class="grid">
-                        @if (it.customerType) { <div><label>Customer type</label><span>{{ it.customerType }}</span></div> }
-                        @if (it.customerStatus) { <div><label>Customer status</label><span>{{ it.customerStatus }}</span></div> }
-                      </div>
-                    </div>
-                  }
-                </div>
-              </li>
-            }
-          </ul>
-        }
-      </div>
+      @if (loadError()) {
+        <p-message severity="error">The customer list could not be loaded. Reload the page to try again.</p-message>
+      } @else {
+        <div class="wmp-panel">
+          <label class="search">
+            <span class="material-symbols-outlined" aria-hidden="true">search</span>
+            <span class="wmp-sr-only">Search customers</span>
+            <input pInputText type="search" placeholder="Search by name or tax ID" [value]="query()"
+                   (input)="query.set($any($event.target).value)"/>
+          </label>
+
+          <p-table [value]="filtered()" [loading]="loading()" [paginator]="filtered().length > 10" [rows]="10"
+                   [tableStyle]="{'min-width': '40rem'}" dataKey="id">
+            <ng-template #header>
+              <tr>
+                <th>Name</th>
+                <th>Tax ID</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th><span class="wmp-sr-only">Actions</span></th>
+              </tr>
+            </ng-template>
+            <ng-template #body let-row>
+              <tr>
+                <td class="name">{{ row.displayName }}</td>
+                <td class="num">{{ row.taxId }}</td>
+                <td class="muted">{{ typeLabel(row.customerType) }}</td>
+                <td><p-tag [value]="statusLabel(row.customerStatus)" [severity]="statusSeverity(row.customerStatus)"/></td>
+                <td class="actions">
+                  <p-button [label]="row.customerStatus === 'DRAFT' ? 'Continue onboarding' : 'Open'" size="small"
+                            [outlined]="true" [loading]="openingId() === row.id" (onClick)="select(row)"/>
+                </td>
+              </tr>
+            </ng-template>
+            <ng-template #emptymessage>
+              <tr><td colspan="5" class="empty">{{ query() ? 'No customers match your search.' : 'No customer profiles yet.' }}</td></tr>
+            </ng-template>
+          </p-table>
+        </div>
+      }
     </section>
   `,
-  styles: [
-    `
-      .onb-shell.onb-shell--disamb {
-        margin: 1rem;
-      }
-
-      .panel-head {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 1rem;
-        margin-bottom: 1rem;
-      }
-
-      .panel-head__actions {
-        display: flex;
-        justify-content: flex-end;
-        flex: 0 0 auto;
-      }
-
-      .panel-head__actions button[disabled] {
-        opacity: .6;
-        cursor: not-allowed;
-      }
-
-      .disamb-list {
-        list-style: none;
-        margin: 0;
-        padding: 0;
-        display: grid;
-        gap: 1rem;
-        grid-template-columns: repeat(3, 1fr);
-      }
-
-      .disamb-item { display: block; }
-
-      .card {
-        background: var(--color-surface);
-        width: 100%;
-      }
-
-      .card.card--3cols {
-        display: grid;
-        grid-template-columns: 2fr 1.5fr auto;
-        align-items: center;
-        gap: .75rem;
-        padding: .75rem .9rem;
-        border: 1px solid var(--color-border);
-        border-radius: var(--radius);
-      }
-
-      .info {
-        display: grid;
-        gap: .15rem;
-      }
-
-      .name {
-        font-size: .95rem;
-      }
-
-      .status {
-        font-size: .75rem;
-        opacity: .8;
-      }
-
-      .toggle {
-        display: inline-flex;
-        align-items: center;
-        gap: .25rem;
-        font-size: .75rem;
-        color: var(--color-primary);
-        cursor: pointer;
-        user-select: none;
-      }
-
-      .toggle .icon {
-        font-size: 18px;
-      }
-
-      .meta-grid {
-        display: grid;
-        gap: .25rem;
-      }
-
-      .meta-row label {
-        display: block;
-        font-size: .7rem;
-        color: var(--color-text-muted, var(--color-text));
-      }
-
-      .meta-row span {
-        display: block;
-        font-size: .85rem;
-      }
-
-      .col--actions {
-        display: flex;
-        justify-content: flex-end;
-      }
-
-      .details {
-        margin: .5rem 0 0;
-        padding: .6rem .8rem;
-        background: var(--color-surface);
-      }
-
-      .details.details--in-card {
-        grid-column: 1 / -1;
-        margin-top: .5rem;
-        padding: .6rem .8rem;
-        background: var(--color-surface);
-      }
-
-      .details .grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: .5rem .75rem;
-      }
-
-      .details label {
-        display: block;
-        font-size: .7rem;
-        color: var(--color-text-muted, var(--color-text));
-      }
-
-      .details span {
-        display: block;
-        font-size: .85rem;
-      }
-
-      @media (max-width: 1000px) {
-        .disamb-list { grid-template-columns: repeat(2, 1fr); }
-      }
-
-      @media (max-width: 640px) {
-        .disamb-list { grid-template-columns: 1fr; }
-      }
-    `
-  ]
+  styles: [`
+    .page { padding: 1.5rem; display: grid; gap: 1.25rem; max-width: 1200px; }
+    .head { display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem; flex-wrap: wrap; }
+    .head h1 { margin: 0; font-size: 1.6rem; font-weight: 600; }
+    .head p { margin: .35rem 0 0; color: var(--wmp-text-muted); }
+    .search { position: relative; display: flex; align-items: center; max-width: 24rem; color: var(--wmp-text-muted); }
+    .search .material-symbols-outlined { position: absolute; left: .65rem; font-size: 18px; pointer-events: none; }
+    .search input { width: 100%; padding-left: 2.1rem; }
+    .name { font-weight: 500; }
+    .muted { color: var(--wmp-text-muted); }
+    .actions { text-align: right; }
+    .empty { text-align: center; color: var(--wmp-text-muted); padding: 2rem 1rem; }
+  `]
 })
 export class CustomerDisambiguationComponent {
   private readonly router = inject(Router);
@@ -224,108 +98,90 @@ export class CustomerDisambiguationComponent {
   private readonly userSession = inject(UserSessionService);
   private readonly toast = inject(ToastService);
   private readonly customerSession = inject(CustomerSessionService);
-  private readonly customerApi = inject(CustomerService);
-  private readonly onboardingApi = inject(OnboardingService);
+  private readonly selection = inject(CustomerSelectionService);
   private readonly progress = inject(OnboardingProgressService);
 
-  loading = true;
-  items: Array<DisambiguationItem & { id?: string; firstName?: string; lastName?: string; customerType?: string; customerStatus?: string }> = [];
-  expandedIndex = signal<number | null>(null);
-  startingNewCustomer = false;
+  protected readonly isAdvisor = this.userSession.isAdvisor;
+  protected readonly loading = signal(true);
+  protected readonly loadError = signal(false);
+  protected readonly startingNew = signal(false);
+  protected readonly openingId = signal<string | null>(null);
+  protected readonly query = signal('');
+  private readonly rows = signal<Row[]>([]);
+
+  protected readonly filtered = computed(() => {
+    const q = this.query().trim().toLowerCase();
+    if (!q) return this.rows();
+    return this.rows().filter(r => r.displayName.toLowerCase().includes(q) || (r.taxId ?? '').toLowerCase().includes(q));
+  });
 
   constructor() {
+    void this.loadCustomers();
+  }
+
+  private async loadCustomers(): Promise<void> {
     const userId = this.userSession.profile()?.id;
     if (!userId) {
-      this.loading = false;
-      this.toast.error('User profile not loaded.');
+      this.loadError.set(true);
+      this.loading.set(false);
       return;
     }
-    this.disamb.listByUser(userId).subscribe({
-      next: (list) => {
-        this.items = (list || []) as any;
-        this.loading = false;
-      },
-      error: () => {
-        this.loading = false;
-        this.items = [];
-        this.toast.error('Unable to load customer list. Please try again later.');
-      }
-    });
-  }
-
-  isExpanded(i: number): boolean {
-    return this.expandedIndex() === i;
-  }
-
-  toggle(i: number) {
-    const curr = this.expandedIndex();
-    this.expandedIndex.set(curr === i ? null : i);
-  }
-
-  async select(it: DisambiguationItem) {
     try {
-      // Precondition: ensure we have a valid customerId or id to avoid sync throws
-      const rawId = (it as any)?.customerId ?? (it as any)?.id;
-      const customerId = rawId ? String(rawId).trim() : '';
-      if (!customerId) {
-        this.toast.error('Invalid customer selection. Please refresh and try again.');
-        return;
-      }
-      // Load and cache selected customer
-      const customer = await firstValueFrom(this.customerApi.getCustomerById(customerId));
-      // Store fetched customer directly in session to avoid a second API call
-      this.customerSession.setCustomer(customer as any);
-      const status = (customer as any)?.customerStatus as string | undefined;
-      if ((status || '').toUpperCase() === 'DRAFT') {
-        // Fetch active onboarding and route to the current step if any
-        try {
-          const active = await firstValueFrom(this.onboardingApi.getActiveOnboarding(customerId));
-          const steps = (active?.steps || []) as Array<any>;
-          const firstIncomplete = steps.find(s => (s.status || '').toUpperCase() !== 'COMPLETED');
-          if (firstIncomplete) {
-            const rawStep = firstIncomplete.step;
-            const idx: number = typeof rawStep === 'number' ? rawStep : Number.parseInt(String(rawStep), 10);
-            const target = Number.isNaN(idx) ? this.progress.firstIncompleteIndex() : idx;
-            const path = this.progress.pathFor(target as OnboardingStep);
-            await this.router.navigateByUrl(path);
-            return;
-          }
-        } catch {
-          // ignore and fallback
-        }
-        await this.router.navigateByUrl('/onboarding/personal-details');
-        return;
-      }
-      await this.router.navigateByUrl('/app/home');
+      // The BE returns full customer records for the user
+      const list = (await firstValueFrom(this.disamb.listByUser(userId))) as unknown as CustomerDTO[];
+      this.rows.set((list ?? []).map(c => ({...c, displayName: this.displayName(c)})));
     } catch {
-      this.toast.error('Unable to load selected customer.');
-    }
-  }
-
-  async startNewCustomerOnboarding() {
-    if (this.startingNewCustomer) return;
-
-    const userId = this.userSession.profile()?.id;
-    if (!userId) {
-      this.toast.error('User profile not loaded.');
-      return;
-    }
-
-    try {
-      this.startingNewCustomer = true;
-
-      // For a brand-new onboarding we reset the local progress tracker.
-      // The first step route is defined in app.routes.ts (step 0).
-      this.progress.reset();
-
-      // Ensure we don't keep a previously-selected customer in memory.
-      this.customerSession.setCustomer(null as any);
-
-      await this.router.navigateByUrl('/onboarding/personal-details');
-    } catch {
-      this.toast.error('Unable to start onboarding. Please try again later.');
+      this.loadError.set(true);
     } finally {
-      this.startingNewCustomer = false;
+      this.loading.set(false);
+    }
+  }
+
+  private displayName(c: CustomerDTO): string {
+    const person = `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim();
+    return person || c.companyName || 'Unnamed customer';
+  }
+
+  protected typeLabel(type?: string): string {
+    return type ? type.charAt(0) + type.slice(1).toLowerCase().replace(/_/g, ' ') : '—';
+  }
+
+  protected statusLabel(status?: string): string {
+    return status === 'DRAFT' ? 'Onboarding' : this.typeLabel(status);
+  }
+
+  protected statusSeverity(status?: string): 'success' | 'warn' | 'info' | 'secondary' | 'danger' {
+    switch (status) {
+      case 'ACTIVE': return 'success';
+      case 'DRAFT': return 'warn';
+      case 'PENDING_VERIFICATION': return 'info';
+      case 'REJECTED': return 'danger';
+      default: return 'secondary';
+    }
+  }
+
+  async select(row: Row): Promise<void> {
+    if (!row.id) return;
+    this.openingId.set(row.id);
+    try {
+      await this.selection.open(row.id);
+    } catch {
+      this.toast.error('Unable to open the selected customer.');
+    } finally {
+      this.openingId.set(null);
+    }
+  }
+
+  async startNewCustomerOnboarding(): Promise<void> {
+    if (this.startingNew()) return;
+    this.startingNew.set(true);
+    try {
+      // A brand-new onboarding: reset local progress and drop any previously selected customer
+      this.progress.reset();
+      this.customerSession.setCustomer(null);
+      await this.router.navigateByUrl('/onboarding/personal-details');
+    } finally {
+      this.startingNew.set(false);
     }
   }
 }

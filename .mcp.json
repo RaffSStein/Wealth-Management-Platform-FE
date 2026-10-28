@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "angular-cli": {
+      "command": "node",
+      "args": ["node_modules/@angular/cli/bin/ng.js", "mcp", "--read-only"],
+      "env": {
+        "NG_DISABLE_VERSION_CHECK": "true"
+      }
+    }
+  }
+}
