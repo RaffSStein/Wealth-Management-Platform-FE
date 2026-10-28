@@ -1,10 +1,11 @@
 import {Component, inject, signal, computed} from '@angular/core';
 
 import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
-import {Router, RouterLink} from '@angular/router';
+import {ActivatedRoute, Router, RouterLink} from '@angular/router';
 import {AuthService as CoreAuthService} from '../../core/services/auth.service';
 import {AuthService as ApiAuthService, LoginCredentialsDTO} from '../../api/user-service';
 import {UserSessionService} from '../../core/services/user-session.service';
+import {CustomerSessionService} from '../../core/services/customer-session.service';
 import {ToastService} from '../../shared/services/toast.service';
 import { firstValueFrom } from 'rxjs';
 
@@ -252,6 +253,8 @@ import { firstValueFrom } from 'rxjs';
 export class LoginComponent {
   private readonly fb = inject(FormBuilder);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  private readonly customerSession = inject(CustomerSessionService);
   private readonly auth = inject(CoreAuthService);
   private readonly apiAuth = inject(ApiAuthService);
   private readonly userSession = inject(UserSessionService);
@@ -303,13 +306,27 @@ export class LoginComponent {
         this.errorOpen.set(true);
         return;
       }
-      // Load customer disambiguation list and navigate to selection page
-      await this.router.navigateByUrl('/onboarding/disambiguation');
+      await this.router.navigateByUrl(this.postLoginUrl());
     } catch {
       this.errorOpen.set(true);
     } finally {
       this.loading.set(false);
     }
+  }
+
+  /**
+   * Where to go after a successful login:
+   * - advisors: back to the requested page (returnUrl) or their workspace;
+   * - customers: customer selection first unless a customer profile is already selected,
+   *   since /app screens operate on the selected customer.
+   */
+  private postLoginUrl(): string {
+    const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
+    // Only same-app absolute paths (no protocol-relative "//host" redirects)
+    const safeReturnUrl = returnUrl && returnUrl.startsWith('/') && !returnUrl.startsWith('//') ? returnUrl : null;
+    if (this.userSession.isAdvisor()) return safeReturnUrl ?? '/app/advisor';
+    if (!this.customerSession.customer()) return '/onboarding/disambiguation';
+    return safeReturnUrl ?? '/app/home';
   }
 
   onSocial(provider: 'google' | 'apple') {
@@ -328,7 +345,7 @@ export class LoginComponent {
         this.errorOpen.set(true);
         return;
       }
-      await this.router.navigateByUrl('/onboarding/disambiguation');
+      await this.router.navigateByUrl(this.postLoginUrl());
     } catch {
       this.errorOpen.set(true);
     }

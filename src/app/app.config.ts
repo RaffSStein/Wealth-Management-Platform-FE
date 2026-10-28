@@ -13,6 +13,7 @@ import {provideApi as provideBankApi} from './api/bank-service';
 import {authInterceptor} from './core/interceptors/auth.interceptor';
 // UI library + theme
 import {providePrimeNG} from 'primeng/config';
+import {MessageService} from 'primeng/api';
 import {LedgerPreset} from './theme/ledger.preset';
 
 export const appConfig: ApplicationConfig = {
@@ -20,6 +21,8 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideZoneChangeDetection({eventCoalescing: true}),
     provideRouter(routes), provideClientHydration(withEventReplay()),
+    // App-wide toast channel used by ToastService and <p-toast> in app.html
+    MessageService,
     providePrimeNG({
       theme: {
         preset: LedgerPreset,

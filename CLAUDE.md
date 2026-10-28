@@ -41,15 +41,36 @@ npm run openapi:gen:all   # regenerate API clients from openapi/*.yaml
 ```
 openapi/<x>-api-data.yaml   copies of BE specs -> generated clients in src/app/api/<x>-service (not committed)
 src/app/core/               services (auth, user-session, onboarding state), guards, interceptors
-src/app/layout/             AppShell (header + sidebar), wraps /app/* and /onboarding/*
-src/app/pages/              one folder per route area (auth, login, onboarding, home, investments, markets, ...)
-src/app/shared/             reusable components (toast, notification-bell, stepper, password-strength, ...)
+src/app/layout/             AppShell (header + side nav + drawer), navigation.ts (nav model), acting-as banner
+src/app/pages/              one folder per route area (auth, login, onboarding, home, investments, markets, advisor...)
+src/app/shared/             reusable components (notification-bell, page-placeholder, stepper, password-strength, ...)
 src/styles/                 global SCSS partials: _variables (tokens), _base, _forms, _icons, _surfaces
 docs/                       functional docs (process + diagrams), mirrored from the BE repo style
 ```
 
-- Routes: public `/`, `/auth/*`; `/onboarding/*` (step guard, `data.step`); `/app/*` authenticated shell.
+- Routes: public `/`, `/auth/*`, `/terms`, `/onboarding/start` (sign-up) and `/onboarding/setup-password` (one-time
+  email link). Every other `/onboarding/*` step uses `authGuard` + `onboardingStepGuard` (`data.step`). `/app/*` uses
+  `authGuard` (token present, else `/auth/sign-in?returnUrl=`). `/app/advisor/**` uses `roleGuard('ADVISOR')`.
+- Render modes (`app.routes.server.ts`): public routes are prerendered; `app/**`, `onboarding/**`, `dev/**` render on the
+  client (session lives in sessionStorage; also avoids the PrimeNG p-motion hydration bug below).
 - Components currently carry **inline templates and styles** in the `.ts` file; many pages under `/app` are placeholders.
+  Inline `styles` are backtick template literals: never put backticks inside them (e.g. in CSS comments), because that
+  breaks compilation.
+- Legacy global element rules (`_forms.scss`: `button { height: 38px; font-weight: 600 … }`) still apply to plain
+  `<button>`s in new components. Reset `height`/`font-weight` on custom buttons, or use PrimeNG buttons.
+
+### Roles, workspace and shell
+- Roles: `UserSessionService.roles()` / `isAdvisor()` come from `/me` → `userBranchRoles[].role` (BE `WmpRole`:
+  `CUSTOMER`, `ADVISOR`; no roles means CUSTOMER, like the BE).
+- `WorkspaceContextService`: `actingAsClient()` (an advisor with a selected customer in `CustomerSessionService`),
+  `clientName()`, `homePath()`, `exitClient()`. Customer selection (`/onboarding/disambiguation`) sets the customer.
+- Login routing: advisors go to `returnUrl` or `/app/advisor`. Customers go to customer selection unless a customer is
+  already selected (then `returnUrl` or `/app/home`).
+- Navigation model: `layout/navigation.ts` (`navigationFor({isAdvisor, actingAsClient})`, `activeSection(url)`). Add
+  pages there, not in the shell. The advisor workspace pages are placeholders (`shared/components/page-placeholder` via
+  route `data`) until advisor-service exists.
+- Toasts: keep using `ToastService` (`success/error/info/warning`). It is a facade over PrimeNG `MessageService`
+  (root-provided in `app.config.ts`), rendered by a deferred `<p-toast>` in `app.html`.
 
 ## Back end
 
@@ -95,8 +116,8 @@ Chosen direction: **"Ledger Pro"** (dark-first, data-dense). Mockups: https://cl
   The toggle UI comes in Phase 1 (shell header). Later, sync with user-service `UserSettingsDTO.theme`.
 - `/dev/ui-kit` (`pages/dev/ui-kit.component.ts`): living style guide of tokens + PrimeNG components in both themes.
 - **PrimeNG 21 + SSR bug:** `<p-motion>` (used by Stepper/Accordion panels) keeps the server-rendered `display: none`
-  after hydration, so initially-expanded panels stay hidden. Routes that need them use `RenderMode.Client` in
-  `app.routes.server.ts` (currently `/dev/ui-kit`).
+  after hydration, so initially-expanded panels stay hidden. All app/onboarding/dev routes are client-rendered, so this
+  only matters if a prerendered public page ever uses such a panel.
 
 ## Decisions log
 

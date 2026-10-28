@@ -1,5 +1,7 @@
 import {Routes} from '@angular/router';
 import {onboardingStepGuard} from './core/guards/onboarding-step.guard';
+import {authGuard} from './core/guards/auth.guard';
+import {roleGuard} from './core/guards/role.guard';
 
 export const routes: Routes = [
   // Landing public root
@@ -21,7 +23,8 @@ export const routes: Routes = [
   // legacy login route redirects to new auth path
   {path: 'login', redirectTo: 'auth/sign-in', pathMatch: 'full'},
 
-  // Onboarding flow (wrapped with AppShell to reuse sidebar/header)
+  // Onboarding flow (wrapped with AppShell in onboarding mode). 'start' (sign-up) and 'setup-password'
+  // (one-time email link) are public; the other steps require a session.
   {
     path: 'onboarding',
     loadComponent: () => import('./layout/app-shell.component').then(m => m.AppShellComponent),
@@ -30,38 +33,42 @@ export const routes: Routes = [
       {
         path: 'personal-details',
         loadComponent: () => import('./pages/onboarding/personal-details.component').then(m => m.PersonalDetailsComponent),
-        canActivate: [onboardingStepGuard],
+        canActivate: [authGuard, onboardingStepGuard],
         data: {step: 0}
       },
       {
         path: 'financial-information',
         loadComponent: () => import('./pages/onboarding/financial-information.component').then(m => m.FinancialInformationComponent),
-        canActivate: [onboardingStepGuard],
+        canActivate: [authGuard, onboardingStepGuard],
         data: {step: 1}
       },
       {
         path: 'investment-goals',
         loadComponent: () => import('./pages/onboarding/investment-goals.component').then(m => m.InvestmentGoalsComponent),
-        canActivate: [onboardingStepGuard],
+        canActivate: [authGuard, onboardingStepGuard],
         data: {step: 2}
       },
       {
         path: 'mifid-questionnaire',
         loadComponent: () => import('./pages/onboarding/mifid-questionnaire.component').then(m => m.MifidQuestionnaireComponent),
-        canActivate: [onboardingStepGuard],
+        canActivate: [authGuard, onboardingStepGuard],
         data: {step: 3}
       },
       {
         path: 'risk-assessment',
         loadComponent: () => import('./pages/onboarding/risk-assessment.component').then(m => m.RiskAssessmentComponent),
-        canActivate: [onboardingStepGuard],
+        canActivate: [authGuard, onboardingStepGuard],
         data: {step: 4}
       },
       {
         path: 'setup-password',
         loadComponent: () => import('./pages/onboarding/setup-password.page').then(m => m.SetupPasswordPage)
       },
-      { path: 'disambiguation', loadComponent: () => import('./pages/onboarding/disambiguation.component').then(m => m.CustomerDisambiguationComponent) },
+      {
+        path: 'disambiguation',
+        loadComponent: () => import('./pages/onboarding/disambiguation.component').then(m => m.CustomerDisambiguationComponent),
+        canActivate: [authGuard]
+      },
       { path: '', pathMatch: 'full', redirectTo: 'personal-details' }
     ]
   },
@@ -70,8 +77,41 @@ export const routes: Routes = [
   {
     path: 'app',
     loadComponent: () => import('./layout/app-shell.component').then(m => m.AppShellComponent),
+    canActivate: [authGuard],
     children: [
       {path: 'home', loadComponent: () => import('./pages/home/home.component').then(m => m.HomeComponent)},
+      // Advisor workspace (advisor-service is still a BE skeleton: sub-pages are placeholders)
+      {
+        path: 'advisor',
+        canActivate: [roleGuard('ADVISOR')],
+        children: [
+          {path: '', loadComponent: () => import('./pages/advisor/advisor-home.component').then(m => m.AdvisorHomeComponent)},
+          {
+            path: 'clients',
+            loadComponent: () => import('./shared/components/page-placeholder.component').then(m => m.PagePlaceholderComponent),
+            data: {
+              title: 'Clients',
+              description: 'Your client book will be listed here. Meanwhile, use customer selection to act on behalf of a client.',
+              action: {label: 'Select a client', path: '/onboarding/disambiguation'}
+            }
+          },
+          {
+            path: 'reviews',
+            loadComponent: () => import('./shared/components/page-placeholder.component').then(m => m.PagePlaceholderComponent),
+            data: {title: 'MiFID reviews', description: 'Suitability reviews that are due or overdue will appear here.'}
+          },
+          {
+            path: 'proposals',
+            loadComponent: () => import('./shared/components/page-placeholder.component').then(m => m.PagePlaceholderComponent),
+            data: {title: 'Proposals', description: 'Investment proposals you prepare for clients will appear here.'}
+          },
+          {
+            path: 'orders',
+            loadComponent: () => import('./shared/components/page-placeholder.component').then(m => m.PagePlaceholderComponent),
+            data: {title: 'Orders', description: 'Orders placed for your clients will appear here.'}
+          }
+        ]
+      },
       {
         path: 'investments',
         loadComponent: () => import('./pages/investments/investments.component').then(m => m.InvestmentsComponent)

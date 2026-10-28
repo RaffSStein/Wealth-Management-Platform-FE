@@ -1,12 +1,12 @@
 import { Component, inject, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { ToastHostComponent } from './shared/components/toast/toast.component';
+import { Toast } from 'primeng/toast';
 import { ThemeService } from './core/services/theme.service';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, ToastHostComponent],
+  imports: [RouterOutlet, Toast],
   templateUrl: './app.html',
   styleUrls: ['./app.scss']
 })

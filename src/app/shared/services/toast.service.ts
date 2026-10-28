@@ -1,4 +1,5 @@
-import {Injectable, Signal, computed, signal} from '@angular/core';
+import {Injectable, inject} from '@angular/core';
+import {MessageService} from 'primeng/api';
 
 export type ToastVariant = 'success' | 'error' | 'info' | 'warning';
 
@@ -8,67 +9,50 @@ export interface ToastOptions {
   durationMs?: number;
 }
 
-export interface ToastStateItem extends ToastOptions {
-  id: number;
-  closing?: boolean; // used to trigger fade-out before removal
-}
+const SEVERITY: Record<ToastVariant, string> = {
+  success: 'success',
+  error: 'error',
+  info: 'info',
+  warning: 'warn'
+};
 
-@Injectable({ providedIn: 'root' })
+/**
+ * App-wide feedback toasts.
+ * Thin facade over PrimeNG's MessageService (rendered by <p-toast> in app.html), so feature code
+ * keeps a small, library-agnostic API.
+ */
+@Injectable({providedIn: 'root'})
 export class ToastService {
-  private _items = signal<ToastStateItem[]>([]);
-  readonly items: Signal<ToastStateItem[]> = computed(() => this._items());
+  private readonly messages = inject(MessageService);
 
-  // Default toast visibility duration updated to 10 seconds
+  // Default toast visibility duration: 10 seconds
   private readonly defaultDuration = 10000;
-  private readonly fadeDurationMs = 300; // CSS transition must match
 
-  show(options: ToastOptions) {
-    const id = Date.now() + Math.random();
-    const item: ToastStateItem = {
-      id,
-      message: options.message,
-      variant: options.variant ?? 'info',
-      durationMs: options.durationMs ?? this.defaultDuration,
-      closing: false
-    };
-    this._items.update(list => [...list, item]);
-
-    // Auto-dismiss after the configured duration with fade-out
-    const duration = item.durationMs ?? this.defaultDuration;
-    if (duration > 0) {
-      setTimeout(() => this.startClosing(id), duration);
-    }
-
-    return id;
+  show(options: ToastOptions): void {
+    this.messages.add({
+      severity: SEVERITY[options.variant ?? 'info'],
+      detail: options.message,
+      life: options.durationMs ?? this.defaultDuration
+    });
   }
 
-  private startClosing(id: number) {
-    // mark item as closing to trigger fade-out
-    this._items.update(list => list.map(i => i.id === id ? { ...i, closing: true } : i));
-    setTimeout(() => this.dismiss(id), this.fadeDurationMs);
+  success(message: string, durationMs?: number): void {
+    this.show({message, variant: 'success', durationMs});
   }
 
-  success(message: string, durationMs?: number) {
-    return this.show({message, variant: 'success', durationMs});
+  error(message: string, durationMs?: number): void {
+    this.show({message, variant: 'error', durationMs});
   }
 
-  error(message: string, durationMs?: number) {
-    return this.show({message, variant: 'error', durationMs});
+  info(message: string, durationMs?: number): void {
+    this.show({message, variant: 'info', durationMs});
   }
 
-  info(message: string, durationMs?: number) {
-    return this.show({message, variant: 'info', durationMs});
+  warning(message: string, durationMs?: number): void {
+    this.show({message, variant: 'warning', durationMs});
   }
 
-  warning(message: string, durationMs?: number) {
-    return this.show({message, variant: 'warning', durationMs});
-  }
-
-  dismiss(id: number) {
-    this._items.update(list => list.filter(i => i.id !== id));
-  }
-
-  clear() {
-    this._items.set([]);
+  clear(): void {
+    this.messages.clear();
   }
 }

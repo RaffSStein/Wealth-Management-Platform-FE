@@ -1,334 +1,260 @@
-import {Component, signal, computed, effect} from '@angular/core';
-
-import {Router, RouterModule, NavigationEnd} from '@angular/router';
+import {Component, computed, inject, signal} from '@angular/core';
+import {toSignal} from '@angular/core/rxjs-interop';
+import {NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet} from '@angular/router';
+import {filter, map} from 'rxjs';
+import {MenuItem} from 'primeng/api';
+import {Avatar} from 'primeng/avatar';
+import {ButtonDirective, ButtonIcon} from 'primeng/button';
+import {Drawer} from 'primeng/drawer';
+import {InputText} from 'primeng/inputtext';
+import {Menu} from 'primeng/menu';
+import {Tooltip} from 'primeng/tooltip';
 import {AuthService} from '../core/services/auth.service';
+import {CustomerSessionService} from '../core/services/customer-session.service';
+import {ThemeService} from '../core/services/theme.service';
+import {UserSessionService} from '../core/services/user-session.service';
+import {WorkspaceContextService} from '../core/services/workspace-context.service';
 import {NotificationBellComponent} from '../shared/components/notification-bell/notification-bell.component';
+import {ActingAsBannerComponent} from './acting-as-banner.component';
+import {activeSection, navigationFor} from './navigation';
+import {SideNavComponent} from './side-nav.component';
 
-interface SideNavItem {
-  label: string;
-  icon: string; // material symbol name
-  path: string;
-  exact?: boolean;
-}
-
-type SectionKey = 'account' | 'investments' | 'news-markets';
+const COLLAPSED_KEY = 'wmp.sidenav.collapsed';
 
 /**
  * AppShellComponent
- * Persistent layout after login: top header + left sidebar.
- * Sidebar changes depending on the active top-level section.
+ * Persistent layout for /app and /onboarding: header (brand, sections, search, notifications, theme, user menu)
+ * plus a collapsible section side nav (a drawer on small screens). Navigation depends on the user's role and,
+ * for advisors, on whether they are acting as a client. Onboarding uses a reduced header with no navigation.
  */
 @Component({
-  standalone: true,
   selector: 'app-shell',
-  imports: [RouterModule, NotificationBellComponent],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, Avatar, ButtonDirective, ButtonIcon, Drawer, InputText, Menu,
+    Tooltip, NotificationBellComponent, ActingAsBannerComponent, SideNavComponent],
   template: `
-    <div class="app-shell">
-      <!-- Top Header -->
-      <header class="topbar" role="banner">
-        <a class="brand" routerLink="/app/home" aria-label="WMP home">
-          <svg class="brand-mark" width="28" height="28" viewBox="0 0 40 40" aria-hidden="true">
+    <div class="shell" [class.shell--onboarding]="isOnboarding()" [class.shell--collapsed]="collapsed()">
+      <header class="topbar">
+        @if (!isOnboarding()) {
+          <button pButton type="button" class="topbar__menu" [text]="true" severity="secondary"
+                  aria-label="Open navigation" (click)="drawerOpen.set(true)">
+            <span pButtonIcon class="material-symbols-outlined" aria-hidden="true">menu</span>
+          </button>
+        }
+        <a class="brand" [routerLink]="workspace.homePath()" aria-label="WMP home">
+          <svg width="28" height="28" viewBox="0 0 40 40" aria-hidden="true">
             <rect x="1" y="1" width="38" height="38" rx="7" fill="var(--wmp-surface)" stroke="var(--wmp-border)"/>
             <path d="M9 28h5V18H9zM17.5 28h5V12h-5zM26 28h5V22h-5z" fill="var(--wmp-primary)"/>
           </svg>
-          <span class="wordmark">WMP</span>
+          <span class="brand__word">WMP</span>
         </a>
+
         @if (!isOnboarding()) {
-          <nav class="primary-nav" aria-label="Primary navigation">
-            <a routerLink="/app/home" (click)="setTopSection('account')" routerLinkActive="active"
-               [routerLinkActiveOptions]="{exact:true}">Account</a>
-            <a routerLink="/app/investments" (click)="setTopSection('investments')"
-               routerLinkActive="active">Investments</a>
-            <a routerLink="/app/news-markets" (click)="setTopSection('news-markets')" routerLinkActive="active">News /
-              Markets</a>
+          <nav class="sections" aria-label="Primary">
+            @for (s of sections(); track s.key) {
+              <a class="sections__link" [routerLink]="s.path" [class.is-active]="section()?.key === s.key"
+                 [attr.aria-current]="section()?.key === s.key ? 'page' : null">{{ s.label }}</a>
+            }
           </nav>
+          <label class="search">
+            <span class="material-symbols-outlined" aria-hidden="true">search</span>
+            <span class="sr-only">Search</span>
+            <input pInputText type="search" placeholder="Search ticker, ISIN…" class="search__input"/>
+          </label>
         }
-        <div class="spacer"></div>
-        <app-notification-bell/>
-      </header>
-      <aside class="sidebar" aria-label="Section navigation">
-        @if (isOnboarding()) {
-          <div class="side-nav">
-            <button type="button" class="logout-item" (click)="logout()">
-              <span class="material-symbols-outlined icon" aria-hidden="true">logout</span>
-              <span class="label">Logout</span>
-            </button>
-          </div>
-        } @else {
-          @if (currentSidebar().length) {
-            <nav class="side-nav">
-              @for (item of currentSidebar(); track item.path) {
-                <a [routerLink]="item.path" routerLinkActive="active"
-                   [routerLinkActiveOptions]="{exact: item.exact !== false}" (click)="onNavClick(item)">
-                  <span class="material-symbols-outlined icon" aria-hidden="true">{{ item.icon }}</span>
-                  <span class="label">{{ item.label }}</span>
-                </a>
-              }
-              <button type="button" class="logout-item" (click)="logout()">
-                <span class="material-symbols-outlined icon" aria-hidden="true">logout</span>
-                <span class="label">Logout</span>
-              </button>
-            </nav>
-          } @else {
-            <div class="empty">No navigation</div>
+
+        <div class="topbar__actions">
+          @if (!isOnboarding()) {
+            <app-notification-bell/>
           }
+          <button pButton type="button" [text]="true" [rounded]="true" severity="secondary"
+                  [attr.aria-label]="theme.theme() === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'"
+                  [pTooltip]="theme.theme() === 'dark' ? 'Light theme' : 'Dark theme'" tooltipPosition="bottom"
+                  (click)="theme.toggle()">
+            <span pButtonIcon class="material-symbols-outlined" aria-hidden="true">
+              {{ theme.theme() === 'dark' ? 'light_mode' : 'dark_mode' }}
+            </span>
+          </button>
+          @if (isAuthenticated()) {
+            <button type="button" class="user" aria-label="Account menu" aria-haspopup="menu" (click)="userMenu.toggle($event)">
+              <p-avatar [label]="initials()" shape="circle" class="user__avatar"/>
+            </button>
+            <p-menu #userMenu [model]="userMenuItems()" [popup]="true" appendTo="body" ariaLabel="Account menu"/>
+          }
+        </div>
+      </header>
+
+      @if (workspace.actingAsClient()) {
+        <app-acting-as-banner/>
+      }
+
+      <div class="body">
+        @if (!isOnboarding()) {
+          <aside class="rail">
+            <app-side-nav [section]="section()" [collapsed]="collapsed()"/>
+            <button pButton type="button" class="rail__toggle" [text]="true" severity="secondary"
+                    [attr.aria-label]="collapsed() ? 'Expand navigation' : 'Collapse navigation'"
+                    [attr.aria-expanded]="!collapsed()" (click)="toggleCollapsed()">
+              <span pButtonIcon class="material-symbols-outlined" aria-hidden="true">
+                {{ collapsed() ? 'left_panel_open' : 'left_panel_close' }}
+              </span>
+            </button>
+          </aside>
         }
-      </aside>
-      <main class="content" role="main">
-        <router-outlet/>
-      </main>
+        <main class="content">
+          <router-outlet/>
+        </main>
+      </div>
     </div>
+
+    <p-drawer [(visible)]="drawerOpen" position="left" header="Navigation" [closable]="true" class="nav-drawer">
+      <nav class="drawer-sections" aria-label="Sections">
+        @for (s of sections(); track s.key) {
+          <a class="drawer-sections__link" [routerLink]="s.path" routerLinkActive="is-active"
+             [routerLinkActiveOptions]="{exact: false}" (click)="drawerOpen.set(false)">{{ s.label }}</a>
+        }
+      </nav>
+      <app-side-nav [section]="section()" (navigate)="drawerOpen.set(false)"/>
+    </p-drawer>
   `,
-  styles: [
-    `:host {
-      display: contents;
-    }
+  styles: [`
+    :host { display: contents; }
+    .shell { min-height: 100dvh; display: flex; flex-direction: column; background: var(--wmp-bg); color: var(--wmp-text); }
+    .material-symbols-outlined { font-size: 20px; }
 
-    .material-symbols-outlined {
-      font-family: 'Material Symbols Outlined', sans-serif;
-      font-weight: normal;
-      font-style: normal;
-      font-size: 20px;
-      line-height: 1;
-      letter-spacing: normal;
-      text-transform: none;
-      display: inline-block;
-      white-space: nowrap;
-      word-wrap: normal;
-      direction: ltr;
-      -webkit-font-feature-settings: 'liga';
-      -webkit-font-smoothing: antialiased;
-    }
-
-    .app-shell {
-      --header-h: 56px;
-      --sidebar-w: 240px;
-      height: 100dvh;
-      width: 100%;
-      display: grid;
-      grid-template-rows:var(--header-h) 1fr;
-      grid-template-columns:var(--sidebar-w) 1fr;
-      grid-template-areas:'topbar topbar' 'sidebar content';
-      background: var(--color-bg);
-      color: var(--color-text);
-    }
-
+    /* Header */
     .topbar {
-      grid-area: topbar;
-      position: sticky;
-      top: 0;
-      z-index: 40;
-      display: flex;
-      align-items: center;
-      gap: 1.5rem;
-      padding: 0 .75rem 0 1rem;
-      background: var(--color-surface);
-      border-bottom: 1px solid var(--color-border);
-      box-shadow: 0 2px 4px rgba(0, 0, 0, .04);
+      position: sticky; top: 0; z-index: 40; height: var(--wmp-header-h);
+      display: flex; align-items: center; gap: 1.25rem; padding: 0 1rem;
+      background: var(--wmp-bg); border-bottom: 1px solid var(--wmp-border);
     }
+    .topbar__menu { display: none; }
+    .brand { display: flex; align-items: center; gap: .5rem; color: var(--wmp-text); font-weight: 600; letter-spacing: .04em; text-decoration: none; }
+    .brand:hover { text-decoration: none; }
+    .sections { display: flex; gap: 2px; }
+    .sections__link {
+      height: 36px; display: flex; align-items: center; padding: 0 .85rem; border-radius: var(--wmp-radius-md);
+      color: var(--wmp-text-muted); font-size: .9rem; text-decoration: none;
+    }
+    .sections__link:hover { color: var(--wmp-text); background: var(--wmp-surface); text-decoration: none; }
+    .sections__link.is-active { color: var(--wmp-text); background: var(--wmp-surface-raised); }
+    .search {
+      margin-left: auto; position: relative; display: flex; align-items: center; width: min(18rem, 28vw);
+      color: var(--wmp-text-muted);
+    }
+    .search .material-symbols-outlined { position: absolute; left: .65rem; font-size: 18px; pointer-events: none; }
+    .search__input { width: 100%; height: 36px; padding-left: 2.1rem; font-size: .85rem; }
+    .topbar__actions { display: flex; align-items: center; gap: .25rem; }
+    .shell--onboarding .topbar__actions { margin-left: auto; }
+    .user { height: auto; padding: 0; margin-left: .25rem; border: 0; background: transparent; border-radius: 50%; cursor: pointer; display: flex; }
+    .user__avatar { background: var(--wmp-primary-soft); color: var(--wmp-primary); font-weight: 600; font-size: .8rem; }
 
-    .brand {
-      font-weight: 600;
-      letter-spacing: .5px;
-      font-size: 1.05rem;
-      color: var(--wmp-text);
-      display: flex;
-      align-items: center;
-      gap: .5rem;
-      text-decoration: none;
+    /* Body: rail + content */
+    .body { flex: 1; display: flex; min-height: 0; }
+    .rail {
+      position: sticky; top: var(--wmp-header-h); align-self: flex-start; height: calc(100dvh - var(--wmp-header-h));
+      width: 232px; flex: 0 0 auto; display: flex; flex-direction: column; justify-content: space-between;
+      border-right: 1px solid var(--wmp-border); background: var(--wmp-bg); transition: width .18s ease; overflow-y: auto;
     }
+    .shell--collapsed .rail { width: 64px; }
+    .rail__toggle { margin: .5rem; align-self: flex-end; }
+    .shell--collapsed .rail__toggle { align-self: center; }
+    .content { flex: 1; min-width: 0; }
 
-    .primary-nav {
-      display: flex;
-      gap: .75rem;
+    /* Mobile drawer */
+    .drawer-sections { display: flex; gap: .25rem; flex-wrap: wrap; padding: 0 .5rem .5rem; border-bottom: 1px solid var(--wmp-border); }
+    .drawer-sections__link {
+      height: 36px; display: flex; align-items: center; padding: 0 .75rem; border-radius: var(--wmp-radius-md);
+      color: var(--wmp-text-muted); text-decoration: none; font-size: .9rem;
     }
+    .drawer-sections__link.is-active { color: var(--wmp-text); background: var(--wmp-surface-raised); }
 
-    .primary-nav a {
-      text-decoration: none;
-      font-size: .85rem;
-      padding: .55rem .85rem;
-      border-radius: 6px;
-      color: var(--color-text);
-      font-weight: 500;
+    @media (max-width: 959.98px) {
+      .topbar { gap: .5rem; padding: 0 .5rem; }
+      .topbar__menu { display: inline-flex; }
+      .sections, .rail { display: none; }
+      .search { width: auto; flex: 1; min-width: 0; }
     }
-
-    .primary-nav a.active, .primary-nav a:hover {
-      background: var(--color-surface-alt);
+    @media (max-width: 479.98px) {
+      .search { display: none; }
+      .topbar__actions { margin-left: auto; }
     }
-
-    .spacer {
-      flex: 1;
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+      clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
     }
-
-    .sidebar {
-      grid-area: sidebar;
-      position: sticky;
-      top: var(--header-h);
-      align-self: start;
-      height: calc(100dvh - var(--header-h));
-      overflow-y: auto;
-      background: var(--color-surface);
-      border-right: 1px solid var(--color-border);
-      padding: 1rem .85rem 1.5rem;
-      display: flex;
-    }
-
-    .side-nav {
-      display: flex;
-      flex-direction: column;
-      gap: .25rem;
-      width: 100%;
-    }
-
-    .side-nav a, .side-nav button.logout-item {
-      text-decoration: none;
-      font-size: .8rem;
-      font-weight: 500;
-      padding: .55rem .65rem;
-      border-radius: 6px;
-      color: var(--color-text);
-      position: relative;
-      display: flex;
-      align-items: center;
-      gap: .6rem;
-      border: none;
-      background: transparent;
-      text-align: left;
-      cursor: pointer;
-      font-family: inherit;
-    }
-
-    .side-nav a .icon, .side-nav button.logout-item .icon {
-      width: 20px;
-      text-align: center;
-    }
-
-    .side-nav a.active {
-      background: var(--color-primary);
-      color: var(--color-primary-contrast);
-    }
-
-    .side-nav a.active .icon {
-      color: var(--color-primary-contrast);
-    }
-
-    .side-nav a:hover:not(.active), .side-nav button.logout-item:hover {
-      background: var(--color-surface-alt);
-    }
-
-    .side-nav button.logout-item {
-      margin-top: .75rem;
-      border-top: 1px solid var(--color-border);
-      padding-top: .85rem;
-    }
-
-    .side-nav button.logout-item:hover {
-      color: var(--color-danger);
-    }
-
-    .empty {
-      font-size: .75rem;
-      color: var(--color-text-muted);
-    }
-
-    .content {
-      grid-area: content;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-    }
-
-    @media (max-width: 900px) {
-      .app-shell {
-        grid-template-columns:1fr;
-        grid-template-areas:'topbar' 'content';
-      }
-      .sidebar {
-        position: fixed;
-        left: 0;
-        top: var(--header-h);
-        transform: translateX(0);
-        width: var(--sidebar-w);
-        box-shadow: 4px 0 12px rgba(0, 0, 0, .12);
-        z-index: 60;
-      }
-    }
-    `]
+  `]
 })
 export class AppShellComponent {
-  private readonly currentUrl = signal<string>('');
-  topSection = signal<SectionKey>('account');
-  isOnboarding = computed(() => this.currentUrl().startsWith('/onboarding'));
+  private readonly router = inject(Router);
+  private readonly auth = inject(AuthService);
+  private readonly userSession = inject(UserSessionService);
+  private readonly customerSession = inject(CustomerSessionService);
+  protected readonly theme = inject(ThemeService);
+  protected readonly workspace = inject(WorkspaceContextService);
 
-  constructor(private readonly router: Router, private readonly auth: AuthService) {
-    // Initialize and react to route changes
-    effect(() => {
-      const url = this.router.url;
-      this.currentUrl.set(url);
-      this.topSection.set(this.deriveTopSection(url));
-    });
-    this.router.events.subscribe(e => {
-      if (e instanceof NavigationEnd) {
-        this.currentUrl.set(e.urlAfterRedirects);
-        this.topSection.set(this.deriveTopSection(e.urlAfterRedirects));
-      }
-    });
-  }
+  private readonly url = toSignal(
+    this.router.events.pipe(
+      filter((e): e is NavigationEnd => e instanceof NavigationEnd),
+      map(e => e.urlAfterRedirects)
+    ),
+    {initialValue: this.router.url}
+  );
 
-  // Sidebar definitions
-  private readonly accountSidebar: SideNavItem[] = [
-    {label: 'Home', icon: 'home', path: '/app/home'},
-    {label: 'Transactions', icon: 'receipt_long', path: '/app/transactions'},
-    {label: 'Assets', icon: 'pie_chart', path: '/app/assets'},
-    {label: 'Bank Transfers', icon: 'account_balance', path: '/app/bank-transfers'},
-    {label: 'Tax Credits', icon: 'balance', path: '/app/tax-credits'},
-    {label: 'Securities Transfer', icon: 'swap_horiz', path: '/app/securities-transfer'}
-  ];
+  protected readonly isOnboarding = computed(() => this.url().startsWith('/onboarding'));
+  // Public onboarding pages (sign-up, password setup link) also use the shell, without a session
+  protected readonly isAuthenticated = computed(() => !!this.auth.token());
+  protected readonly sections = computed(() => navigationFor({
+    isAdvisor: this.workspace.isAdvisor(),
+    actingAsClient: this.workspace.actingAsClient()
+  }));
+  protected readonly section = computed(() => activeSection(this.url(), this.sections()));
 
-  private readonly investmentsSidebar: SideNavItem[] = [
-    {label: 'Overview', icon: 'dashboard', path: '/app/investments', exact: true},
-    {label: 'Positions', icon: 'list', path: '/app/investments/positions', exact: true},
-    {label: 'Orders', icon: 'assignment', path: '/app/investments/orders', exact: true},
-    {label: 'Performance', icon: 'trending_up', path: '/app/investments/performance', exact: true},
-    {label: 'Allocation', icon: 'donut_large', path: '/app/investments/allocation', exact: true}
-  ];
+  protected readonly collapsed = signal(this.readCollapsed());
+  protected readonly drawerOpen = signal(false);
 
-  private readonly marketsSidebar: SideNavItem[] = [
-    {label: 'Overview', icon: 'dashboard', path: '/app/news-markets', exact: true},
-    {label: 'Market News', icon: 'article', path: '/app/news-markets/news', exact: true},
-    {label: 'Indices', icon: 'stacked_line_chart', path: '/app/news-markets/indices', exact: true},
-    {label: 'Currencies', icon: 'currency_exchange', path: '/app/news-markets/currencies', exact: true},
-    {label: 'Commodities', icon: 'oil_barrel', path: '/app/news-markets/commodities', exact: true}
-  ];
-
-  currentSidebar = computed<SideNavItem[]>(() => {
-    switch (this.topSection()) {
-      case 'investments':
-        return this.investmentsSidebar;
-      case 'news-markets':
-        return this.marketsSidebar;
-      default:
-        return this.accountSidebar;
-    }
+  private readonly displayName = computed(() => {
+    const p = this.userSession.profile();
+    const name = `${p?.firstName ?? ''} ${p?.lastName ?? ''}`.trim();
+    return name || p?.email || this.auth.username() || 'Account';
   });
 
-  async logout() {
-    await this.auth.logout();
-    this.router.navigate(['/auth/sign-in']);
-  }
+  protected readonly initials = computed(() => {
+    const p = this.userSession.profile();
+    const fromName = `${p?.firstName?.[0] ?? ''}${p?.lastName?.[0] ?? ''}`;
+    return (fromName || this.displayName()[0] || '?').toUpperCase();
+  });
 
-  setTopSection(section: SectionKey) {
-    this.topSection.set(section);
-  }
+  protected readonly userMenuItems = computed<MenuItem[]>(() => [{
+    label: this.displayName(),
+    items: [
+      {label: this.userSession.isAdvisor() ? 'Advisor' : 'Customer', disabled: true},
+      {separator: true},
+      {label: 'Log out', command: () => void this.logout()}
+    ]
+  }]);
 
-  onNavClick(item: SideNavItem) {
-    if (item.path) {
-      // deliberate: routerLink handles navigation; method can be expanded for analytics
+  protected toggleCollapsed(): void {
+    const next = !this.collapsed();
+    this.collapsed.set(next);
+    try {
+      localStorage.setItem(COLLAPSED_KEY, String(next));
+    } catch {
+      // storage unavailable: keep the in-memory state only
     }
   }
 
-  private deriveTopSection(url: string): SectionKey {
-    if (url.startsWith('/app/investments')) return 'investments';
-    if (url.startsWith('/app/news-markets')) return 'news-markets';
-    return 'account';
+  protected async logout(): Promise<void> {
+    await this.auth.logout();
+    this.userSession.clear();
+    this.customerSession.setCustomer(null);
+    await this.router.navigateByUrl('/auth/sign-in');
+  }
+
+  private readCollapsed(): boolean {
+    try {
+      return localStorage.getItem(COLLAPSED_KEY) === 'true';
+    } catch {
+      return false;
+    }
   }
 }

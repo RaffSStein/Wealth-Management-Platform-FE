@@ -2,6 +2,9 @@ import {Injectable, computed, signal} from '@angular/core';
 import {UserService, UserDTO} from '../../api/user-service';
 import {firstValueFrom} from 'rxjs';
 
+/** Platform roles; mirrors the BE `WmpRole` enum (user-service). */
+export type WmpRole = 'CUSTOMER' | 'ADVISOR';
+
 /**
  * Holds the logged-in user's profile for the whole browser session.
  * - Fetches from backend using /me (UserService.getCurrentUser)
@@ -16,6 +19,19 @@ export class UserSessionService {
   private readonly _profile = signal<UserDTO | null>(this.readFromSession());
   readonly profile = computed(() => this._profile());
   readonly isLoaded = computed(() => this._profile() != null);
+
+  /**
+   * Roles across all branch associations. Like the BE, a user without branch roles is treated as CUSTOMER.
+   */
+  readonly roles = computed<ReadonlySet<WmpRole>>(() => {
+    const roles = new Set<WmpRole>();
+    for (const r of this._profile()?.userBranchRoles ?? []) {
+      roles.add(r.role?.toUpperCase() === 'ADVISOR' ? 'ADVISOR' : 'CUSTOMER');
+    }
+    if (roles.size === 0) roles.add('CUSTOMER');
+    return roles;
+  });
+  readonly isAdvisor = computed(() => this.roles().has('ADVISOR'));
 
   constructor(private readonly userApi: UserService) {
   }
