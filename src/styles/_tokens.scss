@@ -33,10 +33,10 @@
   --wmp-loss: #C2410C;
   --wmp-danger: #B91C1C;
   --wmp-warning: #B45309;
-  --wmp-chart-1: #0F766E;
-  --wmp-chart-2: #2563EB;
-  --wmp-chart-3: #7C3AED;
-  --wmp-chart-4: #64748B;
+  --wmp-chart-1: #0D9488;
+  --wmp-chart-2: #2A78D6;
+  --wmp-chart-3: #C98500;
+  --wmp-chart-4: #6250D6;
   --wmp-shadow: 0 1px 2px rgba(13, 17, 23, .06), 0 6px 20px rgba(13, 17, 23, .06);
 }
 
@@ -56,12 +56,15 @@
   --wmp-loss: #FB923C;
   --wmp-danger: #F87171;
   --wmp-warning: #FBBF24;
-  --wmp-chart-1: #2DD4BF;
-  --wmp-chart-2: #5B8DEF;
-  --wmp-chart-3: #A78BFA;
-  --wmp-chart-4: #6B7482;
+  --wmp-chart-1: #0D9488;
+  --wmp-chart-2: #3987E5;
+  --wmp-chart-3: #C98500;
+  --wmp-chart-4: #9085E9;
   --wmp-shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .35);
 }
+
+// Chart series (--wmp-chart-1..4): categorical, fixed order; validated with the dataviz palette checker for both
+// themes (lightness band, chroma, CVD + normal-vision separation, contrast vs surface). Re-validate on any change.
 
 // Derived tokens (same formula for both themes)
 :root {

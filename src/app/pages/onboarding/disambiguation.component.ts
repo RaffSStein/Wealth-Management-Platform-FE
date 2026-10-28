@@ -6,11 +6,12 @@ import {InputText} from 'primeng/inputtext';
 import {Message} from 'primeng/message';
 import {TableModule} from 'primeng/table';
 import {Tag} from 'primeng/tag';
-import {CustomerDTO, CustomerService, OnboardingService} from '../../api/customer-service';
+import {CustomerDTO} from '../../api/customer-service';
+import {CustomerSelectionService} from '../../core/services/customer-selection.service';
 import {CustomerDisambiguationService} from '../../core/services/customer-disambiguation.service';
 import {UserSessionService} from '../../core/services/user-session.service';
 import {CustomerSessionService} from '../../core/services/customer-session.service';
-import {OnboardingProgressService, OnboardingStep} from '../../core/services/onboarding-progress.service';
+import {OnboardingProgressService} from '../../core/services/onboarding-progress.service';
 import {ToastService} from '../../shared/services/toast.service';
 
 type Row = CustomerDTO & { displayName: string };
@@ -97,8 +98,7 @@ export class CustomerDisambiguationComponent {
   private readonly userSession = inject(UserSessionService);
   private readonly toast = inject(ToastService);
   private readonly customerSession = inject(CustomerSessionService);
-  private readonly customerApi = inject(CustomerService);
-  private readonly onboardingApi = inject(OnboardingService);
+  private readonly selection = inject(CustomerSelectionService);
   private readonly progress = inject(OnboardingProgressService);
 
   protected readonly isAdvisor = this.userSession.isAdvisor;
@@ -164,32 +164,12 @@ export class CustomerDisambiguationComponent {
     if (!row.id) return;
     this.openingId.set(row.id);
     try {
-      // Fresh record (the list may be stale), cached for the next screens
-      const customer = await firstValueFrom(this.customerApi.getCustomerById(row.id));
-      this.customerSession.setCustomer(customer);
-      if ((customer?.customerStatus || '').toUpperCase() === 'DRAFT') {
-        await this.router.navigateByUrl(await this.resumePath(row.id));
-        return;
-      }
-      await this.router.navigateByUrl('/app/home');
+      await this.selection.open(row.id);
     } catch {
       this.toast.error('Unable to open the selected customer.');
     } finally {
       this.openingId.set(null);
     }
-  }
-
-  /** First incomplete step of the active onboarding, mapped from the BE step names. */
-  private async resumePath(customerId: string): Promise<string> {
-    try {
-      const active = await firstValueFrom(this.onboardingApi.getActiveOnboarding(customerId));
-      const firstIncomplete = (active?.steps ?? []).find(s => (s.status || '').toUpperCase() !== 'COMPLETED');
-      const step = this.progress.stepFromBackend(firstIncomplete?.step);
-      if (step !== null) return this.progress.pathFor(step);
-    } catch {
-      // fall back to the first step
-    }
-    return this.progress.pathFor(OnboardingStep.PersonalDetails);
   }
 
   async startNewCustomerOnboarding(): Promise<void> {

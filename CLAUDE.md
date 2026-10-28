@@ -81,6 +81,23 @@ docs/                       functional docs (process + diagrams), mirrored from 
   MiFID PATCH orphan-removal 500. CustomerType: INDIVIDUAL, LEGAL_ENTITY, SOLE_PROPRIETOR, JOINT_ACCOUNT, OTHER.
   CustomerStatus adds CLOSED and DELETED. Invalid bodies return 400 REQUEST_VALIDATION_ERROR.
 
+### Dashboards (Phase 3)
+- Data: `core/services/portfolio-data.ts` defines `PortfolioDataSource` + the `PORTFOLIO_DATA` token. The BE has no
+  portfolio/market services yet, so the token defaults to `MockPortfolioDataService` (deterministic per customer id,
+  `isSample`). Swap the token's provider for a BE-backed implementation later; the pages don't change.
+- **Sample-data rule:** every card fed by the mock shows `<app-sample-badge/>`. Real customer data (goals, financials,
+  risk profile, client list) never carries it. Pure helpers live in `core/services/dashboard-stats.ts`.
+- Charts: `lightweight-charts` 5 (v5 API `chart.addSeries(AreaSeries, …)`), wrapped in
+  `shared/components/dashboard/value-chart`. Canvas colours are read from `--wmp-*` tokens at runtime and re-applied
+  on theme change. Keep the TradingView attribution logo (license). The locale is fixed to `en-GB`.
+- Categorical series use `--wmp-chart-1..4` **in a stable entity order** (colour follows the entity, never its rank),
+  validated with the dataviz palette checker. Re-run it if the colours change.
+- `CustomerSelectionService.open(id)` is the single way to switch the working customer (it resumes onboarding for
+  DRAFT customers). Used by customer selection and the advisor workspace.
+- BE gaps (reported 2026-10-28): the MiFID submit result isn't persisted to `CustomerDTO.riskProfile`, the onboarding
+  `steps` list stays empty, and customers never leave DRAFT. So the dashboards show "No investor profile yet" and
+  "0 active" until that's fixed.
+
 ### Roles, workspace and shell
 - Roles: `UserSessionService.roles()` / `isAdvisor()` come from `/me` → `userBranchRoles[].role` (BE `WmpRole`:
   `CUSTOMER`, `ADVISOR`; no roles means CUSTOMER, like the BE).
@@ -154,3 +171,4 @@ Chosen direction: **"Ledger Pro"** (dark-first, data-dense). Mockups: https://cl
 
 See `.github/copilot-instructions.md` (English-only code/comments; signals for UI state; `firstValueFrom` for one-shot
 HTTP; `ToastService` for feedback; no PII/tokens in logs or URLs). Commit only when asked; branch off `main` first.
+Commit messages and PRs carry no AI attribution: no `Co-Authored-By` trailers and no mention of Claude or AI tools.
