@@ -7,7 +7,7 @@
   // Base icon size converted from 18px -> 1.125rem (assuming 16px root)
   --icon-size: 1.125rem; /* 18px */
   --icon-color: currentColor; // Default icon color inherits current text color
-  --icon-color-muted: #6b7280; // Muted grey
+  --icon-color-muted: var(--wmp-text-muted); // Muted grey
 }
 
 .icon {

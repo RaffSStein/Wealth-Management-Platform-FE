@@ -1,5 +1,5 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { RegLinkService } from '../../core/services/registration-link.service';
@@ -10,7 +10,7 @@ import { firstValueFrom } from 'rxjs';
 @Component({
   selector: 'app-set-password',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink, PasswordStrengthFieldComponent],
+  imports: [ReactiveFormsModule, RouterLink, PasswordStrengthFieldComponent],
   template: `
     <section class="auth-shell">
       <div class="card form-card form-card--md narrow-form">
@@ -48,7 +48,7 @@ import { firstValueFrom } from 'rxjs';
     .headline { display: grid; gap: 0.25rem; margin-bottom: 0.25rem; }
     .greeting { margin: 0; font-size: 1.5rem; line-height: 1.2; }
     .subtitle { margin: 0; font-size: 0.875rem; opacity: 0.8; }
-    .alert.error { margin:.5rem 0; padding:.5rem .6rem; border-radius: var(--radius); background:#fee4e2; border:1px solid #fecdca; color:#b42318; }
+    .alert.error { margin:.5rem 0; padding:.5rem .6rem; border-radius: var(--radius); background:var(--wmp-danger-soft); border:1px solid color-mix(in srgb, var(--wmp-danger), transparent 60%); color:var(--wmp-danger); }
     .actions-col { display: flex; flex-direction: column; gap: .65rem; margin-top: 1rem; }
     .back-link { display:inline-block; font-size:.65rem; letter-spacing:.05em; text-decoration:none; color:var(--color-primary); font-weight:600; margin-bottom:.25rem; }
   `]

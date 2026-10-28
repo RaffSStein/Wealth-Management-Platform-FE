@@ -1,11 +1,11 @@
 import {Component} from '@angular/core';
-import {CommonModule, NgOptimizedImage} from '@angular/common';
+import { NgOptimizedImage } from '@angular/common';
 import {RouterLink} from '@angular/router';
 
 @Component({
   selector: 'app-landing',
   standalone: true,
-  imports: [CommonModule, RouterLink, NgOptimizedImage],
+  imports: [RouterLink, NgOptimizedImage],
   template: `
     <section class="landing-shell">
       <div class="content card">
@@ -13,7 +13,7 @@ import {RouterLink} from '@angular/router';
           <img class="hero-img rounded" ngSrc="assets/brand/landing.png" alt="" width="520" height="400" priority/>
         </div>
         <div class="copy card--padded">
-          <h1>Welcome to Wealth Management Platform</h1>
+          <h1>Welcome to WMP</h1>
           <p>Your journey to financial success begins here. Our platform provides personalized investment strategies
             tailored to your unique goals.</p>
           <ul class="benefits">
@@ -146,7 +146,7 @@ import {RouterLink} from '@angular/router';
       width: 3.5rem;
       height: 3.5rem;
       border-radius: 50%;
-      background-color: rgba(0, 123, 255, 0.1);
+      background-color: var(--wmp-primary-soft);
     }
 
     .icon-mask {

@@ -65,8 +65,8 @@ import {FormGroup, ReactiveFormsModule} from '@angular/forms';
     .group-error {
       margin-top: .35rem;
       color: var(--color-danger);
-      background: #fee4e2;
-      border: 1px solid #fecdca;
+      background: var(--wmp-danger-soft);
+      border: 1px solid color-mix(in srgb, var(--wmp-danger), transparent 60%);
       padding: 0.4rem 0.5rem;
       border-radius: var(--radius);
     }
@@ -92,10 +92,10 @@ import {FormGroup, ReactiveFormsModule} from '@angular/forms';
       transition: width .35s ease, background-color .35s ease;
     }
 
-    .pw-bar__fill.pw-weak { background: #dc2626; }
-    .pw-bar__fill.pw-fair { background: #f59e0b; }
-    .pw-bar__fill.pw-good { background: #eab308; }
-    .pw-bar__fill.pw-strong { background: #16a34a; }
+    .pw-bar__fill.pw-weak { background: var(--wmp-danger); }
+    .pw-bar__fill.pw-fair { background: var(--wmp-warning); }
+    .pw-bar__fill.pw-good { background: var(--wmp-primary); }
+    .pw-bar__fill.pw-strong { background: var(--wmp-gain); }
 
     .pw-strength-label {
       font-size: .65rem;

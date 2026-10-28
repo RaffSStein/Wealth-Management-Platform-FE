@@ -119,7 +119,7 @@ import {CommonModule} from '@angular/common';
     }
 
     .kpi.positive .value, .positive {
-      color: #1a7f37;
+      color: var(--wmp-gain);
     }
 
     .kpi.negative .value, .negative {

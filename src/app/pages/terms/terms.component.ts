@@ -1,11 +1,11 @@
 import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import {BackButtonComponent} from '../../shared/components/back-button/back-button.component';
 
 @Component({
   selector: 'app-terms',
   standalone: true,
-  imports: [CommonModule, BackButtonComponent],
+  imports: [BackButtonComponent],
   template: `
     <section class="terms-shell">
       <div class="container">

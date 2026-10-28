@@ -1,5 +1,5 @@
 import {Component} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 
 /**
  * Promotions widget (placeholder)
@@ -7,7 +7,7 @@ import {CommonModule} from '@angular/common';
 @Component({
   selector: 'app-promotions',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   template: `
     <section class="card promotions" aria-labelledby="promotions-title">
       <h2 id="promotions-title">Promotions</h2>

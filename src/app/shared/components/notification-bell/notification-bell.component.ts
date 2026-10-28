@@ -1,11 +1,11 @@
 import {Component, HostListener, computed, inject, signal} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 import {NotificationService, AppNotification} from '../../../core/services/notification.service';
 
 @Component({
   selector: 'app-notification-bell',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   template: `
     <div class="notif-wrapper" (click)="$event.stopPropagation()">
       <button class="bell-btn" type="button" (click)="toggleDropdown()" aria-haspopup="true"
@@ -146,8 +146,8 @@ import {NotificationService, AppNotification} from '../../../core/services/notif
       height: 18px;
       padding: 0 4px;
       border-radius: 999px;
-      background: #d32f2f;
-      color: #fff;
+      background: var(--wmp-danger);
+      color: var(--wmp-bg);
       font-size: 11px;
       line-height: 18px;
       text-align: center;
@@ -268,7 +268,7 @@ import {NotificationService, AppNotification} from '../../../core/services/notif
       width: 8px;
       height: 8px;
       border-radius: 50%;
-      background: #2e7d32;
+      background: var(--wmp-gain);
       display: inline-block;
     }
 
@@ -299,7 +299,7 @@ import {NotificationService, AppNotification} from '../../../core/services/notif
       align-items: center;
       padding: 12px 16px;
       border-bottom: 1px solid var(--color-border, rgba(0, 0, 0, 0.08));
-      color: #222; /* Force readable text/icon color */
+      color: var(--wmp-text);
     }
 
     .modal-header h3 {
@@ -320,7 +320,7 @@ import {NotificationService, AppNotification} from '../../../core/services/notif
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      color: #222; /* Ensure icon visible on light background */
+      color: var(--wmp-text);
     }
 
     .modal-header .close .material-symbols-outlined {
@@ -393,7 +393,7 @@ import {NotificationService, AppNotification} from '../../../core/services/notif
       border-radius: 6px;
       cursor: pointer;
       font-size: 12px;
-      color: #222; /* Ensure text visible */
+      color: var(--wmp-text);
     }
   `]
 })

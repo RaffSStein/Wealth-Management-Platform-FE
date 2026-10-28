@@ -1,0 +1,113 @@
+# CLAUDE.md
+
+Context for Claude Code when working in this repository. Longer-form references: `README.md`,
+`.github/copilot-instructions.md` (coding conventions, auth/login patterns), `openapi/README.md`, `docs/`.
+Keep this file current: when we learn something non-obvious about the repo, the BE or a decision we made, add it here.
+
+## Project
+
+Front end of **WMP** (Wealth Management Platform; working name, no final brand yet). Used by two main roles:
+**customer** and **advisor** (BE also has `ADMIN`). Work in progress; also meant as a personal portfolio piece.
+
+- Angular 21: standalone components, signals, `inject()`, lazy `loadComponent` routes, SSR (`@angular/ssr` + Express).
+  Zone-based change detection is kept explicitly (`provideZoneChangeDetection`, added by the v21 migration).
+- UI library: **PrimeNG 21** (MIT) + `@primeuix/themes` 2.x, styled mode with our own preset. SCSS for app styles.
+  Material Symbols icon font loaded in `src/index.html`; IBM Plex via `@fontsource` (registered in `angular.json` styles).
+- Tests: Karma + Jasmine (`ng test`).
+- **No deprecated APIs** (user requirement): check `@deprecated` in typings before using a library API. E.g. no
+  `@angular/animations`/`provideAnimationsAsync`, no `label`/`icon` inputs on the `pButton` directive (use `p-button`
+  or `pButtonLabel`), `class` instead of `styleClass`, no PrimeNG `*TransitionOptions` (use `motionOptions`).
+- Don't upgrade to PrimeNG 22+: it moved to the commercial PrimeUI license.
+
+## Commands
+
+```bash
+npm start                 # ng serve on :4200 (uses proxy.conf.js for /<service> paths)
+npm run build             # production build (SSR output in dist/)
+npm test                  # Karma unit tests
+npm run openapi:gen:all   # regenerate API clients from openapi/*.yaml
+```
+
+- `package-lock.json` is gitignored, so fresh installs resolve the newest versions within the `package.json` ranges.
+- npm 10.9 crashes (`Cannot read properties of null (reading 'edgesOut')`) resolving `@angular/build` 21's optional
+  vitest peers on a clean install; `npx npm@11 install` works.
+- Node 22.19 is fine for Angular 21; the Angular 22 CLI needs Node ≥ 22.22, so `ng update` may try to fetch it. Run the
+  local CLI with `NG_DISABLE_VERSION_CHECK=true node node_modules/@angular/cli/bin/ng.js ...`.
+- `src/app/pages/login/login.component.spec.ts` references a removed `bankCode` control and breaks the whole Karma
+  compile (pre-existing, since commit 6eebe23).
+
+## Repository layout
+
+```
+openapi/<x>-api-data.yaml   copies of BE specs -> generated clients in src/app/api/<x>-service (not committed)
+src/app/core/               services (auth, user-session, onboarding state), guards, interceptors
+src/app/layout/             AppShell (header + sidebar), wraps /app/* and /onboarding/*
+src/app/pages/              one folder per route area (auth, login, onboarding, home, investments, markets, ...)
+src/app/shared/             reusable components (toast, notification-bell, stepper, password-strength, ...)
+src/styles/                 global SCSS partials: _variables (tokens), _base, _forms, _icons, _surfaces
+docs/                       functional docs (process + diagrams), mirrored from the BE repo style
+```
+
+- Routes: public `/`, `/auth/*`; `/onboarding/*` (step guard, `data.step`); `/app/*` authenticated shell.
+- Components currently carry **inline templates and styles** in the `.ts` file; many pages under `/app` are placeholders.
+
+## Back end
+
+- Repo: `C:\Users\Raffaele\Desktop\Dev\proposal` (has its own `CLAUDE.md` — read it for BE details).
+- Java 21 / Spring Boot microservices, Kafka events, Postgres per service, `docker compose up -d` for local infra.
+- API-first: specs live in BE `business-modules/<x>-service/<x>-api-data/`. When a spec changes there, copy it into
+  `openapi/` here and run `npm run openapi:gen:<x>`.
+- Dev proxy (`proxy.conf.js`): user-service :8083, order-service :8082, document-service :8091,
+  customer-service :8090, bank-service :8089. Each service is served under context path `/<service-name>`.
+- Auth: JWT bearer, attached by `authInterceptor`. Roles are checked with `@PreAuthorize("hasRole('ADVISOR')")` etc.;
+  in user-service roles are branch-scoped strings (`UserBranchRoleDTO.role`).
+- `UserSettingsDTO` (user-service) has `language` and `theme` → use `theme` to persist dark/light preference.
+
+## UI / visual identity
+
+Chosen direction: **"Ledger Pro"** (dark-first, data-dense). Mockups: https://claude.ai/artifact/RAG8XaL8fkESVMKvt1F2AA
+(row C). Palette may be refined later.
+
+| Token | Value | Use |
+|---|---|---|
+| bg | `#0D1117` | page background |
+| surface | `#161B22` | panels, cards, inputs |
+| surface-raised | `#1F2630` | hover, secondary buttons |
+| border | `#2A323D` | dividers, control borders |
+| text / muted | `#E6EAF0` / `#8B95A3` | body / secondary text |
+| primary | `#2DD4BF` (on-primary `#04221E`) | CTAs, focus, active nav |
+| gain / loss | `#6EE7A8` / `#FB923C` | P/L (green/orange, colour-blind friendly) |
+
+- Type: IBM Plex Sans (UI) + IBM Plex Mono (prices, quantities, ISINs, KPIs). Radius 6px (cards 8px).
+- Use tokens, never hardcoded hex values, in components. Utilities: `.num` (mono, tabular figures), `.gain`, `.loss`.
+  Chart series colours: `--wmp-chart-1..4`.
+
+### Theme architecture
+- `src/styles/_tokens.scss`: `--wmp-*` CSS variables, dark on `:root.wmp-dark`, light on `:root:not(.wmp-dark)`.
+- `src/app/theme/ledger.preset.ts`: PrimeNG preset (Aura base) with the **same hex values**. Keep the two in sync.
+- `src/styles/_variables.scss`: legacy `--color-*` names aliased to `--wmp-*` so pre-redesign screens reskin for free.
+  Delete them once every screen is migrated.
+- Cascade layers (`styles.scss` + `cssLayer` in `app.config.ts`): `wmp-reset < wmp-legacy < primeng < unlayered`.
+  Global element rules (`_forms.scss` `button {}`, `input {}`) live in `wmp-legacy`, so they never override PrimeNG.
+  Component styles are unlayered and can still customise PrimeNG.
+- Dark is the default: `index.html` ships `<html class="wmp-dark">`, and an inline script removes it before paint when
+  `localStorage['wmp.theme'] === 'light'`. `ThemeService` (`core/services/theme.service.ts`) toggles and persists it.
+  The toggle UI comes in Phase 1 (shell header). Later, sync with user-service `UserSettingsDTO.theme`.
+- `/dev/ui-kit` (`pages/dev/ui-kit.component.ts`): living style guide of tokens + PrimeNG components in both themes.
+- **PrimeNG 21 + SSR bug:** `<p-motion>` (used by Stepper/Accordion panels) keeps the server-rendered `display: none`
+  after hydration, so initially-expanded panels stay hidden. Routes that need them use `RenderMode.Client` in
+  `app.routes.server.ts` (currently `/dev/ui-kit`).
+
+## Decisions log
+
+- 2026-10-28 — Visual identity C "Ledger Pro" chosen; product name **WMP** for now.
+- 2026-10-28 — UI library: **PrimeNG 21** (styled mode, custom design-token preset for Ledger Pro, dark default).
+  Angular upgraded 20 → 21 for it (PrimeNG 20 needs the deprecated `@angular/animations`; 22 is commercially licensed).
+- 2026-10-28 — Initial bundle budget raised to 700 kB warning / 1.2 MB error (PrimeNG theme engine + preset load at startup).
+- Redesign is phased: 0 foundation (library, tokens, fonts, brand) → 1 app shell (role-aware nav) →
+  2 auth + onboarding → 3 dashboard → 4 remaining pages.
+
+## Conventions
+
+See `.github/copilot-instructions.md` (English-only code/comments; signals for UI state; `firstValueFrom` for one-shot
+HTTP; `ToastService` for feedback; no PII/tokens in logs or URLs). Commit only when asked; branch off `main` first.

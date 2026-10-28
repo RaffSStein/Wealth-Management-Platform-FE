@@ -1,43 +1,38 @@
-// Design tokens and timing variables for the whole app.
-// - CSS variables under :root are available at runtime and can be themed.
-// - Sass variables ($speed, etc.) are compile-time only and used for transitions.
+// Legacy design tokens (pre-"Ledger Pro" names), kept as aliases of the --wmp-* tokens in _tokens.scss
+// so existing components reskin without edits. New code must use --wmp-* directly; drop these aliases
+// once every screen has been migrated.
 :root {
-  // Primary font stack used across the app (prefers system fonts for performance)
-  --font-sans: "Calibri",
-  system-ui,
-  -apple-system,
-  Segoe UI,
-  Roboto,
-  "Helvetica Neue",
-  Arial,
-  "Noto Sans",
-  "Apple Color Emoji",
-  "Segoe UI Emoji";
+  --font-sans: var(--wmp-font-sans);
 
-  // App color palette (backgrounds, surfaces, text, borders)
-  --color-bg: #ECF8FE; // App page background (palette)
-  --color-surface: #ffffff; // Card and control surface background
-  --color-surface-alt: #F4F0F7; // Subtle alternative surface (derived from E8E1EF)
-  --color-text: #020300; // Default text color (palette near-black)
-  --color-text-muted: #6b6b6b; // Secondary/quiet text
-  --color-border: #dcd6e3; // Neutral border color (derived from bg)
-  --color-heading: #36311F; // Headings color (palette)
+  // Backgrounds, surfaces, text, borders
+  --color-bg: var(--wmp-bg);
+  --color-surface: var(--wmp-surface);
+  --surface: var(--wmp-surface);
+  --color-surface-alt: var(--wmp-surface-raised);
+  --color-surface-hover: var(--wmp-surface-raised);
+  --color-text: var(--wmp-text);
+  --color-text-muted: var(--wmp-text-muted);
+  --color-heading: var(--wmp-text);
+  --color-border: var(--wmp-border);
+  --color-border-subtle: var(--wmp-border);
 
   // Brand and semantic colors
-  --color-primary: #05668D; // Brand primary (palette)
-  --color-primary-contrast: #ffffff; // Text on primary backgrounds
-  --color-secondary: #40BCD8; // Secondary brand/accent (palette)
-  --color-accent: #40BCD8; // Accent reuses secondary unless you add a distinct one
-  --color-success: #1a7f37; // Success (kept neutral/standard)
-  --color-warning: #d92d20; // Warning/Alert red (as requested)
-  --color-danger: #d92d20; // Alias for error styling
+  --color-primary: var(--wmp-primary);
+  --color-primary-contrast: var(--wmp-on-primary);
+  --color-secondary: var(--wmp-chart-2);
+  --color-accent: var(--wmp-chart-2);
+  --color-success: var(--wmp-gain);
+  --color-warning: var(--wmp-warning);
+  --color-danger: var(--wmp-danger);
 
-  // Radii and depth tokens
-  --radius: 8px; // Default corner radius for cards/controls
-  --shadow: 0 6px 24px rgba(0, 0, 0, .08); // Default soft shadow for elevated surfaces
+  // Radii and depth
+  --radius: var(--wmp-radius-md);
+  --radius-lg: var(--wmp-radius-lg);
+  --shadow: var(--wmp-shadow);
+  --shadow-sm: var(--wmp-shadow);
 
-  // Focus ring used for accessibility feedback (based on primary)
-  --ring: 0 0 0 3px color-mix(in oklab, var(--color-primary), white 70%);
+  // Focus ring
+  --ring: var(--wmp-focus-ring);
 }
 
 // Transition speeds used in various interactive elements

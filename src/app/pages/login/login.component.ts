@@ -1,5 +1,5 @@
 import {Component, inject, signal, computed} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
 import {Router, RouterLink} from '@angular/router';
 import {AuthService as CoreAuthService} from '../../core/services/auth.service';
@@ -11,7 +11,7 @@ import { firstValueFrom } from 'rxjs';
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink],
   template: `
     <section class="auth-shell">
       <div class="card form-card form-card--sm">
@@ -263,7 +263,7 @@ export class LoginComponent {
   greeting = computed(() => {
     const u = this.auth.username();
     if (u) return `Welcome back, ${u}`;
-    return 'Welcome to Wealth Management Platform';
+    return 'Welcome to WMP';
   });
 
   form = this.fb.group({

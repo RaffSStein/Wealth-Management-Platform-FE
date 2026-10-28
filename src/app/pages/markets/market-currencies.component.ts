@@ -1,10 +1,10 @@
 import {Component} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 
 @Component({
   standalone: true,
   selector: 'app-market-currencies',
-  imports: [CommonModule],
+  imports: [],
   template: `
     <div class="placeholder"><h1>Currencies</h1>
       <p class="muted">(Placeholder) FX rates and moves.</p></div>`,

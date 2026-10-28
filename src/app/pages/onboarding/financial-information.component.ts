@@ -1,5 +1,5 @@
 import {Component, inject, signal} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 import {OnboardingStep, OnboardingProgressService} from '../../core/services/onboarding-progress.service';
 import {OnboardingStepShellComponent} from '../../shared/components/onboarding-step-shell/onboarding-step-shell.component';
 import {Router, RouterModule} from '@angular/router';
@@ -16,7 +16,7 @@ import {firstValueFrom} from 'rxjs';
 @Component({
   selector: 'app-onboarding-financial-information',
   standalone: true,
-  imports: [CommonModule, OnboardingStepShellComponent, ReactiveFormsModule, RouterModule],
+  imports: [OnboardingStepShellComponent, ReactiveFormsModule, RouterModule],
   template: `
     <app-onboarding-step-shell
       [stepIndex]="step"

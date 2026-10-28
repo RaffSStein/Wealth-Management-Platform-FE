@@ -1,10 +1,10 @@
 import {Component} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 
 @Component({
   standalone: true,
   selector: 'app-tax-credits',
-  imports: [CommonModule],
+  imports: [],
   template: `
     <div class="placeholder">
       <h1>Tax Credits</h1>

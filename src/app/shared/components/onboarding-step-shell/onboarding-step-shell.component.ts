@@ -1,5 +1,5 @@
 import {Component, Input, inject} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 import {RouterModule} from '@angular/router';
 import {OnboardingNavigatorComponent} from '../onboarding-navigator/onboarding-navigator.component';
 import {OnboardingStep} from '../../../core/services/onboarding-progress.service';
@@ -9,7 +9,7 @@ import {Router} from '@angular/router';
 @Component({
   selector: 'app-onboarding-step-shell',
   standalone: true,
-  imports: [CommonModule, RouterModule, OnboardingNavigatorComponent],
+  imports: [RouterModule, OnboardingNavigatorComponent],
   template: `
     <section class="onb-shell">
       <div class="panel">

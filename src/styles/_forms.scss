@@ -46,7 +46,7 @@ input:focus, select:focus, textarea:focus {
 input[disabled], select[disabled], textarea[disabled] {
   opacity: .6;
   cursor: not-allowed;
-  background: #f9fafb;
+  background: var(--color-surface-alt);
 }
 
 /* Checkboxes and radios: opt into accent-color where supported for easy theming */
@@ -92,7 +92,7 @@ button:disabled {
 
 /* Secondary button variant: neutral surface with standard text color */
 .button-secondary {
-  background: #fff;
+  background: var(--color-surface-alt);
   color: var(--color-text);
   border-color: var(--color-border);
 }
@@ -115,8 +115,8 @@ button:disabled {
 
 .field .error {
   color: var(--color-danger); // Error text uses semantic token
-  background: #fee4e2; // Light error background
-  border: 1px solid #fecdca; // Subtle error border
+  background: var(--wmp-danger-soft); // Soft error background
+  border: 1px solid color-mix(in srgb, var(--wmp-danger), transparent 60%); // Subtle error border
   padding: 0.4rem 0.5rem;
   border-radius: var(--radius);
 }
@@ -244,7 +244,7 @@ button:disabled {
 
 /* Bank branch picker overlay */
 .branch-picker-overlay { position:fixed; inset:0; background:rgba(0,0,0,.35); display:grid; place-items:center; z-index:1000; animation: fadeIn .18s ease-out; }
-.branch-picker { width:min(860px,92vw); max-height:82vh; background:var(--color-surface,#fff); border-radius:var(--radius-lg,var(--radius)); padding:1rem 1.25rem 1.25rem; display:grid; grid-template-rows:auto 1fr auto; gap:0.75rem; box-shadow:0 6px 24px -4px rgba(0,0,0,.15),0 2px 6px -2px rgba(0,0,0,.1); animation: scaleIn .22s cubic-bezier(.4,.2,.2,1); }
+.branch-picker { width:min(860px,92vw); max-height:82vh; background:var(--color-surface,#fff); border-radius:var(--radius-lg,var(--radius)); padding:1rem 1.25rem 1.25rem; display:grid; grid-template-rows:auto 1fr auto; gap:0.75rem; box-shadow:var(--wmp-shadow); animation: scaleIn .22s cubic-bezier(.4,.2,.2,1); }
 .branch-picker header { display:flex; justify-content:space-between; align-items:center; }
 .branch-picker h2 { margin:0; font-size:1.1rem; }
 .branch-picker .filters { display:grid; gap:0.75rem; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); }

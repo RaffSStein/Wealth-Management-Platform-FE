@@ -137,5 +137,7 @@ export const routes: Routes = [
   {path: 'home', redirectTo: 'app/home', pathMatch: 'full'},
 
   {path: 'terms', loadComponent: () => import('./pages/terms/terms.component').then(m => m.TermsComponent)},
+  // Dev-only living style guide for the Ledger Pro theme and PrimeNG components
+  {path: 'dev/ui-kit', loadComponent: () => import('./pages/dev/ui-kit.component').then(m => m.UiKitComponent)},
   {path: '**', redirectTo: ''}
 ];

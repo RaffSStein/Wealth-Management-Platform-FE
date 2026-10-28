@@ -1,5 +1,5 @@
 import {Component, inject, OnDestroy} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 import {OnboardingStep, OnboardingProgressService} from '../../core/services/onboarding-progress.service';
 import {
   OnboardingStepShellComponent
@@ -18,7 +18,7 @@ import {CustomerSessionService} from '../../core/services/customer-session.servi
 @Component({
   selector: 'app-onboarding-personal-details',
   standalone: true,
-  imports: [CommonModule, OnboardingStepShellComponent, ReactiveFormsModule],
+  imports: [OnboardingStepShellComponent, ReactiveFormsModule],
   template: `
     <app-onboarding-step-shell
       [stepIndex]="step"

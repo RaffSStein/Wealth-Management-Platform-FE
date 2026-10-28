@@ -1,12 +1,12 @@
 import {Component, inject, signal} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 import {Router, RouterLink} from '@angular/router';
 import {RegistrationStateService} from '../../core/services/registration-state.service';
 
 @Component({
   selector: 'app-registration-success',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [RouterLink],
   template: `
     <section class="auth-shell">
       <div class="card form-card form-card--md narrow-form" role="alert" aria-live="polite">

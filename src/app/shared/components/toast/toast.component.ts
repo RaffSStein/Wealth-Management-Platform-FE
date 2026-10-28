@@ -1,11 +1,11 @@
-import {CommonModule} from '@angular/common';
+
 import {ChangeDetectionStrategy, Component} from '@angular/core';
 import {ToastService} from '../../services/toast.service';
 
 @Component({
   selector: 'app-toast-host',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   template: `
     <div class="toast-host">
       @for (t of toastService.items(); track t.id) {

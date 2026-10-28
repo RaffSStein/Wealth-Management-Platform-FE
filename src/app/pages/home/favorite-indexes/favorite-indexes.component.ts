@@ -200,7 +200,7 @@ export interface FavoriteIndex {
     }
 
     .delta.positive {
-      color: #1a7f37;
+      color: var(--wmp-gain);
     }
 
     .delta.negative {

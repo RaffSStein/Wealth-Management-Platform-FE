@@ -1,5 +1,5 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { ReactiveFormsModule, FormBuilder, Validators, AbstractControl, ValidationErrors, ValidatorFn, FormGroup, FormControl } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { ToastService } from '../../shared/services/toast.service';
@@ -12,7 +12,7 @@ import { ONE_TIME_AUTH_TOKEN } from '../../core/interceptors/auth.context';
 @Component({
   selector: 'app-setup-password',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, PasswordStrengthFieldComponent],
+  imports: [ReactiveFormsModule, PasswordStrengthFieldComponent],
   template: `
     <section class="setup-password-page">
       <h1>Set your password</h1>

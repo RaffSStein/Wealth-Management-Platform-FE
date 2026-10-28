@@ -1,21 +1,26 @@
 /*
   Global stylesheet entrypoint
   - Purpose: wire up shared style modules for the entire app.
-  - Load order matters: variables first (design tokens), then base (resets/typography), then components/forms.
-  - Sass uses module system via `@use`; modules are namespaced unless imported `as *`.
+  - Fonts (IBM Plex Sans / Mono via @fontsource) are registered in angular.json "styles".
+  - Cascade layers (lowest to highest priority): wmp-reset < wmp-legacy < primeng < unlayered.
+    PrimeNG emits its CSS into the `primeng` layer (cssLayer option in app.config.ts), so our global
+    element rules can never override library components, while component styles (unlayered) still can.
 */
-
- /* Design tokens (CSS variables + Sass variables). Using `as *` exposes Sass vars in this file's scope if needed. */
+@use 'sass:meta';
+/* Design tokens (--wmp-* CSS variables, dark + light) and legacy aliases. Unlayered: plain custom properties. */
+@use "./styles/tokens";
 @use "./styles/variables" as *;
 
-/* Base styles (box-sizing, html/body defaults, typography, links, focus ring). */
-@use "./styles/base";
+@layer wmp-reset, wmp-legacy, primeng;
 
-/* Form controls and buttons (inputs, selects, textarea, buttons, helpers). */
-@use "./styles/forms";
+/* Base styles (box-sizing, html/body defaults, typography, links, focus ring, numeric utilities). */
+@layer wmp-reset {
+  @include meta.load-css("./styles/base");
+}
 
-/* Icon utilities (sizes and color helpers, plus mask technique). */
-@use "./styles/icons";
-
-/* Surface utilities (cards, rounded containers, shadows). */
-@use "./styles/surfaces.scss";
+/* Pre-PrimeNG global styles: form controls, buttons, icons, surfaces. To be retired screen by screen. */
+@layer wmp-legacy {
+  @include meta.load-css("./styles/forms");
+  @include meta.load-css("./styles/icons");
+  @include meta.load-css("./styles/surfaces");
+}

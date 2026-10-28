@@ -1,5 +1,5 @@
 import {Component, inject, signal} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 import {Router} from '@angular/router';
 import {CustomerDisambiguationService, DisambiguationItem} from '../../core/services/customer-disambiguation.service';
 import {UserSessionService} from '../../core/services/user-session.service';
@@ -12,7 +12,7 @@ import {firstValueFrom} from 'rxjs';
 @Component({
   selector: 'app-customer-disambiguation',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   template: `
     <section class="onb-shell onb-shell--disamb">
       <div class="panel">

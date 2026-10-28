@@ -1,5 +1,5 @@
 import {Component, inject} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 import {OnboardingStep, OnboardingProgressService} from '../../core/services/onboarding-progress.service';
 import {OnboardingStepShellComponent} from '../../shared/components/onboarding-step-shell/onboarding-step-shell.component';
 import {Router} from '@angular/router';
@@ -9,7 +9,7 @@ import {ToastService} from '../../shared/services/toast.service';
 @Component({
   selector: 'app-onboarding-risk-assessment',
   standalone: true,
-  imports: [CommonModule, OnboardingStepShellComponent],
+  imports: [OnboardingStepShellComponent],
   template: `
     <app-onboarding-step-shell
       [stepIndex]="step"

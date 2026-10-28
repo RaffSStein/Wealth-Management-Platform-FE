@@ -1,10 +1,10 @@
 import {Component} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 
 @Component({
   standalone: true,
   selector: 'app-investment-orders',
-  imports: [CommonModule],
+  imports: [],
   template: `
     <div class="placeholder"><h1>Orders</h1>
       <p class="muted">(Placeholder) Orders history and status will appear here.</p></div>`,

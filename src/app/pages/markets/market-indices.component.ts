@@ -1,10 +1,10 @@
 import {Component} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 
 @Component({
   standalone: true,
   selector: 'app-market-indices',
-  imports: [CommonModule],
+  imports: [],
   template: `
     <div class="placeholder"><h1>Indices</h1>
       <p class="muted">(Placeholder) Major indices overview.</p></div>`,

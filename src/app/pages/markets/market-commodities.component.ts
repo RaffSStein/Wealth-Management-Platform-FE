@@ -1,10 +1,10 @@
 import {Component} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 
 @Component({
   standalone: true,
   selector: 'app-market-commodities',
-  imports: [CommonModule],
+  imports: [],
   template: `
     <div class="placeholder"><h1>Commodities</h1>
       <p class="muted">(Placeholder) Commodities snapshot.</p></div>`,

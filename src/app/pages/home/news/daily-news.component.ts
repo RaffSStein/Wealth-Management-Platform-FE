@@ -1,5 +1,5 @@
 import {Component} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 
 /**
  * Daily News widget (placeholder)
@@ -7,7 +7,7 @@ import {CommonModule} from '@angular/common';
 @Component({
   selector: 'app-daily-news',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   template: `
     <section class="card news" aria-labelledby="news-title">
       <h2 id="news-title">Daily News</h2>

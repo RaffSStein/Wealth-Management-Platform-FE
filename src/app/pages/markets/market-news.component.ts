@@ -1,10 +1,10 @@
 import {Component} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 
 @Component({
   standalone: true,
   selector: 'app-market-news',
-  imports: [CommonModule],
+  imports: [],
   template: `
     <div class="placeholder"><h1>Market News</h1>
       <p class="muted">(Placeholder) Latest market news feed.</p></div>`,

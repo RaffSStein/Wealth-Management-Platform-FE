@@ -1,6 +1,6 @@
 import {Component, inject, signal} from '@angular/core';
 import {Router, RouterLink} from '@angular/router';
-import {CommonModule, Location} from '@angular/common';
+import { Location } from '@angular/common';
 import {
   FormBuilder,
   ReactiveFormsModule,
@@ -12,7 +12,7 @@ import {ToastService} from '../../shared/services/toast.service';
 @Component({
   selector: 'app-onboarding-start',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink],
   template: `
     <section class="auth-shell">
       <div class="card form-card form-card--md narrow-form">
@@ -122,13 +122,13 @@ import {ToastService} from '../../shared/services/toast.service';
 
     .btn.btn--secondary,
     .btn.btn--ghost {
-      background-color: #ffffff;
+      background-color: var(--wmp-surface);
       color: inherit;
     }
 
     .btn.btn--secondary:hover,
     .btn.btn--ghost:hover {
-      background-color: #f5f5f5;
+      background-color: var(--wmp-surface-raised);
     }
   `]
 })

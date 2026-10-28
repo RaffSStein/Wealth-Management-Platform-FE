@@ -1,5 +1,5 @@
 import {Component, signal} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 import {FavoriteIndexesComponent} from './favorite-indexes/favorite-indexes.component';
 import {AssetsOverviewComponent} from './assets/overview/assets.overview.component';
 import {DailyNewsComponent} from './news/daily-news.component';
@@ -16,7 +16,7 @@ import {PromotionsComponent} from './promotions/promotions.component';
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, FavoriteIndexesComponent, AssetsOverviewComponent, DailyNewsComponent, PromotionsComponent],
+  imports: [FavoriteIndexesComponent, AssetsOverviewComponent, DailyNewsComponent, PromotionsComponent],
   template: `
     <div class="dashboard-grid">
       <app-assets-overview />

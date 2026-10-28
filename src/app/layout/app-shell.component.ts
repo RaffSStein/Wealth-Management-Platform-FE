@@ -1,5 +1,5 @@
 import {Component, signal, computed, effect} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 import {Router, RouterModule, NavigationEnd} from '@angular/router';
 import {AuthService} from '../core/services/auth.service';
 import {NotificationBellComponent} from '../shared/components/notification-bell/notification-bell.component';
@@ -21,12 +21,18 @@ type SectionKey = 'account' | 'investments' | 'news-markets';
 @Component({
   standalone: true,
   selector: 'app-shell',
-  imports: [CommonModule, RouterModule, NotificationBellComponent],
+  imports: [RouterModule, NotificationBellComponent],
   template: `
     <div class="app-shell">
       <!-- Top Header -->
       <header class="topbar" role="banner">
-        <div class="brand" routerLink="/app/home" aria-label="Go to Account Home">Wealth<span>Portal</span></div>
+        <a class="brand" routerLink="/app/home" aria-label="WMP home">
+          <svg class="brand-mark" width="28" height="28" viewBox="0 0 40 40" aria-hidden="true">
+            <rect x="1" y="1" width="38" height="38" rx="7" fill="var(--wmp-surface)" stroke="var(--wmp-border)"/>
+            <path d="M9 28h5V18H9zM17.5 28h5V12h-5zM26 28h5V22h-5z" fill="var(--wmp-primary)"/>
+          </svg>
+          <span class="wordmark">WMP</span>
+        </a>
         @if (!isOnboarding()) {
           <nav class="primary-nav" aria-label="Primary navigation">
             <a routerLink="/app/home" (click)="setTopSection('account')" routerLinkActive="active"
@@ -123,18 +129,13 @@ type SectionKey = 'account' | 'investments' | 'news-markets';
 
     .brand {
       font-weight: 600;
-      cursor: pointer;
       letter-spacing: .5px;
       font-size: 1.05rem;
-      color: var(--color-primary);
+      color: var(--wmp-text);
       display: flex;
       align-items: center;
+      gap: .5rem;
       text-decoration: none;
-    }
-
-    .brand span {
-      color: var(--color-heading);
-      margin-left: 2px;
     }
 
     .primary-nav {

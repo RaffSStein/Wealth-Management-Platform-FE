@@ -1,10 +1,10 @@
 import {Component} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 
 @Component({
   standalone: true,
   selector: 'app-securities-transfer',
-  imports: [CommonModule],
+  imports: [],
   template: `
     <div class="placeholder">
       <h1>Securities Transfer</h1>

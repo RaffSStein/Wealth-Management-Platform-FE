@@ -1,10 +1,10 @@
 import {Component} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 
 @Component({
   standalone: true,
   selector: 'app-investment-allocation',
-  imports: [CommonModule],
+  imports: [],
   template: `
     <div class="placeholder"><h1>Allocation</h1>
       <p class="muted">(Placeholder) Asset allocation breakdown.</p></div>`,
