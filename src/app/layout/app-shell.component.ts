@@ -18,6 +18,7 @@ import {NotificationBellComponent} from '../shared/components/notification-bell/
 import {ActingAsBannerComponent} from './acting-as-banner.component';
 import {activeSection, navigationFor} from './navigation';
 import {SideNavComponent} from './side-nav.component';
+import {BrandComponent} from '../shared/components/brand/brand.component';
 
 const COLLAPSED_KEY = 'wmp.sidenav.collapsed';
 
@@ -30,7 +31,7 @@ const COLLAPSED_KEY = 'wmp.sidenav.collapsed';
 @Component({
   selector: 'app-shell',
   imports: [RouterOutlet, RouterLink, RouterLinkActive, Avatar, ButtonDirective, ButtonIcon, Drawer, InputText, Menu,
-    Tooltip, NotificationBellComponent, ActingAsBannerComponent, SideNavComponent],
+    Tooltip, BrandComponent, NotificationBellComponent, ActingAsBannerComponent, SideNavComponent],
   template: `
     <div class="shell" [class.shell--onboarding]="isOnboarding()" [class.shell--collapsed]="collapsed()">
       <header class="topbar">
@@ -40,13 +41,7 @@ const COLLAPSED_KEY = 'wmp.sidenav.collapsed';
             <span pButtonIcon class="material-symbols-outlined" aria-hidden="true">menu</span>
           </button>
         }
-        <a class="brand" [routerLink]="workspace.homePath()" aria-label="WMP home">
-          <svg width="28" height="28" viewBox="0 0 40 40" aria-hidden="true">
-            <rect x="1" y="1" width="38" height="38" rx="7" fill="var(--wmp-surface)" stroke="var(--wmp-border)"/>
-            <path d="M9 28h5V18H9zM17.5 28h5V12h-5zM26 28h5V22h-5z" fill="var(--wmp-primary)"/>
-          </svg>
-          <span class="brand__word">WMP</span>
-        </a>
+        <app-brand [link]="workspace.homePath()"/>
 
         @if (!isOnboarding()) {
           <nav class="sections" aria-label="Primary">
@@ -128,8 +123,6 @@ const COLLAPSED_KEY = 'wmp.sidenav.collapsed';
       background: var(--wmp-bg); border-bottom: 1px solid var(--wmp-border);
     }
     .topbar__menu { display: none; }
-    .brand { display: flex; align-items: center; gap: .5rem; color: var(--wmp-text); font-weight: 600; letter-spacing: .04em; text-decoration: none; }
-    .brand:hover { text-decoration: none; }
     .sections { display: flex; gap: 2px; }
     .sections__link {
       height: 36px; display: flex; align-items: center; padding: 0 .85rem; border-radius: var(--wmp-radius-md);

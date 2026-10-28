@@ -1,143 +1,78 @@
 import {Component, inject, signal} from '@angular/core';
 import {Router, RouterLink} from '@angular/router';
-import { Location } from '@angular/common';
-import {
-  FormBuilder,
-  ReactiveFormsModule,
-  Validators
-} from '@angular/forms';
+import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
+import {firstValueFrom} from 'rxjs';
+import {Button} from 'primeng/button';
+import {InputText} from 'primeng/inputtext';
 import {AuthService as ApiAuthService, RegisterRequestDTO} from '../../api/user-service';
 import {ToastService} from '../../shared/services/toast.service';
+import {RegistrationStateService} from '../../core/services/registration-state.service';
+import {AuthLayoutComponent} from '../../shared/components/auth-layout/auth-layout.component';
 
+/**
+ * Public sign-up (/onboarding/start): creates the user; the BE then emails a password-setup link.
+ */
 @Component({
   selector: 'app-onboarding-start',
-  standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, AuthLayoutComponent, Button, InputText],
   template: `
-    <section class="auth-shell">
-      <div class="card form-card form-card--md narrow-form">
-        <a routerLink="/" class="back-link" aria-label="Back to home">&larr; home</a>
-        <header class="headline">
-          <h1 class="greeting">Welcome</h1>
-          <p class="subtitle">Create your account to get started</p>
-        </header>
+    <app-auth-layout headline="Open your WMP account."
+                     lead="Create your account in a minute. We'll email you a secure link to set your password, then guide you through a short investor profile.">
+      <header class="head">
+        <h2>Create your account</h2>
+        <p>All fields are required.</p>
+      </header>
 
-        <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate class="wm-form vertical">
-          <div class="field">
-            <label for="firstName">First name *</label>
-            <input id="firstName" type="text" formControlName="firstName" autocomplete="given-name"/>
-            @if (showError('firstName')) {
-              <small class="error">Required field</small>
-            }
+      <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate class="wmp-form">
+        <div class="wmp-form-grid">
+          <div class="wmp-field">
+            <label for="firstName">First name</label>
+            <input pInputText id="firstName" formControlName="firstName" autocomplete="given-name"
+                   [attr.aria-invalid]="showError('firstName')"/>
+            @if (showError('firstName')) { <small class="wmp-field__error">Enter your first name.</small> }
           </div>
-
-          <div class="field">
-            <label for="lastName">Last name *</label>
-            <input id="lastName" type="text" formControlName="lastName" autocomplete="family-name"/>
-            @if (showError('lastName')) {
-              <small class="error">Required field</small>
-            }
+          <div class="wmp-field">
+            <label for="lastName">Last name</label>
+            <input pInputText id="lastName" formControlName="lastName" autocomplete="family-name"
+                   [attr.aria-invalid]="showError('lastName')"/>
+            @if (showError('lastName')) { <small class="wmp-field__error">Enter your last name.</small> }
           </div>
+        </div>
+        <div class="wmp-field">
+          <label for="email">Email</label>
+          <input pInputText id="email" type="email" formControlName="email" autocomplete="email"
+                 placeholder="name@example.com" [attr.aria-invalid]="showError('email')"/>
+          @if (showError('email')) { <small class="wmp-field__error">Enter a valid email address.</small> }
+        </div>
+        <div class="wmp-field">
+          <label for="phoneNumber">Phone</label>
+          <input pInputText id="phoneNumber" type="tel" formControlName="phoneNumber" autocomplete="tel"
+                 placeholder="+39 …" [attr.aria-invalid]="showError('phoneNumber')"/>
+          @if (showError('phoneNumber')) { <small class="wmp-field__error">Enter your phone number.</small> }
+        </div>
 
-          <div class="field">
-            <label for="email">Email *</label>
-            <input id="email" type="email" formControlName="email" autocomplete="email"/>
-            @if (showError('email')) {
-              <small class="error">Invalid email</small>
-            }
-          </div>
+        <p-button type="submit" [label]="loading() ? 'Creating account…' : 'Create account'" [loading]="loading()"
+                  [fluid]="true"/>
+      </form>
 
-          <div class="field">
-            <label for="phoneNumber">Phone *</label>
-            <input id="phoneNumber" type="tel" formControlName="phoneNumber" autocomplete="tel"/>
-            @if (showError('phoneNumber')) {
-              <small class="error">Required</small>
-            }
-          </div>
-
-          <div class="actions-row">
-            <button type="button"
-                    class="btn btn--secondary actions-row__prev"
-                    (click)="goBack()"
-                    [disabled]="loading()">
-              Back
-            </button>
-
-            <button type="button"
-                    class="btn btn--ghost actions-row__reset"
-                    (click)="resetForm()"
-                    [disabled]="loading()">
-              Reset
-            </button>
-
-            <button class="primary btn--lg register-submit actions-row__next"
-                    type="submit" [disabled]="loading()">
-              {{ loading() ? 'Signing up…' : 'Create account' }}
-            </button>
-          </div>
-        </form>
-
-        <p class="signin-hint">Already have an account? <a routerLink="/auth/sign-in">Sign in</a></p>
-      </div>
-    </section>
+      <p class="foot">Already have an account? <a routerLink="/auth/sign-in">Sign in</a></p>
+      <p class="terms">By continuing you agree to our <a routerLink="/terms">Terms of Service</a>.</p>
+    </app-auth-layout>
   `,
   styles: [`
-    .narrow-form {
-      max-width: 520px;
-      margin-inline: auto;
-    }
-
-    .wm-form.vertical .field {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .wm-form.vertical .field + .field {
-      margin-top: .6rem;
-    }
-
-    .sr-only {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      padding: 0;
-      margin: -1px;
-      overflow: hidden;
-      clip: rect(0 0 0 0);
-      white-space: nowrap;
-      border: 0;
-    }
-
-    .actions-row {
-      display: flex;
-      width: 100%;
-      align-items: center;
-      justify-content: flex-end;
-      gap: .75rem;
-      margin-top: .9rem;
-    }
-
-    .actions-row__next {
-    }
-
-    .btn.btn--secondary,
-    .btn.btn--ghost {
-      background-color: var(--wmp-surface);
-      color: inherit;
-    }
-
-    .btn.btn--secondary:hover,
-    .btn.btn--ghost:hover {
-      background-color: var(--wmp-surface-raised);
-    }
+    .head { margin-bottom: 1.25rem; }
+    .head h2 { margin: 0; font-size: 1.5rem; font-weight: 600; }
+    .head p { margin: .35rem 0 0; color: var(--wmp-text-muted); font-size: .9rem; }
+    .foot { margin: 1.25rem 0 0; text-align: center; font-size: .9rem; color: var(--wmp-text-muted); }
+    .terms { margin: .5rem 0 0; text-align: center; font-size: .75rem; color: var(--wmp-text-muted); }
   `]
 })
 export class OnboardingStartComponent {
   private readonly fb = inject(FormBuilder);
   private readonly router = inject(Router);
-  private readonly location = inject(Location);
   private readonly apiAuth = inject(ApiAuthService);
   private readonly toast = inject(ToastService);
+  private readonly registrationState = inject(RegistrationStateService);
 
   loading = signal(false);
 
@@ -153,46 +88,28 @@ export class OnboardingStartComponent {
     return !!ctrl && ctrl.invalid && (ctrl.touched || ctrl.dirty);
   }
 
-  resetForm() {
-    this.form.reset();
-  }
-
-  goBack() {
-    this.location.back();
-  }
-
-  onSubmit() {
+  async onSubmit(): Promise<void> {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return;
     }
-
-    const value = this.form.value as any;
+    const value = this.form.getRawValue();
     const payload: RegisterRequestDTO = {
       email: (value.email || '').trim(),
       firstName: (value.firstName || '').trim(),
       lastName: (value.lastName || '').trim(),
       phoneNumber: (value.phoneNumber || '').trim()
-    } as any;
+    } as RegisterRequestDTO;
 
     this.loading.set(true);
-
-    this.apiAuth.registerUser(payload).subscribe({
-      next: () => {
-        this.router.navigate(['auth/sign-in'], {
-          state: {
-            registrationSucceeded: true,
-            registeredEmail: payload.email
-          }
-        }).finally(() => {
-          this.loading.set(false);
-        });
-      },
-      error: (err) => {
-        console.error(err);
-        this.toast.error('Registration failed. Please try again later.', 5000);
-        this.loading.set(false);
-      }
-    });
+    try {
+      await firstValueFrom(this.apiAuth.registerUser(payload));
+      this.registrationState.setEmail(payload.email);
+      await this.router.navigateByUrl('/auth/registration-success');
+    } catch {
+      this.toast.error('Registration failed. Please try again later.', 5000);
+    } finally {
+      this.loading.set(false);
+    }
   }
 }

@@ -1,4 +1,5 @@
-import {Routes} from '@angular/router';
+import {inject} from '@angular/core';
+import {Router, Routes} from '@angular/router';
 import {onboardingStepGuard} from './core/guards/onboarding-step.guard';
 import {authGuard} from './core/guards/auth.guard';
 import {roleGuard} from './core/guards/role.guard';
@@ -16,58 +17,60 @@ export const routes: Routes = [
     path: 'auth/registration-success',
     loadComponent: () => import('./pages/auth/registration-success.component').then(m => m.RegistrationSuccessComponent)
   },
-  // NEW: set password via one-time link
-  { path: 'auth/set-password', loadComponent: () => import('./pages/auth/set-password.component').then(m => m.SetPasswordComponent) },
+  // Legacy password link: the real one-time link is /onboarding/setup-password (query params such as ?token are kept)
+  // Redirect function: keeps the ?token query param on both the SSR server (302) and the client
+  {
+    path: 'auth/set-password',
+    redirectTo: ({queryParams}) => inject(Router).createUrlTree(['/onboarding/setup-password'], {queryParams})
+  },
   // Registration route redirects to sign-in for now
   {path: 'auth/sign-up', redirectTo: 'auth/sign-in', pathMatch: 'full'},
   // legacy login route redirects to new auth path
   {path: 'login', redirectTo: 'auth/sign-in', pathMatch: 'full'},
 
-  // Onboarding flow (wrapped with AppShell in onboarding mode). 'start' (sign-up) and 'setup-password'
-  // (one-time email link) are public; the other steps require a session.
+  // Public onboarding entry points, rendered without the app shell: sign-up and the one-time password link
+  {path: 'onboarding/start', loadComponent: () => import('./pages/onboarding/register.component').then(m => m.OnboardingStartComponent)},
+  {path: 'onboarding/setup-password', loadComponent: () => import('./pages/onboarding/setup-password.page').then(m => m.SetupPasswordPage)},
+
+  // Onboarding flow (AppShell in onboarding mode); requires a session
   {
     path: 'onboarding',
     loadComponent: () => import('./layout/app-shell.component').then(m => m.AppShellComponent),
+    canActivate: [authGuard],
     children: [
-      { path: 'start', loadComponent: () => import('./pages/onboarding/register.component').then(m => m.OnboardingStartComponent) },
       {
         path: 'personal-details',
         loadComponent: () => import('./pages/onboarding/personal-details.component').then(m => m.PersonalDetailsComponent),
-        canActivate: [authGuard, onboardingStepGuard],
+        canActivate: [onboardingStepGuard],
         data: {step: 0}
       },
       {
         path: 'financial-information',
         loadComponent: () => import('./pages/onboarding/financial-information.component').then(m => m.FinancialInformationComponent),
-        canActivate: [authGuard, onboardingStepGuard],
+        canActivate: [onboardingStepGuard],
         data: {step: 1}
       },
       {
         path: 'investment-goals',
         loadComponent: () => import('./pages/onboarding/investment-goals.component').then(m => m.InvestmentGoalsComponent),
-        canActivate: [authGuard, onboardingStepGuard],
+        canActivate: [onboardingStepGuard],
         data: {step: 2}
       },
       {
         path: 'mifid-questionnaire',
         loadComponent: () => import('./pages/onboarding/mifid-questionnaire.component').then(m => m.MifidQuestionnaireComponent),
-        canActivate: [authGuard, onboardingStepGuard],
+        canActivate: [onboardingStepGuard],
         data: {step: 3}
       },
       {
         path: 'risk-assessment',
         loadComponent: () => import('./pages/onboarding/risk-assessment.component').then(m => m.RiskAssessmentComponent),
-        canActivate: [authGuard, onboardingStepGuard],
+        canActivate: [onboardingStepGuard],
         data: {step: 4}
       },
       {
-        path: 'setup-password',
-        loadComponent: () => import('./pages/onboarding/setup-password.page').then(m => m.SetupPasswordPage)
-      },
-      {
         path: 'disambiguation',
-        loadComponent: () => import('./pages/onboarding/disambiguation.component').then(m => m.CustomerDisambiguationComponent),
-        canActivate: [authGuard]
+        loadComponent: () => import('./pages/onboarding/disambiguation.component').then(m => m.CustomerDisambiguationComponent)
       },
       { path: '', pathMatch: 'full', redirectTo: 'personal-details' }
     ]

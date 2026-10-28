@@ -1,7 +1,9 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 
 import { ReactiveFormsModule, FormBuilder, Validators, AbstractControl, ValidationErrors, ValidatorFn, FormGroup, FormControl } from '@angular/forms';
-import { Router, ActivatedRoute } from '@angular/router';
+import { Router, ActivatedRoute, RouterLink } from '@angular/router';
+import { Button } from 'primeng/button';
+import { AuthLayoutComponent } from '../../shared/components/auth-layout/auth-layout.component';
 import { ToastService } from '../../shared/services/toast.service';
 import { PasswordStrengthFieldComponent } from '../../shared/components/password-strength-field/password-strength-field.component';
 import { firstValueFrom } from 'rxjs';
@@ -12,89 +14,48 @@ import { ONE_TIME_AUTH_TOKEN } from '../../core/interceptors/auth.context';
 @Component({
   selector: 'app-setup-password',
   standalone: true,
-  imports: [ReactiveFormsModule, PasswordStrengthFieldComponent],
+  imports: [ReactiveFormsModule, RouterLink, PasswordStrengthFieldComponent, AuthLayoutComponent, Button],
   template: `
-    <section class="setup-password-page">
-      <h1>Set your password</h1>
-
-      @if (!success()) {
-        <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate class="setup-form">
-          <app-password-strength-field
-            [group]="form"
-            [submitted]="submitting()">
-          </app-password-strength-field>
-
-          <div class="form-actions">
-            <button type="submit" [disabled]="submitting() || form.invalid" class="primary-btn">Set password</button>
-          </div>
+    <app-auth-layout headline="Secure your account." lead="Choose a strong password to activate your WMP account. You'll use it with your email to sign in.">
+      @if (success()) {
+        <div class="state" role="status">
+          <span class="material-symbols-outlined state__icon state__icon--ok" aria-hidden="true">verified_user</span>
+          <h2>Password set</h2>
+          <p>Your account is ready. Sign in with your email and new password.</p>
+          <p-button label="Go to sign in" (onClick)="goToLogin()"/>
+        </div>
+      } @else if (!token()) {
+        <div class="state" role="alert">
+          <span class="material-symbols-outlined state__icon state__icon--err" aria-hidden="true">link_off</span>
+          <h2>This link isn't valid</h2>
+          <p>Open the password link from your activation email, or request a new one.</p>
+          <a routerLink="/auth/forgot-password">Request a new link</a>
+        </div>
+      } @else {
+        <header class="head">
+          <h2>Set your password</h2>
+          <p>Use at least 8 characters with an uppercase letter, a number and a symbol.</p>
+        </header>
+        <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate class="wmp-form">
+          <app-password-strength-field [group]="form" [submitted]="submitting()"/>
+          @if (failed()) {
+            <p class="wmp-field__error" role="alert">We couldn't set your password. The link may be invalid or expired;
+              <a routerLink="/auth/forgot-password">request a new one</a>.</p>
+          }
+          <p-button type="submit" label="Set password" [loading]="submitting()" [disabled]="form.invalid" [fluid]="true"/>
         </form>
       }
-
-      @if (success()) {
-        <div class="success">
-          <p>Password successfully set.</p>
-          <button (click)="goToLogin()" class="primary-btn">Go to sign in</button>
-        </div>
-      }
-    </section>
+    </app-auth-layout>
   `,
   styles: [`
-    .setup-password-page {
-      padding: 2rem;
-      color: var(--color-text);
-      display: grid;
-      justify-content: center;
-    }
-    .setup-password-page h1 {
-      text-align: center;
-      margin: 0 0 1rem;
-      color: var(--color-text);
-      font-size: 1.25rem;
-      font-weight: 600;
-    }
-    .setup-form {
-      width: 100%;
-      max-width: 520px;
-      background: var(--surface, var(--color-surface, #fff));
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius, 8px);
-      padding: 1rem;
-      box-shadow: var(--shadow-sm, 0 1px 2px rgba(0,0,0,.06));
-      display: grid;
-      gap: 1rem;
-    }
-    .form-actions {
-      display: flex;
-      justify-content: flex-end;
-      margin-top: .5rem;
-    }
-    .primary-btn {
-      appearance: none;
-      border: none;
-      border-radius: var(--radius, 8px);
-      padding: .6rem 1rem;
-      font-size: .95rem;
-      font-weight: 600;
-      background: var(--color-primary);
-      color: var(--color-primary-contrast);
-      cursor: pointer;
-      transition: background-color .2s ease, opacity .2s ease;
-    }
-    .primary-btn:disabled {
-      opacity: .6;
-      cursor: not-allowed;
-    }
-    .primary-btn:not(:disabled):hover {
-      opacity: .95;
-    }
-    .success {
-      width: 100%;
-      max-width: 520px;
-      margin: 1rem auto 0;
-      text-align: center;
-      display: grid;
-      gap: .75rem;
-    }
+    .head { margin-bottom: 1.25rem; }
+    .head h2, .state h2 { margin: 0; font-size: 1.5rem; font-weight: 600; }
+    .head p { margin: .35rem 0 0; color: var(--wmp-text-muted); font-size: .9rem; }
+    .state { display: grid; gap: .75rem; justify-items: start; }
+    .state p { margin: 0; color: var(--wmp-text-muted); line-height: 1.6; }
+    .state__icon { font-size: 36px; }
+    .state__icon--ok { color: var(--wmp-gain); }
+    .state__icon--err { color: var(--wmp-danger); }
   `]
 })
 export class SetupPasswordPage implements OnInit {
@@ -108,6 +69,7 @@ export class SetupPasswordPage implements OnInit {
   token = signal<string | null>(null);
   submitting = signal(false);
   success = signal(false);
+  failed = signal(false);
 
   form: FormGroup<{
     password: FormControl<string>;
@@ -121,8 +83,7 @@ export class SetupPasswordPage implements OnInit {
     const qp = this.route.snapshot.queryParamMap;
     const t = qp.get('token');
     if (!t) {
-      this.toast.error('Missing token. Please use the link from your email.');
-      return;
+      return; // rendered as the "link isn't valid" state
     }
     this.token.set(t);
 
@@ -140,6 +101,7 @@ export class SetupPasswordPage implements OnInit {
       return;
     }
     this.submitting.set(true);
+    this.failed.set(false);
 
     const payload = { token: this.token()!, password: this.form.get('password')!.value };
     const context = new HttpContext().set(ONE_TIME_AUTH_TOKEN, this.token()!);
@@ -150,7 +112,7 @@ export class SetupPasswordPage implements OnInit {
         this.success.set(true);
       })
       .catch(() => {
-        this.toast.error('Failed to set password. The link may be invalid or expired.');
+        this.failed.set(true);
       })
       .finally(() => {
         this.submitting.set(false);

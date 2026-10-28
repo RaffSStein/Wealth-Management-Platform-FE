@@ -141,6 +141,30 @@ export class OnboardingProgressService {
     return idx === -1 ? this.pathFor(OnboardingStep.RiskAssessment) : this.pathFor(idx as OnboardingStep);
   }
 
+  /**
+   * Maps a BE onboarding step (customer-service `OnboardingStep`: INIT, PERSONAL_DETAILS, DOCUMENTS, FINANCIALS,
+   * GOALS, MIFID, AML, FINALIZE) to the FE step that handles it. Unknown values return null.
+   */
+  stepFromBackend(step: string | null | undefined): OnboardingStep | null {
+    switch ((step ?? '').toUpperCase()) {
+      case 'INIT':
+      case 'PERSONAL_DETAILS':
+      case 'DOCUMENTS':
+        return OnboardingStep.PersonalDetails;
+      case 'FINANCIALS':
+        return OnboardingStep.FinancialInformation;
+      case 'GOALS':
+        return OnboardingStep.InvestmentGoals;
+      case 'MIFID':
+        return OnboardingStep.MifidQuestionnaire;
+      case 'AML':
+      case 'FINALIZE':
+        return OnboardingStep.RiskAssessment;
+      default:
+        return null;
+    }
+  }
+
   stepForPath(path: string): OnboardingStep | null {
     const clean = path.startsWith('/') ? path : '/' + path;
     const found = this.steps.find(s => s.path === clean);

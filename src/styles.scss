@@ -10,6 +10,8 @@
 /* Design tokens (--wmp-* CSS variables, dark + light) and legacy aliases. Unlayered: plain custom properties. */
 @use "./styles/tokens";
 @use "./styles/variables" as *;
+/* Ledger Pro form/layout utilities (.wmp-form, .wmp-field, .wmp-actions...). Unlayered. */
+@use "./styles/ui";
 
 @layer wmp-reset, wmp-legacy, primeng;
 

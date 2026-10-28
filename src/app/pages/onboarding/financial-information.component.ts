@@ -1,236 +1,187 @@
-import {Component, inject, signal} from '@angular/core';
-
-import {OnboardingStep, OnboardingProgressService} from '../../core/services/onboarding-progress.service';
-import {OnboardingStepShellComponent} from '../../shared/components/onboarding-step-shell/onboarding-step-shell.component';
-import {Router, RouterModule} from '@angular/router';
-import {AuthService} from '../../core/services/auth.service';
-import {ToastService} from '../../shared/services/toast.service';
+import {Component, computed, inject, signal} from '@angular/core';
+import {toSignal} from '@angular/core/rxjs-interop';
+import {DecimalPipe} from '@angular/common';
+import {Router, RouterLink} from '@angular/router';
 import {FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators} from '@angular/forms';
-import {OnboardingFormStateService} from '../../core/services/onboarding-form-state.service';
-import {FinancialInformationService, FinancialExpenseFormValue} from '../../core/services/financial-information.service';
-import {FinancialTypeDTO} from '../../api/customer-service';
-import {UserSessionService} from '../../core/services/user-session.service';
-import {CustomerSessionService} from '../../core/services/customer-session.service';
 import {firstValueFrom} from 'rxjs';
+import {Button, ButtonDirective, ButtonIcon, ButtonLabel} from 'primeng/button';
+import {Checkbox} from 'primeng/checkbox';
+import {InputNumber} from 'primeng/inputnumber';
+import {InputText} from 'primeng/inputtext';
+import {Message} from 'primeng/message';
+import {Select} from 'primeng/select';
+import {OnboardingProgressService, OnboardingStep} from '../../core/services/onboarding-progress.service';
+import {ToastService} from '../../shared/services/toast.service';
+import {OnboardingFormStateService} from '../../core/services/onboarding-form-state.service';
+import {FinancialExpenseFormValue, FinancialInformationService} from '../../core/services/financial-information.service';
+import {FinancialTypeDTO} from '../../api/customer-service';
+import {CustomerSessionService} from '../../core/services/customer-session.service';
+import {OnboardingLayoutComponent} from '../../shared/components/onboarding-layout/onboarding-layout.component';
+
+interface FinancialFormValue {
+  annualIncomeEur: number | null;
+  totalInvestmentsEur: number | null;
+  expenses: { typeCode: string | null; amountEur: number | null; description: string | null }[];
+  termsAccepted: boolean;
+}
 
 @Component({
   selector: 'app-onboarding-financial-information',
-  standalone: true,
-  imports: [OnboardingStepShellComponent, ReactiveFormsModule, RouterModule],
+  imports: [ReactiveFormsModule, RouterLink, DecimalPipe, OnboardingLayoutComponent, Button, ButtonDirective, ButtonIcon, Checkbox, InputNumber, InputText, Message, Select, ButtonLabel],
   template: `
-    <app-onboarding-step-shell
-      [stepIndex]="step"
-      title="Financial information"
-      subtitle="Please provide your financial details to help us tailor investment strategies that match your needs."
-    >
-      <form class="wm-form" [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
-        <div class="form-grid form-grid--max2">
-          <div class="field field--compact required">
-            <label for="annualIncomeEur">Annual income (EUR)</label>
-            <div class="money-input">
-              <input id="annualIncomeEur" type="number" formControlName="annualIncomeEur" min="0" step="0.01" />
-              <span class="currency-suffix">EUR</span>
+    <app-onboarding-layout [step]="step" title="Financial information"
+                           subtitle="Required under MiFID II to assess which investments are suitable. Your data stays confidential.">
+      <form id="financial-form" class="wmp-form" [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+        <section class="wmp-panel">
+          <h2 class="wmp-panel__title">Income &amp; assets</h2>
+          <div class="wmp-form-grid">
+            <div class="wmp-field">
+              <label for="annualIncomeEur">Annual net income<span class="wmp-req" aria-hidden="true">*</span></label>
+              <p-inputnumber inputId="annualIncomeEur" formControlName="annualIncomeEur" mode="currency" currency="EUR"
+                             locale="en-IE" [min]="0" [fluid]="true"/>
+              @if (showError('annualIncomeEur')) { <small class="wmp-field__error">Enter the annual net income.</small> }
             </div>
-            @if (showError('annualIncomeEur')) {
-              <small class="error--inline">Annual income is required</small>
-            }
-          </div>
-          <div class="field field--compact">
-            <label for="totalInvestmentsEur">Investments (EUR)</label>
-            <div class="money-input">
-              <input id="totalInvestmentsEur" type="number" formControlName="totalInvestmentsEur" min="0" step="0.01" />
-              <span class="currency-suffix">EUR</span>
+            <div class="wmp-field">
+              <label for="totalInvestmentsEur">Current investments</label>
+              <p-inputnumber inputId="totalInvestmentsEur" formControlName="totalInvestmentsEur" mode="currency" currency="EUR"
+                             locale="en-IE" [min]="0" [fluid]="true"/>
+              <small class="wmp-field__hint">Total value of securities, funds and deposits you hold today.</small>
             </div>
           </div>
-        </div>
+        </section>
 
-        <div class="expenses-block">
-          <div class="expenses-header">
-            <h3>Expenses</h3>
-            <button type="button" class="secondary" (click)="addExpense()">Add expense</button>
+        <section class="wmp-panel">
+          <div class="panel-head">
+            <h2 class="wmp-panel__title">Expenses</h2>
+            <p-button label="Add expense" severity="secondary" [outlined]="true" size="small" (onClick)="addExpense()"/>
           </div>
-          @if (expensesControls.length > 0) {
-            <div class="expenses-table">
-              <div class="expenses-row expenses-row--header">
-                <div>Type</div>
-                <div>Amount (EUR)</div>
-                <div>Description</div>
-                <div></div>
-              </div>
+          @if (expensesControls.length === 0) {
+            <p class="empty">No expenses added. Add recurring commitments such as rent, mortgage or loans.</p>
+          } @else {
+            <div class="rows" role="list">
               @for (group of expensesControls; track $index; let i = $index) {
-                <div class="expenses-row" [formGroup]="group">
-                  <div>
-                    <select formControlName="typeCode">
-                      <option [ngValue]="null">Select type</option>
-                      @for (t of financialTypes(); track t.name) {
-                        <option [value]="t.name">{{ t.name }}</option>
-                      }
-                    </select>
+                <div class="row" role="listitem" [formGroup]="group">
+                  <div class="wmp-field">
+                    <label [for]="'exp-type-' + i">Type</label>
+                    <p-select [inputId]="'exp-type-' + i" formControlName="typeCode" [options]="financialTypes()"
+                              optionLabel="description" optionValue="name" placeholder="Select type" appendTo="body"/>
                   </div>
-                  <div>
-                    <div class="money-input">
-                      <input type="number" formControlName="amountEur" min="0" step="0.01" />
-                      <span class="currency-suffix">EUR</span>
-                    </div>
+                  <div class="wmp-field">
+                    <label [for]="'exp-amount-' + i">Amount</label>
+                    <p-inputnumber [inputId]="'exp-amount-' + i" formControlName="amountEur" mode="currency" currency="EUR"
+                                   locale="en-IE" [min]="0" [fluid]="true"/>
                   </div>
-                  <div>
-                    <input type="text" formControlName="description" />
+                  <div class="wmp-field">
+                    <label [for]="'exp-desc-' + i">Description</label>
+                    <input pInputText [id]="'exp-desc-' + i" formControlName="description"/>
                   </div>
-                  <div class="expenses-actions">
-                    <button type="button" class="link" (click)="removeExpense(i)">Remove</button>
-                  </div>
+                  <button pButton type="button" class="row__remove" [text]="true" severity="secondary"
+                          [attr.aria-label]="'Remove expense ' + (i + 1)" (click)="removeExpense(i)">
+                    <span pButtonIcon class="material-symbols-outlined" aria-hidden="true">delete</span>
+                  </button>
                 </div>
               }
             </div>
           }
+        </section>
+
+        <div class="wmp-field">
+          <span class="wmp-choice">
+            <p-checkbox inputId="termsAccepted" formControlName="termsAccepted" [binary]="true"/>
+            <label for="termsAccepted">I accept the <a routerLink="/terms" target="_blank" rel="noopener">terms of service</a>.</label>
+          </span>
+          @if (showError('termsAccepted')) { <small class="wmp-field__error">You must accept the terms to continue.</small> }
         </div>
 
-        <div class="field field--compact field--full terms-field">
-          <label>
-            <input type="checkbox" formControlName="termsAccepted" />
-            <span>
-              I accept the <a routerLink="/terms" target="_blank" rel="noopener">terms of service</a>.
-            </span>
-          </label>
-          @if (showError('termsAccepted')) {
-            <small class="error--inline">You must accept the terms to continue.</small>
-          }
-        </div>
-
-        <div class="form-actions">
-          <button class="primary" type="submit" [disabled]="loading() || form.invalid">
-            {{ loading() ? 'Saving...' : 'Save & continue' }}
-          </button>
-        </div>
         @if (errorMsg()) {
-          <p class="form-error-global">{{ errorMsg() }}</p>
+          <p-message severity="error">{{ errorMsg() }}</p-message>
         }
       </form>
-    </app-onboarding-step-shell>
+
+      <aside aside class="summary wmp-panel" aria-label="Summary">
+        <h2 class="summary__title num">SUMMARY</h2>
+        <dl>
+          <div><dt>Annual income</dt><dd class="num">€{{ summary().income | number:'1.0-0' }}</dd></div>
+          <div><dt>Current investments</dt><dd class="num">€{{ summary().investments | number:'1.0-0' }}</dd></div>
+          <div><dt>Total expenses</dt><dd class="num">€{{ summary().expenses | number:'1.0-0' }}</dd></div>
+        </dl>
+        @if (summary().ratio !== null) {
+          <div class="ratio">
+            <div class="ratio__bar" role="img" [attr.aria-label]="'Expenses are ' + (summary().ratio | number:'1.0-0') + '% of income'">
+              <span [style.width.%]="summary().ratioClamped"></span>
+            </div>
+            <span class="ratio__label"><span class="num">{{ summary().ratio | number:'1.0-0' }}%</span> of income committed to expenses</span>
+          </div>
+        }
+      </aside>
+
+      <div actions class="wmp-actions">
+        <p-button label="Back" severity="secondary" [outlined]="true" (onClick)="onPrev()"/>
+        <div class="wmp-actions__end">
+          <button pButton type="submit" form="financial-form" [loading]="loading()"><span pButtonLabel>{{ loading() ? 'Saving…' : 'Save & continue' }}</span></button>
+        </div>
+      </div>
+    </app-onboarding-layout>
   `,
-  styles: [
-    `:host ::ng-deep .field.required > label::after {
-      content: ' *';
-      color: var(--color-danger);
+  styles: [`
+    .panel-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+    .empty { margin: 0; color: var(--wmp-text-muted); font-size: .9rem; }
+    .rows { display: grid; gap: .75rem; }
+    .row {
+      display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1.4fr) auto; gap: .75rem; align-items: end;
+      padding-bottom: .75rem; border-bottom: 1px solid var(--wmp-border);
     }
-
-    .money-input {
-      display: flex;
-      align-items: center;
-      gap: .25rem;
+    .row:last-child { border-bottom: 0; padding-bottom: 0; }
+    .row__remove .material-symbols-outlined { font-size: 20px; }
+    .summary { flex: 1 1 240px; max-width: 320px; position: sticky; top: calc(var(--wmp-header-h) + 1rem); }
+    .summary__title { margin: 0; font-size: .75rem; letter-spacing: .08em; color: var(--wmp-text-muted); font-weight: 500; }
+    dl { margin: 0; display: grid; gap: .6rem; }
+    dl div { display: flex; justify-content: space-between; gap: 1rem; font-size: .9rem; }
+    dt { color: var(--wmp-text-muted); }
+    dd { margin: 0; }
+    .ratio { display: grid; gap: .4rem; padding-top: .75rem; border-top: 1px solid var(--wmp-border); }
+    .ratio__bar { height: 8px; border-radius: 4px; background: var(--wmp-surface-raised); overflow: hidden; }
+    .ratio__bar span { display: block; height: 100%; background: var(--wmp-loss); }
+    .ratio__label { font-size: .8rem; color: var(--wmp-text-muted); }
+    @media (max-width: 719.98px) {
+      .row { grid-template-columns: minmax(0, 1fr) auto; }
+      .row > .wmp-field { grid-column: 1 / 2; }
+      .row__remove { grid-column: 2; grid-row: 1; align-self: start; }
+      .summary { max-width: none; position: static; }
     }
-
-    .money-input input {
-      flex: 1;
-    }
-
-    .currency-suffix {
-      font-size: .85rem;
-      color: var(--color-text-muted);
-    }
-
-    .expenses-block {
-      margin-top: 1.5rem;
-    }
-
-    .expenses-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: .5rem;
-    }
-
-    .expenses-table {
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius);
-    }
-
-    .expenses-row {
-      display: grid;
-      grid-template-columns: 2fr 1.5fr 3fr auto;
-      gap: .5rem;
-      padding: .5rem;
-      align-items: center;
-    }
-
-    .expenses-row--header {
-      background: var(--color-surface-alt);
-      font-weight: 600;
-      font-size: .85rem;
-    }
-
-    .expenses-row + .expenses-row {
-      border-top: 1px solid var(--color-border-subtle);
-    }
-
-    .expenses-actions {
-      text-align: right;
-    }
-
-    .expenses-actions .link {
-      background: none;
-      border: none;
-      padding: 0;
-      color: var(--color-primary);
-      cursor: pointer;
-      font-size: .85rem;
-    }
-
-    .terms-field {
-      margin-top: 1.5rem;
-    }
-
-    .terms-field label {
-      display: flex;
-      align-items: center;
-      gap: .5rem;
-      cursor: pointer;
-    }
-
-    .terms-field a {
-      color: var(--color-primary);
-      text-decoration: underline;
-    }
-
-    .step-actions {
-      display: flex;
-      justify-content: flex-end;
-      margin-bottom: .5rem;
-    }
-
-    .step-actions .secondary {
-      background: var(--color-surface-alt);
-      color: var(--color-text);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius);
-      padding: .35rem .6rem;
-      font-size: .8rem;
-      cursor: pointer;
-    }
-    `
-  ]
+  `]
 })
 export class FinancialInformationComponent {
-  step = OnboardingStep.FinancialInformation;
+  protected readonly step = OnboardingStep.FinancialInformation;
   private readonly progress = inject(OnboardingProgressService);
   private readonly router = inject(Router);
-  private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
   private readonly formState = inject(OnboardingFormStateService);
   private readonly financialService = inject(FinancialInformationService);
-  private readonly userSession = inject(UserSessionService);
   private readonly customerSession = inject(CustomerSessionService);
 
-  loading = signal(false);
-  errorMsg = signal<string | null>(null);
-  financialTypes = signal<FinancialTypeDTO[]>([]);
+  protected readonly loading = signal(false);
+  protected readonly errorMsg = signal<string | null>(null);
+  protected readonly financialTypes = signal<FinancialTypeDTO[]>([]);
 
   form: FormGroup = this.fb.group({
     annualIncomeEur: this.fb.control<number | null>(null, {validators: [Validators.required]}),
     totalInvestmentsEur: this.fb.control<number | null>(null),
     expenses: this.fb.array<FormGroup>([]),
     termsAccepted: this.fb.control<boolean>(false, {validators: [Validators.requiredTrue]})
+  });
+
+  private readonly value = toSignal(this.form.valueChanges, {initialValue: this.form.getRawValue()});
+
+  /** Values shown in the live summary: plain sums of what was entered, no assumptions on periodicity. */
+  protected readonly summary = computed(() => {
+    const v = this.value() as FinancialFormValue;
+    const income = v.annualIncomeEur ?? 0;
+    const investments = v.totalInvestmentsEur ?? 0;
+    const expenses = (v.expenses ?? []).reduce((sum, e) => sum + (e.amountEur ?? 0), 0);
+    const ratio = income > 0 ? (expenses / income) * 100 : null;
+    return {income, investments, expenses, ratio, ratioClamped: Math.min(100, ratio ?? 0)};
   });
 
   constructor() {
@@ -242,15 +193,13 @@ export class FinancialInformationComponent {
         termsAccepted: !!saved.termsAccepted
       });
       if (Array.isArray(saved.expenses)) {
-        saved.expenses.forEach((e: any) => {
+        saved.expenses.forEach((e: { typeCode?: string; amountEur?: number; description?: string }) => {
           this.expenses.push(this.createExpenseGroup(e.typeCode ?? null, e.amountEur ?? null, e.description ?? null));
         });
       }
     }
-
     this.form.valueChanges.subscribe(v => this.formState.save('financial-information', v));
-
-    this.loadFinancialTypes();
+    void this.loadFinancialTypes();
   }
 
   get expenses(): FormArray<FormGroup> {
@@ -286,13 +235,11 @@ export class FinancialInformationComponent {
 
   private async loadFinancialTypes() {
     try {
-      this.loading.set(true);
       const types = await firstValueFrom(this.financialService.getFinancialTypes());
-      this.financialTypes.set(types || []);
+      // Only expense categories belong in the expense picker (the BE also returns INCOME types)
+      this.financialTypes.set((types || []).filter(t => !t.type || t.type === 'EXPENSE'));
     } catch {
-      this.toast.error('Could not load financial types. Please try again.');
-    } finally {
-      this.loading.set(false);
+      this.toast.error('Could not load expense types. Please try again.');
     }
   }
 
@@ -302,47 +249,30 @@ export class FinancialInformationComponent {
       this.form.markAllAsTouched();
       return;
     }
-
-    const raw = this.form.getRawValue() as {
-      annualIncomeEur: number | null;
-      totalInvestmentsEur: number | null;
-      expenses: { typeCode: string | null; amountEur: number | null; description: string | null; }[];
-      termsAccepted: boolean;
-    };
-
+    const raw = this.form.getRawValue() as FinancialFormValue;
     if (raw.annualIncomeEur == null) {
       this.errorMsg.set('Annual income is required.');
       return;
     }
-
     // Use the selected customer from CustomerSessionService as the source of customerId
-    const customer = this.customerSession.customer();
-    const customerId = customer?.id;
+    const customerId = this.customerSession.customer()?.id;
     if (!customerId) {
-      this.errorMsg.set('Customer information not available. Please try again later.');
+      this.errorMsg.set('Customer information not available. Please select the customer again.');
       return;
     }
-
     const expensesForm: FinancialExpenseFormValue[] = (raw.expenses || []).map(e => ({
       financialTypeName: e.typeCode || null,
       amount: e.amountEur,
       description: e.description
     }));
-
-    const payload = this.financialService.buildCustomerFinancialPayload(
-      raw.annualIncomeEur,
-      raw.totalInvestmentsEur,
-      expensesForm
-    );
+    const payload = this.financialService.buildCustomerFinancialPayload(raw.annualIncomeEur, raw.totalInvestmentsEur, expensesForm);
 
     this.loading.set(true);
     try {
       await firstValueFrom(this.financialService.addCustomerFinancials(customerId, payload));
       this.progress.completeStep(this.step);
       this.toast.success('Financial information saved.');
-      const next = this.step + 1;
-      const path = this.progress.pathFor(next as OnboardingStep);
-      await this.router.navigateByUrl(path);
+      await this.router.navigateByUrl(this.progress.pathFor(OnboardingStep.InvestmentGoals));
     } catch {
       this.errorMsg.set('Could not save financial information. Please try again.');
     } finally {
@@ -351,27 +281,6 @@ export class FinancialInformationComponent {
   }
 
   onPrev() {
-    const prev = this.step - 1;
-    const path = this.progress.pathFor(prev as OnboardingStep);
-    this.router.navigateByUrl(path).catch(() => {
-    });
-  }
-
-  onNext() {
-    const next = this.step + 1;
-    const path = this.progress.pathFor(next as OnboardingStep);
-    this.router.navigateByUrl(path).catch(() => {
-    });
-  }
-
-  async onLogout() {
-    try {
-      await this.auth.logout();
-    } finally {
-      this.toast.info('You have been logged out.');
-      this.progress.reset();
-      this.router.navigateByUrl('/auth/sign-in').catch(() => {
-      });
-    }
+    void this.router.navigateByUrl(this.progress.pathFor(OnboardingStep.PersonalDetails));
   }
 }

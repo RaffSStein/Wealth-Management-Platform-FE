@@ -59,6 +59,28 @@ docs/                       functional docs (process + diagrams), mirrored from 
 - Legacy global element rules (`_forms.scss`: `button { height: 38px; font-weight: 600 … }`) still apply to plain
   `<button>`s in new components. Reset `height`/`font-weight` on custom buttons, or use PrimeNG buttons.
 
+### Public & onboarding screens (Phase 2)
+- Layouts: `shared/components/auth-layout` (public/auth pages) and `shared/components/onboarding-layout` (step rail +
+  header + content, with `[aside]` and `[actions]` slots). Form utilities live in `src/styles/_ui.scss` (`.wmp-form`,
+  `.wmp-form-grid`, `.wmp-field`, `.wmp-actions`, `.wmp-panel`). `shared/components/brand` is the WMP wordmark.
+- **Submit buttons outside their `<form>`** (e.g. in `[actions]`) must be native `<button pButton type="submit" form="id">`:
+  `p-button` doesn't forward the `form` attribute, so it silently never submits.
+- PrimeNG DatePicker uses `dataType="string" dateFormat="yy-mm-dd"` (BE format). It only parses typed text that follows a
+  keydown, which matters for E2E scripts.
+- BE onboarding step names map to FE steps via `OnboardingProgressService.stepFromBackend()`. Never `parseInt` them.
+- Goals: `core/services/goals-form.ts` (`toCustomerGoals`). MiFID: `core/services/mifid-questionnaire.service.ts`
+  (config load, answers, draft id per customer in localStorage, `toMifidFilling`, submit → `customerRiskProfile`).
+  Risk bands and profile codes come from the questionnaire config. Never hard-code them.
+- Public routes `/onboarding/start` and `/onboarding/setup-password` are top-level (no shell). `/auth/set-password` is
+  client-rendered and redirects with a function that keeps `?token` (a prerendered redirect drops query params, and a
+  relative `redirectTo` is resolved against `/auth/` on the SSR server).
+- MiFID flow (agreed with the BE, 2026-10-28): POST `/mifid/save` creates the filling. Status is **server-derived**
+  (COMPLETED once every question is answered); never send it. PATCH `/mifid/filling/{id}` edits a DRAFT (send response
+  `id`s to update rather than add). POST `/mifid/submit` only when COMPLETED (else 409 INVALID_STATE_TRANSITION).
+- BE fixes pending a customer-service restart: Gender `NOT_SPECIFIED` accepted again; goal `targetDate` nullable;
+  MiFID PATCH orphan-removal 500. CustomerType: INDIVIDUAL, LEGAL_ENTITY, SOLE_PROPRIETOR, JOINT_ACCOUNT, OTHER.
+  CustomerStatus adds CLOSED and DELETED. Invalid bodies return 400 REQUEST_VALIDATION_ERROR.
+
 ### Roles, workspace and shell
 - Roles: `UserSessionService.roles()` / `isAdvisor()` come from `/me` → `userBranchRoles[].role` (BE `WmpRole`:
   `CUSTOMER`, `ADVISOR`; no roles means CUSTOMER, like the BE).

@@ -1,0 +1,49 @@
+// Ledger Pro form & layout utilities (unlayered: they sit above PrimeNG and legacy styles).
+// Used by the redesigned screens instead of the legacy `.field` / `.wm-form` helpers in _forms.scss.
+
+.wmp-form { display: grid; gap: 1.25rem; }
+
+.wmp-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem 1.25rem;
+}
+.wmp-form-grid > .wmp-field--full { grid-column: 1 / -1; }
+@media (max-width: 639.98px) {
+  .wmp-form-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+// Label + control + hint/error stack. Controls stretch to the field width.
+.wmp-field { display: grid; gap: .4rem; align-content: start; min-width: 0; margin: 0; padding: 0; border: 0; }
+.wmp-field > label, .wmp-field > legend, .wmp-field__label {
+  font-size: .85rem; font-weight: 500; color: var(--wmp-text-muted); padding: 0;
+}
+.wmp-field > legend { margin-bottom: .4rem; }
+.wmp-field .p-inputtext, .wmp-field .p-select, .wmp-field .p-inputnumber, .wmp-field .p-datepicker,
+.wmp-field .p-password { width: 100%; }
+.wmp-field__hint { font-size: .8rem; color: var(--wmp-text-muted); }
+.wmp-field__error { font-size: .8rem; color: var(--wmp-danger); }
+.wmp-req { color: var(--wmp-danger); margin-left: .15rem; }
+
+// Inline choice (checkbox / radio + label)
+.wmp-choice { display: inline-flex; align-items: center; gap: .5rem; font-size: .9rem; }
+
+// Page / step footer with secondary action(s) left and primary right
+.wmp-actions {
+  display: flex; justify-content: space-between; align-items: center; gap: .75rem; flex-wrap: wrap;
+  padding-top: 1rem; border-top: 1px solid var(--wmp-border);
+}
+.wmp-actions__end { display: flex; gap: .75rem; margin-left: auto; flex-wrap: wrap; }
+
+// Panel surface for grouped content
+.wmp-panel {
+  background: var(--wmp-surface); border: 1px solid var(--wmp-border); border-radius: var(--wmp-radius-lg);
+  padding: 1.25rem 1.5rem; display: grid; gap: 1rem;
+}
+.wmp-panel__title { margin: 0; font-size: 1rem; font-weight: 600; }
+
+// Visually hidden but available to assistive tech
+.wmp-sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
