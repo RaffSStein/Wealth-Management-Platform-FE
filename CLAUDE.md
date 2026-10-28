@@ -28,13 +28,13 @@ npm test                  # Karma unit tests
 npm run openapi:gen:all   # regenerate API clients from openapi/*.yaml
 ```
 
-- `package-lock.json` is gitignored, so fresh installs resolve the newest versions within the `package.json` ranges.
+- `package-lock.json` is committed (lockfile v3, generated with npm 11): use `npm ci` for reproducible installs.
 - npm 10.9 crashes (`Cannot read properties of null (reading 'edgesOut')`) resolving `@angular/build` 21's optional
-  vitest peers on a clean install; `npx npm@11 install` works.
+  vitest peers when it has to build the tree from scratch (no lockfile); `npx npm@11 install` works.
 - Node 22.19 is fine for Angular 21; the Angular 22 CLI needs Node ≥ 22.22, so `ng update` may try to fetch it. Run the
   local CLI with `NG_DISABLE_VERSION_CHECK=true node node_modules/@angular/cli/bin/ng.js ...`.
-- `src/app/pages/login/login.component.spec.ts` references a removed `bankCode` control and breaks the whole Karma
-  compile (pre-existing, since commit 6eebe23).
+- No Chrome on this machine: run tests headless with Edge via
+  `CHROME_BIN="C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe" npx ng test --watch=false --browsers=ChromeHeadless`.
 
 ## Repository layout
 
