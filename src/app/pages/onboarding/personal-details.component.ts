@@ -1,17 +1,19 @@
-import {Component, inject, OnDestroy, signal} from '@angular/core';
+import {Component, inject, signal} from '@angular/core';
 import {Router} from '@angular/router';
 import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
 import {firstValueFrom} from 'rxjs';
-import {ButtonDirective, ButtonLabel} from 'primeng/button';
+import {Button, ButtonDirective, ButtonLabel} from 'primeng/button';
 import {DatePicker} from 'primeng/datepicker';
 import {InputText} from 'primeng/inputtext';
 import {Message} from 'primeng/message';
 import {Select} from 'primeng/select';
-import {CustomerDTO, CustomerService, OnboardingService} from '../../api/customer-service';
+import {CustomerDTO, CustomerPersonalDetailsDTO, CustomerService} from '../../api/customer-service';
 import {OnboardingProgressService, OnboardingStep} from '../../core/services/onboarding-progress.service';
 import {UserSessionService} from '../../core/services/user-session.service';
 import {OnboardingFormStateService} from '../../core/services/onboarding-form-state.service';
 import {CustomerSessionService} from '../../core/services/customer-session.service';
+import {WorkspaceContextService} from '../../core/services/workspace-context.service';
+import {ToastService} from '../../shared/services/toast.service';
 import {busyAction} from '../../core/services/busy-action';
 import {OnboardingLayoutComponent} from '../../shared/components/onboarding-layout/onboarding-layout.component';
 
@@ -19,7 +21,7 @@ const ISO2 = /^[A-Z]{2}$/;
 
 @Component({
   selector: 'app-onboarding-personal-details',
-  imports: [ReactiveFormsModule, OnboardingLayoutComponent, DatePicker, InputText, Message, Select, ButtonDirective, ButtonLabel],
+  imports: [ReactiveFormsModule, OnboardingLayoutComponent, DatePicker, InputText, Message, Select, Button, ButtonDirective, ButtonLabel],
   template: `
     <app-onboarding-layout [step]="step" title="Personal details"
                            subtitle="Tell us who the account holder is. We use this to identify the customer and meet our regulatory obligations.">
@@ -113,7 +115,10 @@ const ISO2 = /^[A-Z]{2}$/;
       <div actions class="wmp-actions">
         <span></span>
         <div class="wmp-actions__end">
-          <button pButton type="submit" form="personal-details-form" [loading]="onSubmit.pending()"><span pButtonLabel>{{ onSubmit.pending() ? 'Saving…' : 'Save & continue' }}</span></button>
+          <p-button label="Save & exit" severity="secondary" [outlined]="true" [loading]="saveAndExit.pending()"
+                    [disabled]="onSubmit.pending() || prefilling()" (onClick)="saveAndExit()"/>
+          <button pButton type="submit" form="personal-details-form" [loading]="onSubmit.pending()"
+                  [disabled]="saveAndExit.pending() || prefilling()"><span pButtonLabel>{{ onSubmit.pending() ? 'Saving…' : 'Save & continue' }}</span></button>
         </div>
       </div>
     </app-onboarding-layout>
@@ -124,18 +129,28 @@ const ISO2 = /^[A-Z]{2}$/;
     .doc p { margin: .25rem 0 0; color: var(--wmp-text-muted); font-size: .9rem; }
   `]
 })
-export class PersonalDetailsComponent implements OnDestroy {
+export class PersonalDetailsComponent {
   protected readonly step = OnboardingStep.PersonalDetails;
   private readonly progress = inject(OnboardingProgressService);
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
   private readonly customerApi = inject(CustomerService);
-  private readonly onboardingApi = inject(OnboardingService);
   private readonly userSession = inject(UserSessionService);
   private readonly formState = inject(OnboardingFormStateService);
   private readonly customerSession = inject(CustomerSessionService);
+  private readonly workspace = inject(WorkspaceContextService);
+  private readonly toast = inject(ToastService);
 
-  readonly onSubmit = busyAction(() => this.submit());
+  readonly onSubmit = busyAction(async () => {
+    if (await this.save()) await this.router.navigateByUrl(this.progress.pathFor(OnboardingStep.FinancialInformation));
+  });
+  readonly saveAndExit = busyAction(async () => {
+    if (!await this.save()) return;
+    this.toast.success('Personal details saved. You can resume the onboarding at any time.');
+    await this.workspace.exitOnboarding();
+  });
+  /** True while the saved values are loaded from the BE (the form is disabled meanwhile). */
+  protected readonly prefilling = signal(false);
   protected readonly errorMsg = signal<string | null>(null);
   protected readonly today = new Date();
   protected readonly genders = [
@@ -161,29 +176,39 @@ export class PersonalDetailsComponent implements OnDestroy {
   });
 
   constructor() {
-    // Restore saved form state for this step (if any)
-    const saved = this.formState.load('personal-details');
-    if (saved) {
-      this.form.patchValue(saved);
-    }
-    this.form.valueChanges.subscribe(v => this.formState.save('personal-details', v));
-    void this.redirectToActiveOnboardingStep();
+    void this.prefill();
   }
 
-  /** If the selected customer already has an onboarding in progress, resume at its first incomplete step. */
-  private async redirectToActiveOnboardingStep(): Promise<void> {
+  /** Unsaved local draft first (this tab), else the values saved on the BE for the selected customer. */
+  private async prefill(): Promise<void> {
+    const draft = this.formState.load('personal-details');
     const customerId = this.customerSession.customer()?.id;
-    if (!customerId) return;
-    try {
-      const active = await firstValueFrom(this.onboardingApi.getActiveOnboarding(customerId));
-      const firstIncomplete = (active?.steps ?? []).find(s => (s.status || '').toUpperCase() !== 'COMPLETED');
-      const target = this.progress.stepFromBackend(firstIncomplete?.step);
-      if (target !== null && target !== this.step) {
-        await this.router.navigateByUrl(this.progress.pathFor(target));
+    if (draft) {
+      this.form.patchValue(draft);
+    } else if (customerId) {
+      this.prefilling.set(true);
+      this.form.disable({emitEvent: false});
+      try {
+        const customer = await firstValueFrom(this.customerApi.getCustomerById(customerId));
+        this.customerSession.setCustomer(customer);
+        this.form.patchValue(this.fromCustomer(customer), {emitEvent: false});
+      } catch {
+        this.errorMsg.set('Could not load the saved details. You can still edit and save them.');
+      } finally {
+        this.form.enable({emitEvent: false});
+        this.prefilling.set(false);
       }
-    } catch {
-      // stay on the current step
     }
+    this.form.valueChanges.subscribe(v => this.formState.save('personal-details', v));
+  }
+
+  private fromCustomer(c: CustomerDTO) {
+    return {
+      taxId: c.taxId ?? '', firstName: c.firstName ?? '', lastName: c.lastName ?? '', dateOfBirth: c.dateOfBirth ?? '',
+      gender: c.gender ?? 'NOT_SPECIFIED', nationality: c.nationality ?? '', phoneNumber: c.phoneNumber ?? '',
+      addressLine1: c.addressLine1 ?? '', addressLine2: c.addressLine2 ?? '', city: c.city ?? '',
+      zipCode: c.zipCode ?? '', country: c.country ?? ''
+    };
   }
 
   showError(controlName: string): boolean {
@@ -198,60 +223,71 @@ export class PersonalDetailsComponent implements OnDestroy {
     this.form.get(control)?.setValue(v);
   }
 
-  private async submit(): Promise<void> {
-    const nextPath = this.progress.pathFor(OnboardingStep.FinancialInformation);
-    if (this.progress.isStepCompleted(this.step)) {
-      // Already submitted and unchanged: skip re-init
-      if (!this.formState.isDirty('personal-details', this.form.getRawValue())) {
-        await this.router.navigateByUrl(nextPath);
-        return;
-      }
-    }
+  /**
+   * Creates the customer (first save) or updates the selected one, so saving again never makes a duplicate.
+   * Returns false when nothing was saved (invalid form or error, shown inline).
+   */
+  private async save(): Promise<boolean> {
     this.errorMsg.set(null);
     if (this.form.invalid) {
       this.form.markAllAsTouched();
-      return;
+      return false;
     }
     const raw = this.form.getRawValue();
-    const userId = this.userSession.profile()?.id; // take id from /me profile
-    if (!userId) {
-      this.errorMsg.set('User profile not loaded. Please sign in again.');
-      return;
-    }
-    const dto = {
-      customerType: 'INDIVIDUAL',
-      taxId: raw.taxId,
-      customerStatus: 'DRAFT',
-      userId,
-      firstName: raw.firstName,
-      lastName: raw.lastName,
-      dateOfBirth: raw.dateOfBirth,
-      gender: raw.gender,
-      nationality: raw.nationality || undefined,
-      phoneNumber: raw.phoneNumber || undefined,
-      addressLine1: raw.addressLine1 || undefined,
-      addressLine2: raw.addressLine2 || undefined,
-      city: raw.city || undefined,
-      zipCode: raw.zipCode || undefined,
-      country: raw.country || undefined
-    } as CustomerDTO;
-
+    const existingId = this.customerSession.customer()?.id;
     try {
-      const created = await firstValueFrom(this.customerApi.initCustomer(dto));
-      // The next steps operate on the selected customer
-      if (created?.id) this.customerSession.setCustomer(created);
+      if (existingId) {
+        // The update DTO has no address lines yet (BE spec): they are only stored on the first save
+        const details = {
+          firstName: raw.firstName,
+          lastName: raw.lastName,
+          dateOfBirth: raw.dateOfBirth,
+          gender: raw.gender,
+          taxId: raw.taxId,
+          nationality: raw.nationality || undefined,
+          phoneNumber: raw.phoneNumber || undefined,
+          city: raw.city || undefined,
+          zipCode: raw.zipCode || undefined,
+          country: raw.country || undefined
+        } as CustomerPersonalDetailsDTO;
+        const updated = await firstValueFrom(this.customerApi.updateCustomerPersonalDetails(existingId, details));
+        if (updated?.id) this.customerSession.setCustomer(updated);
+      } else {
+        const userId = this.userSession.profile()?.id; // take id from /me profile
+        if (!userId) {
+          this.errorMsg.set('User profile not loaded. Please sign in again.');
+          return false;
+        }
+        const dto = {
+          customerType: 'INDIVIDUAL',
+          taxId: raw.taxId,
+          customerStatus: 'DRAFT',
+          userId,
+          firstName: raw.firstName,
+          lastName: raw.lastName,
+          dateOfBirth: raw.dateOfBirth,
+          gender: raw.gender,
+          nationality: raw.nationality || undefined,
+          phoneNumber: raw.phoneNumber || undefined,
+          addressLine1: raw.addressLine1 || undefined,
+          addressLine2: raw.addressLine2 || undefined,
+          city: raw.city || undefined,
+          zipCode: raw.zipCode || undefined,
+          country: raw.country || undefined
+        } as CustomerDTO;
+        const created = await firstValueFrom(this.customerApi.initCustomer(dto));
+        // Drop the 'new' draft before the draft scope switches to the created customer
+        this.formState.clear('personal-details');
+        // The next steps operate on the selected customer
+        if (created?.id) this.customerSession.setCustomer(created);
+      }
+      this.formState.clear('personal-details');
       this.progress.markPersonalDetailsSubmitted();
-      // Save submitted snapshot for dirty-check
-      this.formState.saveSubmitted('personal-details', this.form.getRawValue());
-      await this.router.navigateByUrl(nextPath);
+      return true;
     } catch (err: unknown) {
       const message = (err as { error?: { message?: string } })?.error?.message;
       this.errorMsg.set(message || 'Unable to save the personal details. Please try again.');
+      return false;
     }
-  }
-
-  ngOnDestroy() {
-    // Persist latest state on destroy (defensive)
-    this.formState.save('personal-details', this.form.getRawValue());
   }
 }

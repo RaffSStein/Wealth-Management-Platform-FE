@@ -31,6 +31,18 @@ export class WorkspaceContextService {
   /** Landing page for the current user/context. */
   readonly homePath = computed(() => this.isAdvisor() && !this.actingAsClient() ? '/app/advisor' : '/app/home');
 
+  /**
+   * Leave the onboarding flow; it can be resumed later from the customer list (CustomerSelectionService.open).
+   * Advisors leave the client context and go back to their workspace; customers go to their profile list.
+   */
+  async exitOnboarding(): Promise<void> {
+    if (this.isAdvisor()) {
+      await this.exitClient();
+      return;
+    }
+    await this.router.navigateByUrl('/onboarding/disambiguation');
+  }
+
   /** Leave the client context and go back to the Advisor workspace. */
   async exitClient(): Promise<void> {
     this.customerSession.setCustomer(null);

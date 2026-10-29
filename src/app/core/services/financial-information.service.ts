@@ -3,9 +3,44 @@ import {Observable} from 'rxjs';
 import {CustomerService, FinancialService, CustomerFinancialDTO, FinancialTypeDTO} from '../../api/customer-service';
 
 export interface FinancialExpenseFormValue {
+  /** BE id of a saved row: sent back so a re-save updates it instead of adding a copy. */
+  id?: number | null;
   financialTypeName: string | null;
   amount: number | null;
   description: string | null;
+}
+
+/** Financial type names the step uses for the two fixed amounts; every other row is an expense. */
+const INCOME_TYPE = 'SALARY';
+const INVESTMENTS_TYPE = 'INVESTMENTS';
+
+/** Saved financials (CustomerDTO.customerFinancials) split back into the step's fields, keeping row ids. */
+export interface SavedFinancials {
+  annualIncome: number | null;
+  incomeId: number | null;
+  totalInvestments: number | null;
+  investmentsId: number | null;
+  expenses: FinancialExpenseFormValue[];
+}
+
+export function fromCustomerFinancials(rows: CustomerFinancialDTO[] | null | undefined): SavedFinancials {
+  const all = rows ?? [];
+  const income = all.find(r => r.financialType?.name === INCOME_TYPE);
+  const investments = all.find(r => r.financialType?.name === INVESTMENTS_TYPE);
+  return {
+    annualIncome: income?.amount ?? null,
+    incomeId: income?.id ?? null,
+    totalInvestments: investments?.amount ?? null,
+    investmentsId: investments?.id ?? null,
+    expenses: all
+      .filter(r => r !== income && r !== investments)
+      .map(r => ({
+        id: r.id ?? null,
+        financialTypeName: r.financialType?.name ?? null,
+        amount: r.amount ?? null,
+        description: r.description ?? null
+      }))
+  };
 }
 
 @Injectable({providedIn: 'root'})
@@ -20,14 +55,16 @@ export class FinancialInformationService {
   buildCustomerFinancialPayload(
     annualIncomeEur: number,
     totalInvestmentsEur: number | null,
-    expenses: FinancialExpenseFormValue[]
+    expenses: FinancialExpenseFormValue[],
+    ids: {income?: number | null; investments?: number | null} = {}
   ): CustomerFinancialDTO[] {
     const result: CustomerFinancialDTO[] = [];
 
     // Map annual income as an INCOME record
     result.push({
+      ...(ids.income != null ? {id: ids.income} : {}),
       financialType: {
-        name: 'SALARY',
+        name: INCOME_TYPE,
         type: 'INCOME',
         description: 'Annual income (EUR)'
       },
@@ -37,8 +74,9 @@ export class FinancialInformationService {
     // Optional investments as an ASSET/INCOME record (label can be refined when backend defines canonical types)
     if (totalInvestmentsEur != null) {
       result.push({
+        ...(ids.investments != null ? {id: ids.investments} : {}),
         financialType: {
-          name: 'INVESTMENTS',
+          name: INVESTMENTS_TYPE,
           type: 'INCOME',
           description: 'Total investments (EUR)'
         },
@@ -50,6 +88,7 @@ export class FinancialInformationService {
     for (const e of expenses) {
       if (e.amount == null) continue;
       result.push({
+        ...(e.id != null ? {id: e.id} : {}),
         financialType: {
           name: e.financialTypeName || 'OTHER_EXPENSE',
           type: 'EXPENSE',

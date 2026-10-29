@@ -1,4 +1,4 @@
-import { toCustomerGoals } from './goals-form';
+import { fromCustomerGoals, toCustomerGoals } from './goals-form';
 
 describe('toCustomerGoals', () => {
   const types = [
@@ -35,5 +35,22 @@ describe('toCustomerGoals', () => {
       { goalTypeName: 'YACHT', targetAmount: 1, goalTimeline: 'SHORT_TERM', targetDate: null, notes: null }
     ], types);
     expect(goals).toEqual([]);
+  });
+
+  it('round-trips saved goals with their ids, so a re-save updates instead of duplicating', () => {
+    const rows = fromCustomerGoals([
+      { id: 7, goalType: types[0], targetAmount: 250000, goalTimeline: 'MEDIUM_TERM', targetDate: '2030-06-01' }
+    ]);
+    expect(rows).toEqual([
+      { id: 7, goalTypeName: 'HOME', targetAmount: 250000, goalTimeline: 'MEDIUM_TERM', targetDate: '2030-06-01', notes: null }
+    ]);
+    expect(toCustomerGoals(rows, types)[0].id).toBe(7);
+  });
+
+  it('sends no id for new goals', () => {
+    const [goal] = toCustomerGoals([
+      { goalTypeName: 'HOME', targetAmount: 1, goalTimeline: 'SHORT_TERM', targetDate: null, notes: null }
+    ], types);
+    expect('id' in goal).toBeFalse();
   });
 });

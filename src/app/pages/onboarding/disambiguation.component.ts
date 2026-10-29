@@ -13,6 +13,7 @@ import {UserSessionService} from '../../core/services/user-session.service';
 import {CustomerSessionService} from '../../core/services/customer-session.service';
 import {OnboardingProgressService} from '../../core/services/onboarding-progress.service';
 import {busyAction} from '../../core/services/busy-action';
+import {OnboardingFormStateService} from '../../core/services/onboarding-form-state.service';
 import {ToastService} from '../../shared/services/toast.service';
 
 type Row = CustomerDTO & { displayName: string };
@@ -101,6 +102,7 @@ export class CustomerDisambiguationComponent {
   private readonly customerSession = inject(CustomerSessionService);
   private readonly selection = inject(CustomerSelectionService);
   private readonly progress = inject(OnboardingProgressService);
+  private readonly formState = inject(OnboardingFormStateService);
 
   protected readonly isAdvisor = this.userSession.isAdvisor;
   protected readonly loading = signal(true);
@@ -177,6 +179,8 @@ export class CustomerDisambiguationComponent {
     // A brand-new onboarding: reset local progress and drop any previously selected customer
     this.progress.reset();
     this.customerSession.setCustomer(null);
+    // Start from a blank form, not the draft of a previous new-customer attempt
+    this.formState.clear('personal-details');
     await this.router.navigateByUrl('/onboarding/personal-details');
   });
 }

@@ -69,6 +69,14 @@ docs/                       functional docs (process + diagrams), mirrored from 
   keydown, which matters for E2E scripts.
 - BE onboarding step names map to FE steps via `OnboardingProgressService.stepFromBackend()`. Never `parseInt` them.
   BE step status is `DONE` / `REJECTED` (not `COMPLETED`, which is only the MiFID filling status).
+- Save & exit: every onboarding step has "Exit" (layout header) and the form steps have "Save & exit"
+  (`WorkspaceContextService.exitOnboarding()`: advisors go back to their workspace, customers to their profile list).
+  Steps pre-fill from `GET /customer/{id}` and **send row `id`s back**: the BE financials/goals endpoints upsert by id
+  (rows without an id are added), so a re-save without ids duplicates rows. Personal details uses `initCustomer` only
+  for a new customer, then `POST /customer/{id}/personal-details`. Unsaved typing is a per-customer sessionStorage
+  draft (`OnboardingFormStateService`), cleared after a successful save.
+- BE gaps (2026-10-29): no per-step drafts except MiFID; saved financials/goals can't be deleted (the FE disables
+  removing them); `CustomerPersonalDetailsDTO` has no address lines, so they can't be updated after the first save.
 - Step flags are stored per browser (`wm.onboarding.progress`), not per customer: `syncFromBackend(active.steps)`
   rebuilds them, and runs on customer open and after a full reload (guard). Otherwise stale flags show as completed.
 - Goals: `core/services/goals-form.ts` (`toCustomerGoals`). MiFID: `core/services/mifid-questionnaire.service.ts`

@@ -13,16 +13,19 @@ import {Select} from 'primeng/select';
 import {OnboardingProgressService, OnboardingStep} from '../../core/services/onboarding-progress.service';
 import {ToastService} from '../../shared/services/toast.service';
 import {OnboardingFormStateService} from '../../core/services/onboarding-form-state.service';
-import {FinancialExpenseFormValue, FinancialInformationService} from '../../core/services/financial-information.service';
-import {FinancialTypeDTO} from '../../api/customer-service';
+import {FinancialExpenseFormValue, FinancialInformationService, fromCustomerFinancials} from '../../core/services/financial-information.service';
+import {CustomerService, FinancialTypeDTO} from '../../api/customer-service';
 import {CustomerSessionService} from '../../core/services/customer-session.service';
+import {WorkspaceContextService} from '../../core/services/workspace-context.service';
 import {busyAction} from '../../core/services/busy-action';
 import {OnboardingLayoutComponent} from '../../shared/components/onboarding-layout/onboarding-layout.component';
 
 interface FinancialFormValue {
+  incomeId: number | null;
+  investmentsId: number | null;
   annualIncomeEur: number | null;
   totalInvestmentsEur: number | null;
-  expenses: { typeCode: string | null; amountEur: number | null; description: string | null }[];
+  expenses: { id: number | null; typeCode: string | null; amountEur: number | null; description: string | null }[];
   termsAccepted: boolean;
 }
 
@@ -56,6 +59,9 @@ interface FinancialFormValue {
             <h2 class="wmp-panel__title">Expenses</h2>
             <p-button label="Add expense" severity="secondary" [outlined]="true" size="small" (onClick)="addExpense()"/>
           </div>
+          @if (hasSavedExpenses()) {
+            <small class="wmp-field__hint">Saved expenses can't be removed yet. You can still change their values.</small>
+          }
           @if (expensesControls.length === 0) {
             <p class="empty">No expenses added. Add recurring commitments such as rent, mortgage or loans.</p>
           } @else {
@@ -77,7 +83,8 @@ interface FinancialFormValue {
                     <input pInputText [id]="'exp-desc-' + i" formControlName="description"/>
                   </div>
                   <button pButton type="button" class="row__remove" [text]="true" severity="secondary"
-                          [attr.aria-label]="'Remove expense ' + (i + 1)" (click)="removeExpense(i)">
+                          [disabled]="group.value.id != null" [attr.aria-label]="'Remove expense ' + (i + 1)"
+                          (click)="removeExpense(i)">
                     <span pButtonIcon class="material-symbols-outlined" aria-hidden="true">delete</span>
                   </button>
                 </div>
@@ -119,7 +126,10 @@ interface FinancialFormValue {
       <div actions class="wmp-actions">
         <p-button label="Back" severity="secondary" [outlined]="true" [loading]="onPrev.pending()" (onClick)="onPrev()"/>
         <div class="wmp-actions__end">
-          <button pButton type="submit" form="financial-form" [loading]="onSubmit.pending()"><span pButtonLabel>{{ onSubmit.pending() ? 'Saving…' : 'Save & continue' }}</span></button>
+          <p-button label="Save & exit" severity="secondary" [outlined]="true" [loading]="saveAndExit.pending()"
+                    [disabled]="onSubmit.pending() || prefilling()" (onClick)="saveAndExit()"/>
+          <button pButton type="submit" form="financial-form" [loading]="onSubmit.pending()"
+                  [disabled]="saveAndExit.pending() || prefilling()"><span pButtonLabel>{{ onSubmit.pending() ? 'Saving…' : 'Save & continue' }}</span></button>
         </div>
       </div>
     </app-onboarding-layout>
@@ -161,14 +171,27 @@ export class FinancialInformationComponent {
   private readonly formState = inject(OnboardingFormStateService);
   private readonly financialService = inject(FinancialInformationService);
   private readonly customerSession = inject(CustomerSessionService);
+  private readonly customerApi = inject(CustomerService);
+  private readonly workspace = inject(WorkspaceContextService);
 
-  readonly onSubmit = busyAction(() => this.submit());
+  readonly onSubmit = busyAction(async () => {
+    if (await this.save()) await this.router.navigateByUrl(this.progress.pathFor(OnboardingStep.InvestmentGoals));
+  });
+  readonly saveAndExit = busyAction(async () => {
+    if (!await this.save()) return;
+    await this.workspace.exitOnboarding();
+  });
+  /** True while the saved values are loaded from the BE (the form is disabled meanwhile). */
+  protected readonly prefilling = signal(false);
   readonly onPrev = busyAction(() =>
     this.router.navigateByUrl(this.progress.pathFor(OnboardingStep.PersonalDetails)));
   protected readonly errorMsg = signal<string | null>(null);
   protected readonly financialTypes = signal<FinancialTypeDTO[]>([]);
 
   form: FormGroup = this.fb.group({
+    // BE ids of the saved income/investments rows, sent back so a re-save updates them
+    incomeId: this.fb.control<number | null>(null),
+    investmentsId: this.fb.control<number | null>(null),
     annualIncomeEur: this.fb.control<number | null>(null, {validators: [Validators.required]}),
     totalInvestmentsEur: this.fb.control<number | null>(null),
     expenses: this.fb.array<FormGroup>([]),
@@ -187,22 +210,61 @@ export class FinancialInformationComponent {
     return {income, investments, expenses, ratio, ratioClamped: Math.min(100, ratio ?? 0)};
   });
 
+  protected readonly hasSavedExpenses = computed(() =>
+    ((this.value() as FinancialFormValue).expenses ?? []).some(e => e.id != null));
+
   constructor() {
-    const saved = this.formState.load('financial-information');
-    if (saved) {
-      this.form.patchValue({
-        annualIncomeEur: saved.annualIncomeEur ?? null,
-        totalInvestmentsEur: saved.totalInvestmentsEur ?? null,
-        termsAccepted: !!saved.termsAccepted
-      });
-      if (Array.isArray(saved.expenses)) {
-        saved.expenses.forEach((e: { typeCode?: string; amountEur?: number; description?: string }) => {
-          this.expenses.push(this.createExpenseGroup(e.typeCode ?? null, e.amountEur ?? null, e.description ?? null));
-        });
+    void this.loadFinancialTypes();
+    void this.prefill();
+  }
+
+  /** Unsaved local draft first (this tab), else the financials saved on the BE, with their row ids. */
+  private async prefill(): Promise<void> {
+    const draft = this.formState.load<FinancialFormValue>('financial-information');
+    const customerId = this.customerSession.customer()?.id;
+    if (draft) {
+      this.applyValue(draft);
+    } else if (customerId) {
+      this.prefilling.set(true);
+      this.form.disable({emitEvent: false});
+      try {
+        const customer = await firstValueFrom(this.customerApi.getCustomerById(customerId));
+        if (customer?.customerFinancials?.length) {
+          const saved = fromCustomerFinancials(customer.customerFinancials);
+          this.applyValue({
+            incomeId: saved.incomeId,
+            investmentsId: saved.investmentsId,
+            annualIncomeEur: saved.annualIncome,
+            totalInvestmentsEur: saved.totalInvestments,
+            expenses: saved.expenses.map(e => ({
+              id: e.id ?? null, typeCode: e.financialTypeName, amountEur: e.amount, description: e.description
+            })),
+            // Saving the step required accepting the terms
+            termsAccepted: true
+          });
+        }
+      } catch {
+        this.errorMsg.set('Could not load the saved financial information. You can still edit and save it.');
+      } finally {
+        // Emits the full value (a disabled form emits none), which refreshes the summary
+        this.form.enable();
+        this.prefilling.set(false);
       }
     }
     this.form.valueChanges.subscribe(v => this.formState.save('financial-information', v));
-    void this.loadFinancialTypes();
+  }
+
+  private applyValue(v: Partial<FinancialFormValue>): void {
+    this.form.patchValue({
+      incomeId: v.incomeId ?? null,
+      investmentsId: v.investmentsId ?? null,
+      annualIncomeEur: v.annualIncomeEur ?? null,
+      totalInvestmentsEur: v.totalInvestmentsEur ?? null,
+      termsAccepted: !!v.termsAccepted
+    });
+    this.expenses.clear();
+    (v.expenses ?? []).forEach(e =>
+      this.expenses.push(this.createExpenseGroup(e.typeCode ?? null, e.amountEur ?? null, e.description ?? null, e.id ?? null)));
   }
 
   get expenses(): FormArray<FormGroup> {
@@ -213,8 +275,10 @@ export class FinancialInformationComponent {
     return this.expenses.controls;
   }
 
-  private createExpenseGroup(typeCode: string | null = null, amountEur: number | null = null, description: string | null = null): FormGroup {
+  private createExpenseGroup(typeCode: string | null = null, amountEur: number | null = null, description: string | null = null,
+                             id: number | null = null): FormGroup {
     return this.fb.group({
+      id: this.fb.control<number | null>(id),
       typeCode: this.fb.control<string | null>(typeCode),
       amountEur: this.fb.control<number | null>(amountEur),
       description: this.fb.control<string | null>(description)
@@ -226,7 +290,8 @@ export class FinancialInformationComponent {
   }
 
   removeExpense(index: number) {
-    if (index >= 0 && index < this.expenses.length) {
+    // The BE can't delete saved rows yet: only unsaved ones can be removed
+    if (index >= 0 && index < this.expenses.length && this.expenses.at(index).value.id == null) {
       this.expenses.removeAt(index);
     }
   }
@@ -246,37 +311,43 @@ export class FinancialInformationComponent {
     }
   }
 
-  private async submit(): Promise<void> {
+  /** Saves the step (rows with ids are updated, not duplicated). Returns false when nothing was saved. */
+  private async save(): Promise<boolean> {
     this.errorMsg.set(null);
     if (this.form.invalid) {
       this.form.markAllAsTouched();
-      return;
+      return false;
     }
     const raw = this.form.getRawValue() as FinancialFormValue;
     if (raw.annualIncomeEur == null) {
       this.errorMsg.set('Annual income is required.');
-      return;
+      return false;
     }
     // Use the selected customer from CustomerSessionService as the source of customerId
     const customerId = this.customerSession.customer()?.id;
     if (!customerId) {
       this.errorMsg.set('Customer information not available. Please select the customer again.');
-      return;
+      return false;
     }
     const expensesForm: FinancialExpenseFormValue[] = (raw.expenses || []).map(e => ({
+      id: e.id,
       financialTypeName: e.typeCode || null,
       amount: e.amountEur,
       description: e.description
     }));
-    const payload = this.financialService.buildCustomerFinancialPayload(raw.annualIncomeEur, raw.totalInvestmentsEur, expensesForm);
+    const payload = this.financialService.buildCustomerFinancialPayload(raw.annualIncomeEur, raw.totalInvestmentsEur, expensesForm,
+      {income: raw.incomeId, investments: raw.investmentsId});
 
     try {
       await firstValueFrom(this.financialService.addCustomerFinancials(customerId, payload));
+      // The BE now holds the values (with ids): the next visit loads them from there
+      this.formState.clear('financial-information');
       this.progress.completeStep(this.step);
       this.toast.success('Financial information saved.');
-      await this.router.navigateByUrl(this.progress.pathFor(OnboardingStep.InvestmentGoals));
+      return true;
     } catch {
       this.errorMsg.set('Could not save financial information. Please try again.');
+      return false;
     }
   }
 }

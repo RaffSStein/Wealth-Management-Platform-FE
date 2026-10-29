@@ -10,6 +10,7 @@ import {OnboardingProgressService, OnboardingStep} from '../../core/services/onb
 import {CustomerSessionService} from '../../core/services/customer-session.service';
 import {isAnswered, MifidQuestionnaireService} from '../../core/services/mifid-questionnaire.service';
 import {busyAction} from '../../core/services/busy-action';
+import {WorkspaceContextService} from '../../core/services/workspace-context.service';
 import {ToastService} from '../../shared/services/toast.service';
 import {OnboardingLayoutComponent} from '../../shared/components/onboarding-layout/onboarding-layout.component';
 
@@ -76,7 +77,8 @@ import {OnboardingLayoutComponent} from '../../shared/components/onboarding-layo
                   [loading]="previous.pending()" (onClick)="previous()"/>
         @if (mifid.state() === 'ready') {
           <div class="wmp-actions__end">
-            <p-button label="Save draft" severity="secondary" [text]="true" [loading]="saveDraft.pending()" (onClick)="saveDraft()"/>
+            <p-button label="Save & exit" severity="secondary" [outlined]="true" [loading]="saveAndExit.pending()"
+                      [disabled]="submit.pending()" (onClick)="saveAndExit()"/>
             @if (isLast()) {
               <p-button [label]="submit.pending() ? 'Submitting…' : 'Submit questionnaire'" [loading]="submit.pending()" (onClick)="submit()"/>
             } @else {
@@ -119,11 +121,12 @@ export class MifidQuestionnaireComponent {
   private readonly router = inject(Router);
   private readonly customerSession = inject(CustomerSessionService);
   private readonly toast = inject(ToastService);
+  private readonly workspace = inject(WorkspaceContextService);
 
   protected readonly index = signal(0);
   protected readonly showMissing = signal(false);
   protected readonly previous = busyAction(() => this.goToPrevious());
-  protected readonly saveDraft = busyAction(() => this.persistDraft());
+  protected readonly saveAndExit = busyAction(() => this.saveDraftAndExit());
   protected readonly submit = busyAction(() => this.submitQuestionnaire());
   protected readonly errorMsg = signal<string | null>(null);
 
@@ -171,13 +174,16 @@ export class MifidQuestionnaireComponent {
     window.scrollTo({top: 0});
   }
 
-  private async persistDraft(): Promise<void> {
+  /** Saves the answers as a BE draft (resumed on the next visit), then leaves the onboarding. */
+  private async saveDraftAndExit(): Promise<void> {
     try {
       await this.mifid.saveDraft();
       this.toast.success('Draft saved. You can continue later.');
     } catch {
       this.toast.error('Could not save the draft. Please try again.');
+      return;
     }
+    await this.workspace.exitOnboarding();
   }
 
   private async submitQuestionnaire(): Promise<void> {

@@ -13,7 +13,9 @@ import {CustomerService, GoalService, GoalTypeDTO} from '../../api/customer-serv
 import {OnboardingProgressService, OnboardingStep} from '../../core/services/onboarding-progress.service';
 import {CustomerSessionService} from '../../core/services/customer-session.service';
 import {busyAction} from '../../core/services/busy-action';
-import {GOAL_TIMELINES, GoalFormRow, toCustomerGoals} from '../../core/services/goals-form';
+import {fromCustomerGoals, GOAL_TIMELINES, GoalFormRow, toCustomerGoals} from '../../core/services/goals-form';
+import {OnboardingFormStateService} from '../../core/services/onboarding-form-state.service';
+import {WorkspaceContextService} from '../../core/services/workspace-context.service';
 import {ToastService} from '../../shared/services/toast.service';
 import {OnboardingLayoutComponent} from '../../shared/components/onboarding-layout/onboarding-layout.component';
 
@@ -27,13 +29,16 @@ import {OnboardingLayoutComponent} from '../../shared/components/onboarding-layo
         @if (typesError()) {
           <p-message severity="error">Goal types could not be loaded. Reload the page to try again.</p-message>
         }
+        @if (hasSavedGoals()) {
+          <small class="wmp-field__hint">Saved goals can't be removed yet. You can still change their values.</small>
+        }
         @for (group of goals.controls; track $index; let i = $index) {
           <section class="wmp-panel goal" [formGroup]="group" [attr.aria-label]="'Goal ' + (i + 1)">
             <div class="goal__head">
               <h2 class="wmp-panel__title">Goal {{ i + 1 }}</h2>
               @if (goals.length > 1) {
                 <button pButton type="button" [text]="true" severity="secondary" [attr.aria-label]="'Remove goal ' + (i + 1)"
-                        (click)="removeGoal(i)">
+                        [disabled]="group.value.id != null" (click)="removeGoal(i)">
                   <span pButtonIcon class="material-symbols-outlined" aria-hidden="true">delete</span>
                 </button>
               }
@@ -78,7 +83,10 @@ import {OnboardingLayoutComponent} from '../../shared/components/onboarding-layo
       <div actions class="wmp-actions">
         <p-button label="Back" severity="secondary" [outlined]="true" [loading]="onPrev.pending()" (onClick)="onPrev()"/>
         <div class="wmp-actions__end">
-          <button pButton type="submit" form="goals-form" [loading]="onSubmit.pending()"><span pButtonLabel>{{ onSubmit.pending() ? 'Saving…' : 'Save & continue' }}</span></button>
+          <p-button label="Save & exit" severity="secondary" [outlined]="true" [loading]="saveAndExit.pending()"
+                    [disabled]="onSubmit.pending() || prefilling()" (onClick)="saveAndExit()"/>
+          <button pButton type="submit" form="goals-form" [loading]="onSubmit.pending()"
+                  [disabled]="saveAndExit.pending() || prefilling()"><span pButtonLabel>{{ onSubmit.pending() ? 'Saving…' : 'Save & continue' }}</span></button>
         </div>
       </div>
     </app-onboarding-layout>
@@ -97,12 +105,23 @@ export class InvestmentGoalsComponent {
   private readonly customerApi = inject(CustomerService);
   private readonly customerSession = inject(CustomerSessionService);
   private readonly toast = inject(ToastService);
+  private readonly formState = inject(OnboardingFormStateService);
+  private readonly workspace = inject(WorkspaceContextService);
 
   protected readonly timelines = GOAL_TIMELINES;
   protected readonly today = new Date();
   protected readonly goalTypes = signal<GoalTypeDTO[]>([]);
   protected readonly typesError = signal(false);
-  readonly onSubmit = busyAction(() => this.submit());
+  readonly onSubmit = busyAction(async () => {
+    if (await this.save()) await this.router.navigateByUrl(this.progress.pathFor(OnboardingStep.MifidQuestionnaire));
+  });
+  readonly saveAndExit = busyAction(async () => {
+    if (!await this.save()) return;
+    await this.workspace.exitOnboarding();
+  });
+  /** True while the saved goals are loaded from the BE (the form is disabled meanwhile). */
+  protected readonly prefilling = signal(false);
+  protected readonly hasSavedGoals = signal(false);
   protected readonly onPrev = busyAction(() =>
     this.router.navigateByUrl(this.progress.pathFor(OnboardingStep.FinancialInformation)));
   protected readonly errorMsg = signal<string | null>(null);
@@ -111,6 +130,43 @@ export class InvestmentGoalsComponent {
 
   constructor() {
     void this.loadGoalTypes();
+    void this.prefill();
+  }
+
+  /** Unsaved local draft first (this tab), else the goals saved on the BE, with their ids. */
+  private async prefill(): Promise<void> {
+    const draft = this.formState.load<GoalFormRow[]>('investment-goals');
+    const customerId = this.customerSession.customer()?.id;
+    if (draft?.length) {
+      this.setRows(draft);
+    } else if (customerId) {
+      this.prefilling.set(true);
+      this.form.disable({emitEvent: false});
+      try {
+        const customer = await firstValueFrom(this.customerApi.getCustomerById(customerId));
+        const saved = fromCustomerGoals(customer?.customerGoals);
+        if (saved.length) this.setRows(saved);
+      } catch {
+        this.errorMsg.set('Could not load the saved goals. You can still edit and save them.');
+      } finally {
+        this.form.enable({emitEvent: false});
+        this.prefilling.set(false);
+      }
+    }
+    this.goals.valueChanges.subscribe(() => {
+      this.formState.save('investment-goals', this.goals.getRawValue());
+      this.hasSavedGoals.set((this.goals.getRawValue() as GoalFormRow[]).some(g => g.id != null));
+    });
+  }
+
+  private setRows(rows: GoalFormRow[]): void {
+    this.goals.clear({emitEvent: false});
+    rows.forEach(row => {
+      const group = this.createGoal();
+      group.patchValue(row, {emitEvent: false});
+      this.goals.push(group, {emitEvent: false});
+    });
+    this.hasSavedGoals.set(rows.some(g => g.id != null));
   }
 
   get goals(): FormArray<FormGroup> {
@@ -119,6 +175,8 @@ export class InvestmentGoalsComponent {
 
   private createGoal(): FormGroup {
     return this.fb.group({
+      // BE id of a saved goal, sent back so a re-save updates it
+      id: this.fb.control<number | null>(null),
       goalTypeName: this.fb.control<string | null>(null, {validators: [Validators.required]}),
       targetAmount: this.fb.control<number | null>(null, {validators: [Validators.required, Validators.min(1)]}),
       goalTimeline: this.fb.control<string | null>('MEDIUM_TERM', {validators: [Validators.required]}),
@@ -140,7 +198,8 @@ export class InvestmentGoalsComponent {
   }
 
   protected removeGoal(index: number): void {
-    if (this.goals.length > 1) this.goals.removeAt(index);
+    // The BE can't delete saved goals yet: only unsaved ones can be removed
+    if (this.goals.length > 1 && this.goals.at(index).value.id == null) this.goals.removeAt(index);
   }
 
   protected showError(group: FormGroup, control: string): boolean {
@@ -148,25 +207,29 @@ export class InvestmentGoalsComponent {
     return !!c && c.touched && c.invalid;
   }
 
-  private async submit(): Promise<void> {
+  /** Saves the goals (goals with ids are updated, not duplicated). Returns false when nothing was saved. */
+  private async save(): Promise<boolean> {
     this.errorMsg.set(null);
     if (this.form.invalid) {
       this.form.markAllAsTouched();
-      return;
+      return false;
     }
     const customerId = this.customerSession.customer()?.id;
     if (!customerId) {
       this.errorMsg.set('Customer information not available. Please select the customer again.');
-      return;
+      return false;
     }
     const goals = toCustomerGoals(this.goals.getRawValue() as GoalFormRow[], this.goalTypes());
     try {
       await firstValueFrom(this.customerApi.addCustomerGoals(customerId, goals));
+      // The BE now holds the goals (with ids): the next visit loads them from there
+      this.formState.clear('investment-goals');
       this.progress.completeStep(this.step);
       this.toast.success('Investment goals saved.');
-      await this.router.navigateByUrl(this.progress.pathFor(OnboardingStep.MifidQuestionnaire));
+      return true;
     } catch {
       this.errorMsg.set('Could not save your goals. Please try again.');
+      return false;
     }
   }
 }
