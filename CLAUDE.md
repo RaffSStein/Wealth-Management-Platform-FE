@@ -68,6 +68,9 @@ docs/                       functional docs (process + diagrams), mirrored from 
 - PrimeNG DatePicker uses `dataType="string" dateFormat="yy-mm-dd"` (BE format). It only parses typed text that follows a
   keydown, which matters for E2E scripts.
 - BE onboarding step names map to FE steps via `OnboardingProgressService.stepFromBackend()`. Never `parseInt` them.
+  BE step status is `DONE` / `REJECTED` (not `COMPLETED`, which is only the MiFID filling status).
+- Step flags are stored per browser (`wm.onboarding.progress`), not per customer: `syncFromBackend(active.steps)`
+  rebuilds them, and runs on customer open and after a full reload (guard). Otherwise stale flags show as completed.
 - Goals: `core/services/goals-form.ts` (`toCustomerGoals`). MiFID: `core/services/mifid-questionnaire.service.ts`
   (config load, answers, draft id per customer in localStorage, `toMifidFilling`, submit → `customerRiskProfile`).
   Risk bands and profile codes come from the questionnaire config. Never hard-code them.
