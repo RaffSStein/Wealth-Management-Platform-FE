@@ -221,7 +221,8 @@ export class AdvisorHomeComponent {
   }
 
   protected async open(c: CustomerDTO): Promise<void> {
-    if (!c.id) return;
+    // One client at a time: ignore clicks on other rows while one is opening
+    if (!c.id || this.openingId()) return;
     this.openingId.set(c.id);
     try {
       await this.selection.open(c.id);

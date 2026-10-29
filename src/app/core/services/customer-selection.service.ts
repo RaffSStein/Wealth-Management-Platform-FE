@@ -27,16 +27,16 @@ export class CustomerSelectionService {
     await this.router.navigateByUrl('/app/home');
   }
 
-  /** First incomplete step of the active onboarding, mapped from the BE step names. */
+  /** Syncs the step flags with the customer's active onboarding, then resumes at the first incomplete step. */
   private async resumePath(customerId: string): Promise<string> {
     try {
       const active = await firstValueFrom(this.onboardingApi.getActiveOnboarding(customerId));
-      const firstIncomplete = (active?.steps ?? []).find(s => (s.status || '').toUpperCase() !== 'COMPLETED');
-      const step = this.progress.stepFromBackend(firstIncomplete?.step);
-      if (step !== null) return this.progress.pathFor(step);
+      this.progress.syncFromBackend(active?.steps);
+      return this.progress.firstIncompletePath();
     } catch {
-      // fall back to the first step
+      // Unknown progress: drop any flags left from another customer and start from the first step
+      this.progress.reset();
+      return this.progress.pathFor(OnboardingStep.PersonalDetails);
     }
-    return this.progress.pathFor(OnboardingStep.PersonalDetails);
   }
 }

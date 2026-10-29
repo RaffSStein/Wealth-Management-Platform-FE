@@ -108,7 +108,7 @@ describe('LoginComponent', () => {
     await comp.onSubmit();
     expect(navigateByUrl).not.toHaveBeenCalled();
     expect(comp.errorOpen()).toBeTrue();
-    expect(comp.loading()).toBeFalse();
+    expect(comp.onSubmit.pending()).toBeFalse();
   });
 
   it('should not submit an invalid form', async () => {

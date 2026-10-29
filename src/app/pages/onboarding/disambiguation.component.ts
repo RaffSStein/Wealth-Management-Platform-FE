@@ -12,6 +12,8 @@ import {CustomerDisambiguationService} from '../../core/services/customer-disamb
 import {UserSessionService} from '../../core/services/user-session.service';
 import {CustomerSessionService} from '../../core/services/customer-session.service';
 import {OnboardingProgressService} from '../../core/services/onboarding-progress.service';
+import {busyAction} from '../../core/services/busy-action';
+import {OnboardingFormStateService} from '../../core/services/onboarding-form-state.service';
 import {ToastService} from '../../shared/services/toast.service';
 
 type Row = CustomerDTO & { displayName: string };
@@ -32,7 +34,7 @@ type Row = CustomerDTO & { displayName: string };
             ? 'Pick the client you want to work on, or onboard a new one.'
             : 'Choose which customer profile you want to use.' }}</p>
         </div>
-        <p-button [label]="isAdvisor() ? 'Onboard new client' : 'Create new profile'" [loading]="startingNew()"
+        <p-button [label]="isAdvisor() ? 'Onboard new client' : 'Create new profile'" [loading]="startNewCustomerOnboarding.pending()"
                   (onClick)="startNewCustomerOnboarding()"/>
       </header>
 
@@ -100,11 +102,11 @@ export class CustomerDisambiguationComponent {
   private readonly customerSession = inject(CustomerSessionService);
   private readonly selection = inject(CustomerSelectionService);
   private readonly progress = inject(OnboardingProgressService);
+  private readonly formState = inject(OnboardingFormStateService);
 
   protected readonly isAdvisor = this.userSession.isAdvisor;
   protected readonly loading = signal(true);
   protected readonly loadError = signal(false);
-  protected readonly startingNew = signal(false);
   protected readonly openingId = signal<string | null>(null);
   protected readonly query = signal('');
   private readonly rows = signal<Row[]>([]);
@@ -161,7 +163,8 @@ export class CustomerDisambiguationComponent {
   }
 
   async select(row: Row): Promise<void> {
-    if (!row.id) return;
+    // One customer at a time: ignore clicks on other rows while one is opening
+    if (!row.id || this.openingId()) return;
     this.openingId.set(row.id);
     try {
       await this.selection.open(row.id);
@@ -172,16 +175,12 @@ export class CustomerDisambiguationComponent {
     }
   }
 
-  async startNewCustomerOnboarding(): Promise<void> {
-    if (this.startingNew()) return;
-    this.startingNew.set(true);
-    try {
-      // A brand-new onboarding: reset local progress and drop any previously selected customer
-      this.progress.reset();
-      this.customerSession.setCustomer(null);
-      await this.router.navigateByUrl('/onboarding/personal-details');
-    } finally {
-      this.startingNew.set(false);
-    }
-  }
+  readonly startNewCustomerOnboarding = busyAction(async () => {
+    // A brand-new onboarding: reset local progress and drop any previously selected customer
+    this.progress.reset();
+    this.customerSession.setCustomer(null);
+    // Start from a blank form, not the draft of a previous new-customer attempt
+    this.formState.clear('personal-details');
+    await this.router.navigateByUrl('/onboarding/personal-details');
+  });
 }

@@ -68,6 +68,21 @@ docs/                       functional docs (process + diagrams), mirrored from 
 - PrimeNG DatePicker uses `dataType="string" dateFormat="yy-mm-dd"` (BE format). It only parses typed text that follows a
   keydown, which matters for E2E scripts.
 - BE onboarding step names map to FE steps via `OnboardingProgressService.stepFromBackend()`. Never `parseInt` them.
+  BE step status is `DONE` / `REJECTED` (not `COMPLETED`, which is only the MiFID filling status).
+- Save & exit: every onboarding step has "Exit" (layout header) and the form steps have "Save & exit"
+  (`WorkspaceContextService.exitOnboarding()`: advisors go back to their workspace, customers to their profile list).
+  Steps pre-fill from `GET /customer/{id}` and **send row `id`s back**. Personal details uses `initCustomer` only
+  for a new customer, then `POST /customer/{id}/personal-details`. Unsaved typing is a per-customer sessionStorage
+  draft (`OnboardingFormStateService`), cleared after a successful save.
+- Financials/goals POST **replaces** the customer's set (BE b9438eb): rows with an id are updated, rows without one
+  inserted, rows left out deleted; an unknown or foreign id gives 400 and nothing is written. Always send the full
+  list. An empty array is unsupported (the steps always send at least one row). The BE ignores a type change on an
+  update, so a saved row whose type changed is sent without its id (`savedTypeName` / `savedGoalTypeName`).
+  Unknown customer ids return 404 OBJECT_NOT_FOUND (BE da77c50). No per-step drafts on the BE except MiFID.
+- The generated clients in `src/app/api` are not committed and can lag the spec: regenerate after pulling spec changes
+  (`npm run openapi:gen:<x>`) before concluding a field is missing.
+- Step flags are stored per browser (`wm.onboarding.progress`), not per customer: `syncFromBackend(active.steps)`
+  rebuilds them, and runs on customer open and after a full reload (guard). Otherwise stale flags show as completed.
 - Goals: `core/services/goals-form.ts` (`toCustomerGoals`). MiFID: `core/services/mifid-questionnaire.service.ts`
   (config load, answers, draft id per customer in localStorage, `toMifidFilling`, submit → `customerRiskProfile`).
   Risk bands and profile codes come from the questionnaire config. Never hard-code them.
@@ -112,6 +127,11 @@ docs/                       functional docs (process + diagrams), mirrored from 
 - Navigation model: `layout/navigation.ts` (`navigationFor({isAdvisor, actingAsClient})`, `activeSection(url)`). Add
   pages there, not in the shell. The advisor workspace pages are placeholders (`shared/components/page-placeholder` via
   route `data`) until advisor-service exists.
+- Loading feedback: `<app-loading-bar>` (in `app.html`) shows a top bar while a navigation is pending or a foreground
+  request is in flight (`LoadingIndicatorService` + `loadingInterceptor`, 150 ms show delay, 300 ms minimum).
+  Polling and other background calls must pass `HttpContext` with `BACKGROUND_REQUEST`, or the bar never hides.
+  CTAs that start async work use `busyAction()` (`core/services/busy-action.ts`): `[loading]="x.pending()"`.
+  It also blocks double submits. Don't add `loading = signal(false)` with try/finally by hand.
 - Toasts: keep using `ToastService` (`success/error/info/warning`). It is a facade over PrimeNG `MessageService`
   (root-provided in `app.config.ts`), rendered by a deferred `<p-toast>` in `app.html`.
 

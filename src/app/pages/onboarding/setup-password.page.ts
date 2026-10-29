@@ -10,6 +10,7 @@ import { firstValueFrom } from 'rxjs';
 import { AuthService as ApiAuthService } from '../../api/user-service';
 import { HttpContext } from '@angular/common/http';
 import { ONE_TIME_AUTH_TOKEN } from '../../core/interceptors/auth.context';
+import { busyAction } from '../../core/services/busy-action';
 
 @Component({
   selector: 'app-setup-password',
@@ -22,7 +23,7 @@ import { ONE_TIME_AUTH_TOKEN } from '../../core/interceptors/auth.context';
           <span class="material-symbols-outlined state__icon state__icon--ok" aria-hidden="true">verified_user</span>
           <h2>Password set</h2>
           <p>Your account is ready. Sign in with your email and new password.</p>
-          <p-button label="Go to sign in" (onClick)="goToLogin()"/>
+          <p-button label="Go to sign in" [loading]="goToLogin.pending()" (onClick)="goToLogin()"/>
         </div>
       } @else if (!token()) {
         <div class="state" role="alert">
@@ -37,12 +38,12 @@ import { ONE_TIME_AUTH_TOKEN } from '../../core/interceptors/auth.context';
           <p>Use at least 8 characters with an uppercase letter, a number and a symbol.</p>
         </header>
         <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate class="wmp-form">
-          <app-password-strength-field [group]="form" [submitted]="submitting()"/>
+          <app-password-strength-field [group]="form" [submitted]="onSubmit.pending()"/>
           @if (failed()) {
             <p class="wmp-field__error" role="alert">We couldn't set your password. The link may be invalid or expired;
               <a routerLink="/auth/forgot-password">request a new one</a>.</p>
           }
-          <p-button type="submit" label="Set password" [loading]="submitting()" [disabled]="form.invalid" [fluid]="true"/>
+          <p-button type="submit" label="Set password" [loading]="onSubmit.pending()" [disabled]="form.invalid" [fluid]="true"/>
         </form>
       }
     </app-auth-layout>
@@ -67,7 +68,8 @@ export class SetupPasswordPage implements OnInit {
   private readonly api = inject(ApiAuthService);
 
   token = signal<string | null>(null);
-  submitting = signal(false);
+  readonly onSubmit = busyAction(() => this.submit());
+  readonly goToLogin = busyAction(() => this.router.navigateByUrl('/auth/sign-in'));
   success = signal(false);
   failed = signal(false);
 
@@ -95,12 +97,11 @@ export class SetupPasswordPage implements OnInit {
     }).then();
   }
 
-  async onSubmit(): Promise<void> {
+  private async submit(): Promise<void> {
     if (!this.form.valid || !this.token()) {
       this.form.markAllAsTouched();
       return;
     }
-    this.submitting.set(true);
     this.failed.set(false);
 
     const payload = { token: this.token()!, password: this.form.get('password')!.value };
@@ -113,14 +114,7 @@ export class SetupPasswordPage implements OnInit {
       })
       .catch(() => {
         this.failed.set(true);
-      })
-      .finally(() => {
-        this.submitting.set(false);
       });
-  }
-
-  goToLogin(): void {
-    this.router.navigateByUrl('/auth/sign-in');
   }
 }
 

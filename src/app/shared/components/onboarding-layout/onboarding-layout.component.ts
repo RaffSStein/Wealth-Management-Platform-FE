@@ -1,6 +1,9 @@
 import {Component, computed, inject, input} from '@angular/core';
 import {Router} from '@angular/router';
+import {Button} from 'primeng/button';
 import {OnboardingProgressService, OnboardingStep} from '../../../core/services/onboarding-progress.service';
+import {WorkspaceContextService} from '../../../core/services/workspace-context.service';
+import {busyAction} from '../../../core/services/busy-action';
 
 interface RailStep {
   index: number;
@@ -17,6 +20,7 @@ interface RailStep {
  */
 @Component({
   selector: 'app-onboarding-layout',
+  imports: [Button],
   template: `
     <div class="onb">
       <nav class="rail" aria-label="Onboarding steps">
@@ -47,8 +51,12 @@ interface RailStep {
 
       <div class="main">
         <header class="head">
-          <h1>{{ title() }}</h1>
-          @if (subtitle()) { <p>{{ subtitle() }}</p> }
+          <div class="head__text">
+            <h1>{{ title() }}</h1>
+            @if (subtitle()) { <p>{{ subtitle() }}</p> }
+          </div>
+          <p-button label="Exit" severity="secondary" [text]="true" ariaLabel="Exit onboarding, resume later"
+                    [loading]="exit.pending()" (onClick)="exit()"/>
         </header>
         <div class="body">
           <div class="content"><ng-content/></div>
@@ -78,6 +86,7 @@ interface RailStep {
     .rail__step.is-done .rail__marker { color: var(--wmp-gain); }
     .rail__marker .material-symbols-outlined { font-size: 18px; }
     .main { flex: 1; min-width: 0; padding: 2rem 2.5rem 3rem; box-sizing: border-box; display: grid; gap: 1.5rem; align-content: start; }
+    .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
     .head h1 { margin: 0; font-size: 1.75rem; font-weight: 600; }
     .head p { margin: .4rem 0 0; color: var(--wmp-text-muted); max-width: 42rem; }
     .body { display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: flex-start; }
@@ -96,6 +105,7 @@ interface RailStep {
 export class OnboardingLayoutComponent {
   private readonly progress = inject(OnboardingProgressService);
   private readonly router = inject(Router);
+  private readonly workspace = inject(WorkspaceContextService);
 
   readonly step = input.required<OnboardingStep>();
   readonly title = input.required<string>();
@@ -115,6 +125,9 @@ export class OnboardingLayoutComponent {
   });
 
   protected readonly percent = computed(() => ((this.step() + 1) / this.steps().length) * 100);
+
+  /** Leaves without saving the current step: completed steps are on the BE, typing stays in the local draft. */
+  protected readonly exit = busyAction(() => this.workspace.exitOnboarding());
 
   protected go(s: RailStep): void {
     if (s.reachable && !s.current) void this.router.navigateByUrl(s.path);

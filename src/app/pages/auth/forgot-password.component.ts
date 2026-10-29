@@ -2,6 +2,7 @@ import {Component, inject, signal} from '@angular/core';
 import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
 import {RouterLink} from '@angular/router';
 import {firstValueFrom} from 'rxjs';
+import {busyAction} from '../../core/services/busy-action';
 import {Button} from 'primeng/button';
 import {InputText} from 'primeng/inputtext';
 import {AuthService as ApiAuthService} from '../../api/user-service';
@@ -36,7 +37,7 @@ import {AuthLayoutComponent} from '../../shared/components/auth-layout/auth-layo
                    placeholder="name@example.com" [attr.aria-invalid]="showError()"/>
             @if (showError()) { <small class="wmp-field__error">Enter a valid email address.</small> }
           </div>
-          <p-button type="submit" label="Send reset link" [loading]="loading()" [fluid]="true"/>
+          <p-button type="submit" label="Send reset link" [loading]="onSubmit.pending()" [fluid]="true"/>
         </form>
         <p class="foot"><a routerLink="/auth/sign-in">Back to sign in</a></p>
       }
@@ -57,7 +58,7 @@ export class ForgotPasswordComponent {
   private readonly fb = inject(FormBuilder);
   private readonly apiAuth = inject(ApiAuthService);
 
-  protected readonly loading = signal(false);
+  readonly onSubmit = busyAction(() => this.submit());
   protected readonly sentTo = signal<string | null>(null);
 
   protected readonly form = this.fb.group({
@@ -69,19 +70,17 @@ export class ForgotPasswordComponent {
     return c.invalid && (c.touched || c.dirty);
   }
 
-  async onSubmit(): Promise<void> {
+  private async submit(): Promise<void> {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return;
     }
     const email = (this.form.controls.email.value || '').trim();
-    this.loading.set(true);
     try {
       await firstValueFrom(this.apiAuth.requestPasswordReset({email}));
     } catch {
       // Deliberately ignored: the outcome shown to the user is the same either way (no account enumeration)
     } finally {
-      this.loading.set(false);
       this.sentTo.set(email);
     }
   }

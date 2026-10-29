@@ -152,8 +152,12 @@ paths:
   # (Onboarding) Financial and Goal Types
   /customer/{customerId}/financials:
     post:
-      summary: Add financial data for a customer
-      description: Adds a list of financial records for the specified customer.
+      summary: Replace financial data for a customer
+      description: >-
+        Replaces the customer's set of financial records with the given list. Records with an id are updated,
+        records without an id are created and the customer's records whose id is missing from the list are deleted.
+        Every id must belong to the customer and appear at most once, otherwise the request is rejected with 400.
+        The response contains the resulting full set of financial records.
       operationId: addCustomerFinancials
       parameters:
         - name: customerId
@@ -172,18 +176,24 @@ paths:
                 $ref: '#/components/schemas/CustomerFinancialDTO'
       responses:
         '200':
-          description: Financial records created successfully
+          description: Financial records replaced successfully
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/CustomerDTO'
+        '400':
+          description: Invalid input data, e.g. an id that does not belong to the customer or appears more than once
       tags:
         - Customer
 
   /customer/{customerId}/goals:
     post:
-      summary: Add goals for a customer
-      description: Adds a list of goals for the specified customer.
+      summary: Replace goals for a customer
+      description: >-
+        Replaces the customer's set of goals with the given list. Goals with an id are updated,
+        goals without an id are created and the customer's goals whose id is missing from the list are deleted.
+        Every id must belong to the customer and appear at most once, otherwise the request is rejected with 400.
+        The response contains the resulting full set of goals.
       operationId: addCustomerGoals
       parameters:
         - name: customerId
@@ -201,12 +211,14 @@ paths:
               items:
                 $ref: '#/components/schemas/CustomerGoalDTO'
       responses:
-        '201':
-          description: Goals created successfully
+        '200':
+          description: Goals replaced successfully
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/CustomerDTO'
+        '400':
+          description: Invalid input data, e.g. an id that does not belong to the customer or appears more than once
       tags:
         - Customer
   # MIFID configuration
@@ -491,7 +503,10 @@ components:
       type: string
       enum:
         - INDIVIDUAL
-        - CORPORATE
+        - LEGAL_ENTITY
+        - SOLE_PROPRIETOR
+        - JOINT_ACCOUNT
+        - OTHER
 
     Gender:
       type: string
@@ -508,6 +523,8 @@ components:
         - PENDING_VERIFICATION
         - ACTIVE
         - REJECTED
+        - CLOSED
+        - DELETED
 
     FinancialTypeDTO:
       type: object
@@ -554,7 +571,7 @@ components:
       required:
           - goalType
           - targetAmount
-          - goalTimeLine
+          - goalTimeline
       properties:
         id:
           type: integer

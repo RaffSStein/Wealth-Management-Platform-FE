@@ -5,6 +5,7 @@ import { UserSessionService } from '../services/user-session.service';
 import { OnboardingService } from '../../api/customer-service';
 import { firstValueFrom } from 'rxjs';
 import { SessionRefreshService } from '../services/session-refresh.service';
+import { CustomerSessionService } from '../services/customer-session.service';
 
 export const onboardingStepGuard: CanActivateFn = async (route, _state): Promise<boolean | UrlTree> => {
   const progress: OnboardingProgressService = inject(OnboardingProgressService);
@@ -12,13 +13,17 @@ export const onboardingStepGuard: CanActivateFn = async (route, _state): Promise
   const userSession = inject(UserSessionService);
   const onboardingApi = inject(OnboardingService);
   const sessionRefresh = inject(SessionRefreshService);
+  const customerSession = inject(CustomerSessionService);
 
   // Only refresh /me and active onboarding once after a full page load
   if (sessionRefresh.shouldRefreshOnce()) {
     try { await userSession.ensureLoaded(true); } catch {}
-    const customerId = (userSession as any).getAccountId?.();
+    // The working customer (advisors act on a client), else the user's own account
+    const customerId = customerSession.customer()?.id ?? userSession.getAccountId();
     if (typeof customerId === 'string' && customerId.trim().length > 0) {
-      try { await firstValueFrom(onboardingApi.getActiveOnboarding(customerId)); } catch {}
+      try {
+        progress.syncFromBackend((await firstValueFrom(onboardingApi.getActiveOnboarding(customerId)))?.steps);
+      } catch {}
     }
     sessionRefresh.markRefreshed();
   }

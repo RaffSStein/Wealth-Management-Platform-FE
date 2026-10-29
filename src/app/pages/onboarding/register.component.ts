@@ -1,4 +1,4 @@
-import {Component, inject, signal} from '@angular/core';
+import {Component, inject} from '@angular/core';
 import {Router, RouterLink} from '@angular/router';
 import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
 import {firstValueFrom} from 'rxjs';
@@ -7,6 +7,7 @@ import {InputText} from 'primeng/inputtext';
 import {AuthService as ApiAuthService, RegisterRequestDTO} from '../../api/user-service';
 import {ToastService} from '../../shared/services/toast.service';
 import {RegistrationStateService} from '../../core/services/registration-state.service';
+import {busyAction} from '../../core/services/busy-action';
 import {AuthLayoutComponent} from '../../shared/components/auth-layout/auth-layout.component';
 
 /**
@@ -51,7 +52,7 @@ import {AuthLayoutComponent} from '../../shared/components/auth-layout/auth-layo
           @if (showError('phoneNumber')) { <small class="wmp-field__error">Enter your phone number.</small> }
         </div>
 
-        <p-button type="submit" [label]="loading() ? 'Creating account…' : 'Create account'" [loading]="loading()"
+        <p-button type="submit" [label]="onSubmit.pending() ? 'Creating account…' : 'Create account'" [loading]="onSubmit.pending()"
                   [fluid]="true"/>
       </form>
 
@@ -74,7 +75,7 @@ export class OnboardingStartComponent {
   private readonly toast = inject(ToastService);
   private readonly registrationState = inject(RegistrationStateService);
 
-  loading = signal(false);
+  readonly onSubmit = busyAction(() => this.submit());
 
   form = this.fb.group({
     firstName: this.fb.control('', {validators: [Validators.required]}),
@@ -88,7 +89,7 @@ export class OnboardingStartComponent {
     return !!ctrl && ctrl.invalid && (ctrl.touched || ctrl.dirty);
   }
 
-  async onSubmit(): Promise<void> {
+  private async submit(): Promise<void> {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return;
@@ -101,15 +102,12 @@ export class OnboardingStartComponent {
       phoneNumber: (value.phoneNumber || '').trim()
     } as RegisterRequestDTO;
 
-    this.loading.set(true);
     try {
       await firstValueFrom(this.apiAuth.registerUser(payload));
       this.registrationState.setEmail(payload.email);
       await this.router.navigateByUrl('/auth/registration-success');
     } catch {
       this.toast.error('Registration failed. Please try again later.', 5000);
-    } finally {
-      this.loading.set(false);
     }
   }
 }
