@@ -10,6 +10,7 @@ import {findBand, MifidQuestionnaireService, profileDisplay, riskBands} from '..
 import {WorkspaceContextService} from '../../core/services/workspace-context.service';
 import {busyAction} from '../../core/services/busy-action';
 import {VerificationWatcherService} from '../../core/services/verification-watcher.service';
+import {ToastService} from '../../shared/services/toast.service';
 import {OnboardingLayoutComponent} from '../../shared/components/onboarding-layout/onboarding-layout.component';
 
 interface BandView {
@@ -133,6 +134,7 @@ export class RiskAssessmentComponent {
   private readonly customerSession = inject(CustomerSessionService);
   private readonly workspace = inject(WorkspaceContextService);
   private readonly watcher = inject(VerificationWatcherService);
+  private readonly toast = inject(ToastService);
 
   protected readonly loading = signal(true);
   /** Onboarding lifecycle after submit: PENDING_VERIFICATION -> ACTIVE | REJECTED (async AML check on the BE). */
@@ -222,6 +224,13 @@ export class RiskAssessmentComponent {
   protected readonly finish = busyAction(async () => {
     if (this.verification() === 'rejected') return;
     this.progress.completeStep(this.step);
+    if (this.workspace.isAdvisor()) {
+      // Advisors don't stay "acting as" the client they just onboarded: back to the workspace, where they pick
+      // their clients themselves. The AML check keeps being followed in the background (VerificationWatcherService).
+      this.toast.success(`${this.workspace.clientName() || 'The client'} has been onboarded.`);
+      await this.workspace.exitClient();
+      return;
+    }
     await this.router.navigateByUrl(this.workspace.homePath());
   });
 }

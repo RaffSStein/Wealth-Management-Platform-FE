@@ -50,3 +50,7 @@
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
   clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
 }
+
+// Overlay badge kept inside the header: PrimeNG shifts it up by half its height (translate(50%, -50%)),
+// which pushes it past the top of the viewport on a 56px header. Unlayered, so it beats the primeng layer.
+.wmp-header-badge .p-badge { transform: translate(35%, -20%); }

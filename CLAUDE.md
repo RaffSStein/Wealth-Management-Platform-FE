@@ -135,6 +135,11 @@ docs/                       functional docs (process + diagrams), mirrored from 
   Polling and other background calls must pass `HttpContext` with `BACKGROUND_REQUEST`, or the bar never hides.
   CTAs that start async work use `busyAction()` (`core/services/busy-action.ts`): `[loading]="x.pending()"`.
   It also blocks double submits. Don't add `loading = signal(false)` with try/finally by hand.
+- Header dropdowns (notification bell): render the panel inside the header element, not with `p-popover`. Popover
+  positions in page coordinates and only closes on scroll of scrollable parents, so under the sticky header it
+  detaches when the page scrolls. Overlay badges in the header use `.wmp-header-badge` (`_ui.scss`) to stay in view.
+- Finishing an onboarding as an advisor exits the client (`exitClient()` → `/app/advisor`): advisors pick clients
+  themselves and never stay "acting as" the customer they just onboarded.
 - Toasts: keep using `ToastService` (`success/error/info/warning`). It is a facade over PrimeNG `MessageService`
   (root-provided in `app.config.ts`), rendered by a deferred `<p-toast>` in `app.html`.
 
