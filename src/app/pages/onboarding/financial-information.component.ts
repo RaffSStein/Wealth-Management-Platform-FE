@@ -25,7 +25,9 @@ interface FinancialFormValue {
   investmentsId: number | null;
   annualIncomeEur: number | null;
   totalInvestmentsEur: number | null;
-  expenses: { id: number | null; typeCode: string | null; amountEur: number | null; description: string | null }[];
+  expenses: {
+    id: number | null; savedTypeCode: string | null; typeCode: string | null; amountEur: number | null; description: string | null
+  }[];
   termsAccepted: boolean;
 }
 
@@ -59,9 +61,6 @@ interface FinancialFormValue {
             <h2 class="wmp-panel__title">Expenses</h2>
             <p-button label="Add expense" severity="secondary" [outlined]="true" size="small" (onClick)="addExpense()"/>
           </div>
-          @if (hasSavedExpenses()) {
-            <small class="wmp-field__hint">Saved expenses can't be removed yet. You can still change their values.</small>
-          }
           @if (expensesControls.length === 0) {
             <p class="empty">No expenses added. Add recurring commitments such as rent, mortgage or loans.</p>
           } @else {
@@ -83,8 +82,7 @@ interface FinancialFormValue {
                     <input pInputText [id]="'exp-desc-' + i" formControlName="description"/>
                   </div>
                   <button pButton type="button" class="row__remove" [text]="true" severity="secondary"
-                          [disabled]="group.value.id != null" [attr.aria-label]="'Remove expense ' + (i + 1)"
-                          (click)="removeExpense(i)">
+                          [attr.aria-label]="'Remove expense ' + (i + 1)" (click)="removeExpense(i)">
                     <span pButtonIcon class="material-symbols-outlined" aria-hidden="true">delete</span>
                   </button>
                 </div>
@@ -210,9 +208,6 @@ export class FinancialInformationComponent {
     return {income, investments, expenses, ratio, ratioClamped: Math.min(100, ratio ?? 0)};
   });
 
-  protected readonly hasSavedExpenses = computed(() =>
-    ((this.value() as FinancialFormValue).expenses ?? []).some(e => e.id != null));
-
   constructor() {
     void this.loadFinancialTypes();
     void this.prefill();
@@ -237,7 +232,8 @@ export class FinancialInformationComponent {
             annualIncomeEur: saved.annualIncome,
             totalInvestmentsEur: saved.totalInvestments,
             expenses: saved.expenses.map(e => ({
-              id: e.id ?? null, typeCode: e.financialTypeName, amountEur: e.amount, description: e.description
+              id: e.id ?? null, savedTypeCode: e.savedTypeName ?? null, typeCode: e.financialTypeName,
+              amountEur: e.amount, description: e.description
             })),
             // Saving the step required accepting the terms
             termsAccepted: true
@@ -264,7 +260,8 @@ export class FinancialInformationComponent {
     });
     this.expenses.clear();
     (v.expenses ?? []).forEach(e =>
-      this.expenses.push(this.createExpenseGroup(e.typeCode ?? null, e.amountEur ?? null, e.description ?? null, e.id ?? null)));
+      this.expenses.push(this.createExpenseGroup(e.typeCode ?? null, e.amountEur ?? null, e.description ?? null,
+        e.id ?? null, e.savedTypeCode ?? null)));
   }
 
   get expenses(): FormArray<FormGroup> {
@@ -276,9 +273,11 @@ export class FinancialInformationComponent {
   }
 
   private createExpenseGroup(typeCode: string | null = null, amountEur: number | null = null, description: string | null = null,
-                             id: number | null = null): FormGroup {
+                             id: number | null = null, savedTypeCode: string | null = null): FormGroup {
     return this.fb.group({
+      // BE id and loaded type of a saved row (see buildCustomerFinancialPayload)
       id: this.fb.control<number | null>(id),
+      savedTypeCode: this.fb.control<string | null>(savedTypeCode),
       typeCode: this.fb.control<string | null>(typeCode),
       amountEur: this.fb.control<number | null>(amountEur),
       description: this.fb.control<string | null>(description)
@@ -290,8 +289,8 @@ export class FinancialInformationComponent {
   }
 
   removeExpense(index: number) {
-    // The BE can't delete saved rows yet: only unsaved ones can be removed
-    if (index >= 0 && index < this.expenses.length && this.expenses.at(index).value.id == null) {
+    // Saved rows are deleted on the BE by leaving them out of the next save (replace semantics)
+    if (index >= 0 && index < this.expenses.length) {
       this.expenses.removeAt(index);
     }
   }
@@ -331,6 +330,7 @@ export class FinancialInformationComponent {
     }
     const expensesForm: FinancialExpenseFormValue[] = (raw.expenses || []).map(e => ({
       id: e.id,
+      savedTypeName: e.savedTypeCode,
       financialTypeName: e.typeCode || null,
       amount: e.amountEur,
       description: e.description

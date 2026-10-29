@@ -15,7 +15,7 @@ describe('financial information mapping', () => {
       incomeId: 1,
       totalInvestments: 15000,
       investmentsId: 2,
-      expenses: [{ id: 3, financialTypeName: 'RENT', amount: 9000, description: 'Flat' }]
+      expenses: [{ id: 3, savedTypeName: 'RENT', financialTypeName: 'RENT', amount: 9000, description: 'Flat' }]
     });
   });
 
@@ -31,9 +31,11 @@ describe('financial information mapping', () => {
     });
     const service = TestBed.inject(FinancialInformationService);
     const payload = service.buildCustomerFinancialPayload(60000, 15000, [
-      { id: 3, financialTypeName: 'RENT', amount: 9500, description: 'Flat' },
+      { id: 3, savedTypeName: 'RENT', financialTypeName: 'RENT', amount: 9500, description: 'Flat' },
+      { id: 4, savedTypeName: 'LOAN', financialTypeName: 'MORTGAGE', amount: 700, description: null },
       { financialTypeName: 'LOAN', amount: 2000, description: null }
     ], { income: 1, investments: 2 });
-    expect(payload.map(p => p.id)).toEqual([1, 2, 3, undefined]);
+    // Row 4 changed type: sent as new (the BE ignores type changes on update and deletes the old row)
+    expect(payload.map(p => p.id)).toEqual([1, 2, 3, undefined, undefined]);
   });
 });

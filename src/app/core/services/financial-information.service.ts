@@ -5,6 +5,8 @@ import {CustomerService, FinancialService, CustomerFinancialDTO, FinancialTypeDT
 export interface FinancialExpenseFormValue {
   /** BE id of a saved row: sent back so a re-save updates it instead of adding a copy. */
   id?: number | null;
+  /** Type the saved row had when loaded: the BE ignores type changes on an update. */
+  savedTypeName?: string | null;
   financialTypeName: string | null;
   amount: number | null;
   description: string | null;
@@ -36,6 +38,7 @@ export function fromCustomerFinancials(rows: CustomerFinancialDTO[] | null | und
       .filter(r => r !== income && r !== investments)
       .map(r => ({
         id: r.id ?? null,
+        savedTypeName: r.financialType?.name ?? null,
         financialTypeName: r.financialType?.name ?? null,
         amount: r.amount ?? null,
         description: r.description ?? null
@@ -88,7 +91,8 @@ export class FinancialInformationService {
     for (const e of expenses) {
       if (e.amount == null) continue;
       result.push({
-        ...(e.id != null ? {id: e.id} : {}),
+        // A changed type is ignored on update by the BE: send the row as new, the old one gets deleted
+        ...(e.id != null && (e.savedTypeName == null || e.savedTypeName === e.financialTypeName) ? {id: e.id} : {}),
         financialType: {
           name: e.financialTypeName || 'OTHER_EXPENSE',
           type: 'EXPENSE',
@@ -102,6 +106,7 @@ export class FinancialInformationService {
     return result;
   }
 
+  /** Replaces the customer's financials with `payload` (rows left out are deleted by the BE). */
   addCustomerFinancials(customerId: string, payload: CustomerFinancialDTO[]): Observable<void> {
     // We ignore the CustomerDTO body here; the component only needs to know the call succeeded.
     return this.customerApi.addCustomerFinancials(customerId, payload) as unknown as Observable<void>;

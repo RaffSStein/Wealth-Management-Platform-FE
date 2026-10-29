@@ -42,9 +42,19 @@ describe('toCustomerGoals', () => {
       { id: 7, goalType: types[0], targetAmount: 250000, goalTimeline: 'MEDIUM_TERM', targetDate: '2030-06-01' }
     ]);
     expect(rows).toEqual([
-      { id: 7, goalTypeName: 'HOME', targetAmount: 250000, goalTimeline: 'MEDIUM_TERM', targetDate: '2030-06-01', notes: null }
+      { id: 7, savedGoalTypeName: 'HOME', goalTypeName: 'HOME', targetAmount: 250000, goalTimeline: 'MEDIUM_TERM',
+        targetDate: '2030-06-01', notes: null }
     ]);
     expect(toCustomerGoals(rows, types)[0].id).toBe(7);
+  });
+
+  it('sends a saved goal whose type changed as a new goal (the BE ignores type changes on update)', () => {
+    const [goal] = toCustomerGoals([
+      { id: 7, savedGoalTypeName: 'HOME', goalTypeName: 'RETIREMENT', targetAmount: 1, goalTimeline: 'LONG_TERM',
+        targetDate: null, notes: null }
+    ], types);
+    expect('id' in goal).toBeFalse();
+    expect(goal.goalType.name).toBe('RETIREMENT');
   });
 
   it('sends no id for new goals', () => {

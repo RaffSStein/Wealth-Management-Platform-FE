@@ -29,16 +29,13 @@ import {OnboardingLayoutComponent} from '../../shared/components/onboarding-layo
         @if (typesError()) {
           <p-message severity="error">Goal types could not be loaded. Reload the page to try again.</p-message>
         }
-        @if (hasSavedGoals()) {
-          <small class="wmp-field__hint">Saved goals can't be removed yet. You can still change their values.</small>
-        }
         @for (group of goals.controls; track $index; let i = $index) {
           <section class="wmp-panel goal" [formGroup]="group" [attr.aria-label]="'Goal ' + (i + 1)">
             <div class="goal__head">
               <h2 class="wmp-panel__title">Goal {{ i + 1 }}</h2>
               @if (goals.length > 1) {
                 <button pButton type="button" [text]="true" severity="secondary" [attr.aria-label]="'Remove goal ' + (i + 1)"
-                        [disabled]="group.value.id != null" (click)="removeGoal(i)">
+                        (click)="removeGoal(i)">
                   <span pButtonIcon class="material-symbols-outlined" aria-hidden="true">delete</span>
                 </button>
               }
@@ -121,7 +118,6 @@ export class InvestmentGoalsComponent {
   });
   /** True while the saved goals are loaded from the BE (the form is disabled meanwhile). */
   protected readonly prefilling = signal(false);
-  protected readonly hasSavedGoals = signal(false);
   protected readonly onPrev = busyAction(() =>
     this.router.navigateByUrl(this.progress.pathFor(OnboardingStep.FinancialInformation)));
   protected readonly errorMsg = signal<string | null>(null);
@@ -153,10 +149,7 @@ export class InvestmentGoalsComponent {
         this.prefilling.set(false);
       }
     }
-    this.goals.valueChanges.subscribe(() => {
-      this.formState.save('investment-goals', this.goals.getRawValue());
-      this.hasSavedGoals.set((this.goals.getRawValue() as GoalFormRow[]).some(g => g.id != null));
-    });
+    this.goals.valueChanges.subscribe(() => this.formState.save('investment-goals', this.goals.getRawValue()));
   }
 
   private setRows(rows: GoalFormRow[]): void {
@@ -166,7 +159,6 @@ export class InvestmentGoalsComponent {
       group.patchValue(row, {emitEvent: false});
       this.goals.push(group, {emitEvent: false});
     });
-    this.hasSavedGoals.set(rows.some(g => g.id != null));
   }
 
   get goals(): FormArray<FormGroup> {
@@ -175,8 +167,9 @@ export class InvestmentGoalsComponent {
 
   private createGoal(): FormGroup {
     return this.fb.group({
-      // BE id of a saved goal, sent back so a re-save updates it
+      // BE id and loaded type of a saved goal (see toCustomerGoals)
       id: this.fb.control<number | null>(null),
+      savedGoalTypeName: this.fb.control<string | null>(null),
       goalTypeName: this.fb.control<string | null>(null, {validators: [Validators.required]}),
       targetAmount: this.fb.control<number | null>(null, {validators: [Validators.required, Validators.min(1)]}),
       goalTimeline: this.fb.control<string | null>('MEDIUM_TERM', {validators: [Validators.required]}),
@@ -198,8 +191,8 @@ export class InvestmentGoalsComponent {
   }
 
   protected removeGoal(index: number): void {
-    // The BE can't delete saved goals yet: only unsaved ones can be removed
-    if (this.goals.length > 1 && this.goals.at(index).value.id == null) this.goals.removeAt(index);
+    // Saved goals are deleted on the BE by leaving them out of the next save (replace semantics)
+    if (this.goals.length > 1) this.goals.removeAt(index);
   }
 
   protected showError(group: FormGroup, control: string): boolean {
