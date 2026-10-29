@@ -110,8 +110,11 @@ docs/                       functional docs (process + diagrams), mirrored from 
 - `CustomerSelectionService.open(id)` is the single way to switch the working customer (it resumes onboarding for
   DRAFT customers). Used by customer selection and the advisor workspace.
 - Onboarding lifecycle (BE, 2026-10-28): MiFID submit sets PENDING_VERIFICATION, then an async AML check (Kafka) sets ACTIVE
-  (onboarding DONE) or REJECTED (FAILED). There is no "finish" call: the risk step polls GET /customer/{id} (1.5 s,
-  20 s timeout). `riskProfile.profile` is the configured **label**, so match bands with `findBand` / `profileDisplay`
+  (onboarding DONE) or REJECTED (FAILED). There is no "finish" call and no push channel
+  (BE notification-service is an empty skeleton): `VerificationWatcherService` polls GET /customer/{id} in the
+  background (1.5 s, then 5 s after 20 s, then 30 s after 2 min; gives up after 30 min) for as long as the app is open,
+  resumes for a selected PENDING_VERIFICATION customer, and reports the outcome as toast + notification. The risk
+  step reads its state from it; a REJECTED onboarding can't be finished (Exit instead). `riskProfile.profile` is the configured **label**, so match bands with `findBand` / `profileDisplay`
   (code or label). `onboarding/active` returns ordered steps (DONE/REJECTED).
 - Unbuilt sections (investments, markets, account sub-pages, advisor clients/reviews/proposals/orders) use the shared
   work-in-progress page (`wip()` in app.routes.ts). **No sample data there.** Their concepts and data/API needs live

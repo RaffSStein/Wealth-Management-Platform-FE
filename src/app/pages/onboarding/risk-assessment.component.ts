@@ -1,6 +1,5 @@
-import {Component, DestroyRef, computed, inject, signal} from '@angular/core';
+import {Component, computed, inject, signal} from '@angular/core';
 import {Router} from '@angular/router';
-import {HttpContext} from '@angular/common/http';
 import {firstValueFrom} from 'rxjs';
 import {Button} from 'primeng/button';
 import {Message} from 'primeng/message';
@@ -10,7 +9,7 @@ import {CustomerSessionService} from '../../core/services/customer-session.servi
 import {findBand, MifidQuestionnaireService, profileDisplay, riskBands} from '../../core/services/mifid-questionnaire.service';
 import {WorkspaceContextService} from '../../core/services/workspace-context.service';
 import {busyAction} from '../../core/services/busy-action';
-import {BACKGROUND_REQUEST} from '../../core/interceptors/loading.context';
+import {VerificationWatcherService} from '../../core/services/verification-watcher.service';
 import {OnboardingLayoutComponent} from '../../shared/components/onboarding-layout/onboarding-layout.component';
 
 interface BandView {
@@ -65,7 +64,16 @@ interface BandView {
             @case ('pending') { <span class="material-symbols-outlined spin" aria-hidden="true">progress_activity</span> Verifying the account (anti-money-laundering check)… }
             @case ('active') { <span class="material-symbols-outlined ok" aria-hidden="true">verified</span> Account verified and active. }
             @case ('rejected') { <span class="material-symbols-outlined err" aria-hidden="true">block</span> The account could not be verified. Your advisor will contact you. }
-            @case ('timeout') { <span class="material-symbols-outlined" aria-hidden="true">schedule</span> Verification is taking longer than usual. You can continue; the status updates automatically. }
+            @case ('slow') {
+              <span class="material-symbols-outlined spin" aria-hidden="true">progress_activity</span>
+              Verification is taking longer than usual. You can finish now: we keep checking while the app is open and
+              notify you when it's done.
+            }
+            @case ('stalled') {
+              <span class="material-symbols-outlined" aria-hidden="true">schedule</span>
+              The verification isn't complete yet.
+              <p-button label="Check again" severity="secondary" [text]="true" size="small" (onClick)="checkAgain()"/>
+            }
           }
         </div>
         <p class="note">Your advisor reviews this profile with you. You can retake the questionnaire if your situation changes.</p>
@@ -76,8 +84,13 @@ interface BandView {
       <div actions class="wmp-actions">
         <p-button label="Back to questionnaire" severity="secondary" [outlined]="true" [loading]="back.pending()" (onClick)="back()"/>
         <div class="wmp-actions__end">
-          <p-button label="Finish onboarding" [disabled]="!profile() || verification() === 'pending'"
-                    [loading]="finish.pending()" (onClick)="finish()"/>
+          @if (verification() === 'rejected') {
+            <!-- A rejected onboarding can't be finished: leave it (advisors back to their workspace) -->
+            <p-button label="Exit onboarding" [loading]="exit.pending()" (onClick)="exit()"/>
+          } @else {
+            <p-button label="Finish onboarding" [disabled]="!profile() || verification() === 'pending'"
+                      [loading]="finish.pending()" (onClick)="finish()"/>
+          }
         </div>
       </div>
     </app-onboarding-layout>
@@ -119,10 +132,11 @@ export class RiskAssessmentComponent {
   private readonly customerApi = inject(CustomerService);
   private readonly customerSession = inject(CustomerSessionService);
   private readonly workspace = inject(WorkspaceContextService);
+  private readonly watcher = inject(VerificationWatcherService);
 
   protected readonly loading = signal(true);
   /** Onboarding lifecycle after submit: PENDING_VERIFICATION -> ACTIVE | REJECTED (async AML check on the BE). */
-  protected readonly verification = signal<'none' | 'pending' | 'active' | 'rejected' | 'timeout'>('none');
+  protected readonly verification = computed(() => this.watcher.stateFor(this.customerSession.customer()?.id) ?? 'none');
   protected readonly profile = signal<CustomerRiskProfileDTO | null>(this.mifid.result());
   private readonly config = signal<MifidQuestionnaireConfigDTO | null>(this.mifid.config());
 
@@ -169,10 +183,7 @@ export class RiskAssessmentComponent {
     return Math.min(100, Math.max(0, ((score - min) / span) * 100));
   });
 
-  private destroyed = false;
-
   constructor() {
-    inject(DestroyRef).onDestroy(() => (this.destroyed = true));
     void this.load();
   }
 
@@ -194,40 +205,22 @@ export class RiskAssessmentComponent {
       }
     }
     this.loading.set(false);
-    if (customerId) void this.pollVerification(customerId);
+    // Follows the AML check in the background; it keeps going after this page is left
+    if (customerId) this.watcher.watch(customerId, {justSubmitted: !!this.mifid.result()});
   }
 
-  /** Polls the customer status until it leaves PENDING_VERIFICATION (interval 1.5 s, timeout 20 s). */
-  private async pollVerification(customerId: string): Promise<void> {
-    const deadline = Date.now() + 20000;
-    // Right after a submit the status may still read DRAFT for a moment: keep polling in that case
-    const justSubmitted = !!this.mifid.result();
-    // Background polling: the page already shows its own "verifying" state, so keep the global bar out of it
-    const context = new HttpContext().set(BACKGROUND_REQUEST, true);
-    while (!this.destroyed) {
-      let status: string | undefined;
-      try {
-        const customer = await firstValueFrom(this.customerApi.getCustomerById(customerId, 'body', false, {context}));
-        status = customer?.customerStatus;
-        if (customer) this.customerSession.setCustomer(customer);
-        if (!this.profile() && customer?.riskProfile) this.profile.set(customer.riskProfile);
-      } catch {
-        // transient error: keep polling until the deadline
-      }
-      if (status === 'ACTIVE') { this.verification.set('active'); return; }
-      if (status === 'REJECTED') { this.verification.set('rejected'); return; }
-      const waiting = status === undefined || status === 'PENDING_VERIFICATION' || (justSubmitted && status === 'DRAFT');
-      if (!waiting) { this.verification.set('none'); return; }
-      if (Date.now() > deadline) { this.verification.set('timeout'); return; }
-      this.verification.set('pending');
-      await new Promise(resolve => setTimeout(resolve, 1500));
-    }
+  protected checkAgain(): void {
+    const customerId = this.customerSession.customer()?.id;
+    if (customerId) this.watcher.checkNow(customerId);
   }
 
   protected readonly back = busyAction(() =>
     this.router.navigateByUrl(this.progress.pathFor(OnboardingStep.MifidQuestionnaire)));
 
+  protected readonly exit = busyAction(() => this.workspace.exitOnboarding());
+
   protected readonly finish = busyAction(async () => {
+    if (this.verification() === 'rejected') return;
     this.progress.completeStep(this.step);
     await this.router.navigateByUrl(this.workspace.homePath());
   });
