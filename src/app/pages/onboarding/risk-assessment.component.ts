@@ -1,5 +1,6 @@
 import {Component, DestroyRef, computed, inject, signal} from '@angular/core';
 import {Router} from '@angular/router';
+import {HttpContext} from '@angular/common/http';
 import {firstValueFrom} from 'rxjs';
 import {Button} from 'primeng/button';
 import {Message} from 'primeng/message';
@@ -8,6 +9,8 @@ import {OnboardingProgressService, OnboardingStep} from '../../core/services/onb
 import {CustomerSessionService} from '../../core/services/customer-session.service';
 import {findBand, MifidQuestionnaireService, profileDisplay, riskBands} from '../../core/services/mifid-questionnaire.service';
 import {WorkspaceContextService} from '../../core/services/workspace-context.service';
+import {busyAction} from '../../core/services/busy-action';
+import {BACKGROUND_REQUEST} from '../../core/interceptors/loading.context';
 import {OnboardingLayoutComponent} from '../../shared/components/onboarding-layout/onboarding-layout.component';
 
 interface BandView {
@@ -71,9 +74,10 @@ interface BandView {
       }
 
       <div actions class="wmp-actions">
-        <p-button label="Back to questionnaire" severity="secondary" [outlined]="true" (onClick)="back()"/>
+        <p-button label="Back to questionnaire" severity="secondary" [outlined]="true" [loading]="back.pending()" (onClick)="back()"/>
         <div class="wmp-actions__end">
-          <p-button label="Finish onboarding" [disabled]="!profile() || verification() === 'pending'" (onClick)="finish()"/>
+          <p-button label="Finish onboarding" [disabled]="!profile() || verification() === 'pending'"
+                    [loading]="finish.pending()" (onClick)="finish()"/>
         </div>
       </div>
     </app-onboarding-layout>
@@ -198,10 +202,12 @@ export class RiskAssessmentComponent {
     const deadline = Date.now() + 20000;
     // Right after a submit the status may still read DRAFT for a moment: keep polling in that case
     const justSubmitted = !!this.mifid.result();
+    // Background polling: the page already shows its own "verifying" state, so keep the global bar out of it
+    const context = new HttpContext().set(BACKGROUND_REQUEST, true);
     while (!this.destroyed) {
       let status: string | undefined;
       try {
-        const customer = await firstValueFrom(this.customerApi.getCustomerById(customerId));
+        const customer = await firstValueFrom(this.customerApi.getCustomerById(customerId, 'body', false, {context}));
         status = customer?.customerStatus;
         if (customer) this.customerSession.setCustomer(customer);
         if (!this.profile() && customer?.riskProfile) this.profile.set(customer.riskProfile);
@@ -218,12 +224,11 @@ export class RiskAssessmentComponent {
     }
   }
 
-  protected back(): void {
-    void this.router.navigateByUrl(this.progress.pathFor(OnboardingStep.MifidQuestionnaire));
-  }
+  protected readonly back = busyAction(() =>
+    this.router.navigateByUrl(this.progress.pathFor(OnboardingStep.MifidQuestionnaire)));
 
-  protected async finish(): Promise<void> {
+  protected readonly finish = busyAction(async () => {
     this.progress.completeStep(this.step);
     await this.router.navigateByUrl(this.workspace.homePath());
-  }
+  });
 }

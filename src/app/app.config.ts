@@ -11,6 +11,8 @@ import {provideApi as provideDocumentApi} from './api/document-service';
 import {provideApi as provideBankApi} from './api/bank-service';
 // interceptor which adds auth token to requests
 import {authInterceptor} from './core/interceptors/auth.interceptor';
+// counts foreground requests for the global loading bar
+import {loadingInterceptor} from './core/interceptors/loading.interceptor';
 // UI library + theme
 import {providePrimeNG} from 'primeng/config';
 import {MessageService} from 'primeng/api';
@@ -36,7 +38,7 @@ export const appConfig: ApplicationConfig = {
     }),
     provideHttpClient(
       withFetch(),
-      withInterceptors([authInterceptor])
+      withInterceptors([authInterceptor, loadingInterceptor])
     ),
     provideUserApi('/user-service'),
     provideCustomerApi('/customer-service'),

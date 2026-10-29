@@ -112,6 +112,11 @@ docs/                       functional docs (process + diagrams), mirrored from 
 - Navigation model: `layout/navigation.ts` (`navigationFor({isAdvisor, actingAsClient})`, `activeSection(url)`). Add
   pages there, not in the shell. The advisor workspace pages are placeholders (`shared/components/page-placeholder` via
   route `data`) until advisor-service exists.
+- Loading feedback: `<app-loading-bar>` (in `app.html`) shows a top bar while a navigation is pending or a foreground
+  request is in flight (`LoadingIndicatorService` + `loadingInterceptor`, 150 ms show delay, 300 ms minimum).
+  Polling and other background calls must pass `HttpContext` with `BACKGROUND_REQUEST`, or the bar never hides.
+  CTAs that start async work use `busyAction()` (`core/services/busy-action.ts`): `[loading]="x.pending()"`.
+  It also blocks double submits. Don't add `loading = signal(false)` with try/finally by hand.
 - Toasts: keep using `ToastService` (`success/error/info/warning`). It is a facade over PrimeNG `MessageService`
   (root-provided in `app.config.ts`), rendered by a deferred `<p-toast>` in `app.html`.
 

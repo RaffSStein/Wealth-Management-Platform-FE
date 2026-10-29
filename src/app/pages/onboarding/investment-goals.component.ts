@@ -12,6 +12,7 @@ import {SelectButton} from 'primeng/selectbutton';
 import {CustomerService, GoalService, GoalTypeDTO} from '../../api/customer-service';
 import {OnboardingProgressService, OnboardingStep} from '../../core/services/onboarding-progress.service';
 import {CustomerSessionService} from '../../core/services/customer-session.service';
+import {busyAction} from '../../core/services/busy-action';
 import {GOAL_TIMELINES, GoalFormRow, toCustomerGoals} from '../../core/services/goals-form';
 import {ToastService} from '../../shared/services/toast.service';
 import {OnboardingLayoutComponent} from '../../shared/components/onboarding-layout/onboarding-layout.component';
@@ -75,9 +76,9 @@ import {OnboardingLayoutComponent} from '../../shared/components/onboarding-layo
       </form>
 
       <div actions class="wmp-actions">
-        <p-button label="Back" severity="secondary" [outlined]="true" (onClick)="onPrev()"/>
+        <p-button label="Back" severity="secondary" [outlined]="true" [loading]="onPrev.pending()" (onClick)="onPrev()"/>
         <div class="wmp-actions__end">
-          <button pButton type="submit" form="goals-form" [loading]="loading()"><span pButtonLabel>{{ loading() ? 'Saving…' : 'Save & continue' }}</span></button>
+          <button pButton type="submit" form="goals-form" [loading]="onSubmit.pending()"><span pButtonLabel>{{ onSubmit.pending() ? 'Saving…' : 'Save & continue' }}</span></button>
         </div>
       </div>
     </app-onboarding-layout>
@@ -101,7 +102,9 @@ export class InvestmentGoalsComponent {
   protected readonly today = new Date();
   protected readonly goalTypes = signal<GoalTypeDTO[]>([]);
   protected readonly typesError = signal(false);
-  protected readonly loading = signal(false);
+  readonly onSubmit = busyAction(() => this.submit());
+  protected readonly onPrev = busyAction(() =>
+    this.router.navigateByUrl(this.progress.pathFor(OnboardingStep.FinancialInformation)));
   protected readonly errorMsg = signal<string | null>(null);
 
   protected readonly form = this.fb.group({goals: this.fb.array<FormGroup>([this.createGoal()])});
@@ -145,11 +148,7 @@ export class InvestmentGoalsComponent {
     return !!c && c.touched && c.invalid;
   }
 
-  protected onPrev(): void {
-    void this.router.navigateByUrl(this.progress.pathFor(OnboardingStep.FinancialInformation));
-  }
-
-  async onSubmit(): Promise<void> {
+  private async submit(): Promise<void> {
     this.errorMsg.set(null);
     if (this.form.invalid) {
       this.form.markAllAsTouched();
@@ -161,7 +160,6 @@ export class InvestmentGoalsComponent {
       return;
     }
     const goals = toCustomerGoals(this.goals.getRawValue() as GoalFormRow[], this.goalTypes());
-    this.loading.set(true);
     try {
       await firstValueFrom(this.customerApi.addCustomerGoals(customerId, goals));
       this.progress.completeStep(this.step);
@@ -169,8 +167,6 @@ export class InvestmentGoalsComponent {
       await this.router.navigateByUrl(this.progress.pathFor(OnboardingStep.MifidQuestionnaire));
     } catch {
       this.errorMsg.set('Could not save your goals. Please try again.');
-    } finally {
-      this.loading.set(false);
     }
   }
 }

@@ -6,6 +6,7 @@ import {AuthService as CoreAuthService} from '../../core/services/auth.service';
 import {AuthService as ApiAuthService, LoginCredentialsDTO} from '../../api/user-service';
 import {UserSessionService} from '../../core/services/user-session.service';
 import {CustomerSessionService} from '../../core/services/customer-session.service';
+import {busyAction} from '../../core/services/busy-action';
 import {ToastService} from '../../shared/services/toast.service';
 import { firstValueFrom } from 'rxjs';
 import {Button} from 'primeng/button';
@@ -60,7 +61,7 @@ import {AuthLayoutComponent} from '../../shared/components/auth-layout/auth-layo
           <label for="rememberMe">Remember my email on this device</label>
         </span>
 
-        <p-button type="submit" [label]="loading() ? 'Signing in…' : 'Sign in'" [loading]="loading()"
+        <p-button type="submit" [label]="onSubmit.pending() ? 'Signing in…' : 'Sign in'" [loading]="onSubmit.pending()"
                   [disabled]="form.invalid" [fluid]="true"/>
       </form>
 
@@ -105,7 +106,7 @@ export class LoginComponent {
   private readonly userSession = inject(UserSessionService);
   private readonly toast = inject(ToastService);
 
-  loading = signal(false);
+  readonly onSubmit = busyAction(() => this.submit());
   errorOpen = signal(false);
   protected readonly devMode = isDevMode();
 
@@ -133,9 +134,8 @@ export class LoginComponent {
     }
   }
 
-  async onSubmit() {
-    if (this.form.invalid || this.loading()) return;
-    this.loading.set(true);
+  private async submit(): Promise<void> {
+    if (this.form.invalid) return;
     this.errorOpen.set(false);
     const username = this.form.controls.username.value?.trim() || '';
     const password = this.form.controls.password.value?.trim() || '';
@@ -156,8 +156,6 @@ export class LoginComponent {
       await this.router.navigateByUrl(this.postLoginUrl());
     } catch {
       this.errorOpen.set(true);
-    } finally {
-      this.loading.set(false);
     }
   }
 

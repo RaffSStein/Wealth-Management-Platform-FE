@@ -16,6 +16,7 @@ import {OnboardingFormStateService} from '../../core/services/onboarding-form-st
 import {FinancialExpenseFormValue, FinancialInformationService} from '../../core/services/financial-information.service';
 import {FinancialTypeDTO} from '../../api/customer-service';
 import {CustomerSessionService} from '../../core/services/customer-session.service';
+import {busyAction} from '../../core/services/busy-action';
 import {OnboardingLayoutComponent} from '../../shared/components/onboarding-layout/onboarding-layout.component';
 
 interface FinancialFormValue {
@@ -116,9 +117,9 @@ interface FinancialFormValue {
       </aside>
 
       <div actions class="wmp-actions">
-        <p-button label="Back" severity="secondary" [outlined]="true" (onClick)="onPrev()"/>
+        <p-button label="Back" severity="secondary" [outlined]="true" [loading]="onPrev.pending()" (onClick)="onPrev()"/>
         <div class="wmp-actions__end">
-          <button pButton type="submit" form="financial-form" [loading]="loading()"><span pButtonLabel>{{ loading() ? 'Saving…' : 'Save & continue' }}</span></button>
+          <button pButton type="submit" form="financial-form" [loading]="onSubmit.pending()"><span pButtonLabel>{{ onSubmit.pending() ? 'Saving…' : 'Save & continue' }}</span></button>
         </div>
       </div>
     </app-onboarding-layout>
@@ -161,7 +162,9 @@ export class FinancialInformationComponent {
   private readonly financialService = inject(FinancialInformationService);
   private readonly customerSession = inject(CustomerSessionService);
 
-  protected readonly loading = signal(false);
+  readonly onSubmit = busyAction(() => this.submit());
+  readonly onPrev = busyAction(() =>
+    this.router.navigateByUrl(this.progress.pathFor(OnboardingStep.PersonalDetails)));
   protected readonly errorMsg = signal<string | null>(null);
   protected readonly financialTypes = signal<FinancialTypeDTO[]>([]);
 
@@ -243,7 +246,7 @@ export class FinancialInformationComponent {
     }
   }
 
-  async onSubmit() {
+  private async submit(): Promise<void> {
     this.errorMsg.set(null);
     if (this.form.invalid) {
       this.form.markAllAsTouched();
@@ -267,7 +270,6 @@ export class FinancialInformationComponent {
     }));
     const payload = this.financialService.buildCustomerFinancialPayload(raw.annualIncomeEur, raw.totalInvestmentsEur, expensesForm);
 
-    this.loading.set(true);
     try {
       await firstValueFrom(this.financialService.addCustomerFinancials(customerId, payload));
       this.progress.completeStep(this.step);
@@ -275,12 +277,6 @@ export class FinancialInformationComponent {
       await this.router.navigateByUrl(this.progress.pathFor(OnboardingStep.InvestmentGoals));
     } catch {
       this.errorMsg.set('Could not save financial information. Please try again.');
-    } finally {
-      this.loading.set(false);
     }
-  }
-
-  onPrev() {
-    void this.router.navigateByUrl(this.progress.pathFor(OnboardingStep.PersonalDetails));
   }
 }

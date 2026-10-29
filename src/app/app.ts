@@ -2,11 +2,12 @@ import { Component, inject, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { Toast } from 'primeng/toast';
 import { ThemeService } from './core/services/theme.service';
+import { LoadingBarComponent } from './shared/components/loading-bar.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, Toast],
+  imports: [RouterOutlet, Toast, LoadingBarComponent],
   templateUrl: './app.html',
   styleUrls: ['./app.scss']
 })

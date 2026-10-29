@@ -12,6 +12,7 @@ import {OnboardingProgressService, OnboardingStep} from '../../core/services/onb
 import {UserSessionService} from '../../core/services/user-session.service';
 import {OnboardingFormStateService} from '../../core/services/onboarding-form-state.service';
 import {CustomerSessionService} from '../../core/services/customer-session.service';
+import {busyAction} from '../../core/services/busy-action';
 import {OnboardingLayoutComponent} from '../../shared/components/onboarding-layout/onboarding-layout.component';
 
 const ISO2 = /^[A-Z]{2}$/;
@@ -112,7 +113,7 @@ const ISO2 = /^[A-Z]{2}$/;
       <div actions class="wmp-actions">
         <span></span>
         <div class="wmp-actions__end">
-          <button pButton type="submit" form="personal-details-form" [loading]="loading()"><span pButtonLabel>{{ loading() ? 'Saving…' : 'Save & continue' }}</span></button>
+          <button pButton type="submit" form="personal-details-form" [loading]="onSubmit.pending()"><span pButtonLabel>{{ onSubmit.pending() ? 'Saving…' : 'Save & continue' }}</span></button>
         </div>
       </div>
     </app-onboarding-layout>
@@ -134,7 +135,7 @@ export class PersonalDetailsComponent implements OnDestroy {
   private readonly formState = inject(OnboardingFormStateService);
   private readonly customerSession = inject(CustomerSessionService);
 
-  protected readonly loading = signal(false);
+  readonly onSubmit = busyAction(() => this.submit());
   protected readonly errorMsg = signal<string | null>(null);
   protected readonly today = new Date();
   protected readonly genders = [
@@ -197,7 +198,7 @@ export class PersonalDetailsComponent implements OnDestroy {
     this.form.get(control)?.setValue(v);
   }
 
-  async onSubmit(): Promise<void> {
+  private async submit(): Promise<void> {
     const nextPath = this.progress.pathFor(OnboardingStep.FinancialInformation);
     if (this.progress.isStepCompleted(this.step)) {
       // Already submitted and unchanged: skip re-init
@@ -235,7 +236,6 @@ export class PersonalDetailsComponent implements OnDestroy {
       country: raw.country || undefined
     } as CustomerDTO;
 
-    this.loading.set(true);
     try {
       const created = await firstValueFrom(this.customerApi.initCustomer(dto));
       // The next steps operate on the selected customer
@@ -247,8 +247,6 @@ export class PersonalDetailsComponent implements OnDestroy {
     } catch (err: unknown) {
       const message = (err as { error?: { message?: string } })?.error?.message;
       this.errorMsg.set(message || 'Unable to save the personal details. Please try again.');
-    } finally {
-      this.loading.set(false);
     }
   }
 
