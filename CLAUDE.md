@@ -76,7 +76,11 @@ docs/                       functional docs (process + diagrams), mirrored from 
   for a new customer, then `POST /customer/{id}/personal-details`. Unsaved typing is a per-customer sessionStorage
   draft (`OnboardingFormStateService`), cleared after a successful save.
 - BE gaps (2026-10-29): no per-step drafts except MiFID; saved financials/goals can't be deleted (the FE disables
-  removing them); `CustomerPersonalDetailsDTO` has no address lines, so they can't be updated after the first save.
+  removing them). Pending on BE main: financials/goals POST becomes **replace** (full set; rows missing from the body
+  are deleted; foreign/unknown ids → 400). Then re-enable removal. Caveats: an empty array is unsupported, and a
+  type change on a saved row is ignored, so send that row without its id.
+- The generated clients in `src/app/api` are not committed and can lag the spec: regenerate after pulling spec changes
+  (`npm run openapi:gen:<x>`) before concluding a field is missing.
 - Step flags are stored per browser (`wm.onboarding.progress`), not per customer: `syncFromBackend(active.steps)`
   rebuilds them, and runs on customer open and after a full reload (guard). Otherwise stale flags show as completed.
 - Goals: `core/services/goals-form.ts` (`toCustomerGoals`). MiFID: `core/services/mifid-questionnaire.service.ts`

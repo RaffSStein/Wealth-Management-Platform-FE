@@ -237,7 +237,6 @@ export class PersonalDetailsComponent {
     const existingId = this.customerSession.customer()?.id;
     try {
       if (existingId) {
-        // The update DTO has no address lines yet (BE spec): they are only stored on the first save
         const details = {
           firstName: raw.firstName,
           lastName: raw.lastName,
@@ -246,6 +245,8 @@ export class PersonalDetailsComponent {
           taxId: raw.taxId,
           nationality: raw.nationality || undefined,
           phoneNumber: raw.phoneNumber || undefined,
+          addressLine1: raw.addressLine1 || undefined,
+          addressLine2: raw.addressLine2 || undefined,
           city: raw.city || undefined,
           zipCode: raw.zipCode || undefined,
           country: raw.country || undefined
