@@ -113,6 +113,14 @@ export const routes: Routes = [
     canActivate: [authGuard],
     children: [
       {path: 'home', loadComponent: () => import('./pages/home/home.component').then(m => m.HomeComponent)},
+      {
+        path: 'investor-profile',
+        loadComponent: () => import('./pages/investor-profile/investor-profile.component').then(m => m.InvestorProfileComponent)
+      },
+      {
+        path: 'investor-profile/update',
+        loadComponent: () => import('./pages/investor-profile/investor-profile-update.component').then(m => m.InvestorProfileUpdateComponent)
+      },
       // Advisor workspace (advisor-service is still a BE skeleton: sub-pages are placeholders)
       {
         path: 'advisor',

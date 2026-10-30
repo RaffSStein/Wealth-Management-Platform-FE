@@ -240,7 +240,7 @@ paths:
   /customer/{customerId}/mifid/submit:
     post:
       summary: Submit MIFID questionnaire answers for a customer
-      description: Receives the answers to a MIFID questionnaire for a customer, including questionnaire name and responses. Returns the calculated risk profile.
+      description: Submits a COMPLETED MIFID filling of the customer and returns the calculated risk profile. Any previously SUBMITTED filling becomes DEPRECATED. For an already active customer (renewal) only the risk profile is updated; the onboarding is not re-run.
       operationId: submitQuestionnaire
       parameters:
         - name: customerId
@@ -265,10 +265,34 @@ paths:
       tags:
         - Mifid
 
+  /customer/{customerId}/mifid/current:
+    get:
+      summary: Get the current submitted MIFID filling for a customer
+      description: Returns the latest SUBMITTED MIFID questionnaire filling of the customer, including the calculated risk profile. Open renewal drafts are ignored.
+      operationId: getCurrentMifidFillingForCustomer
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Latest submitted MIFID questionnaire filling for the customer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MifidFillingDTO'
+        '404':
+          description: The customer has no submitted filling
+      tags:
+        - Mifid
+
   /customer/{customerId}/mifid/{fillingId}:
     get:
       summary: Get MIFID questionnaire filling for a customer
-      description: Returns the current (possibly incomplete) MIFID questionnaire filling for the specified customer.
+      description: Returns the MIFID questionnaire filling identified by fillingId, in any status, for the specified customer.
       operationId: getMifidFillingForCustomer
       parameters:
         - name: customerId
@@ -285,20 +309,20 @@ paths:
             format: int64
       responses:
         '200':
-          description: Current MIFID questionnaire filling for the customer
+          description: MIFID questionnaire filling for the customer
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/MifidFillingDTO'
         '404':
-          description: No filling found for the customer
+          description: No filling with this id found for the customer
       tags:
         - Mifid
 
   /customer/{customerId}/mifid/save:
     post:
       summary: Save (partial) MIFID questionnaire filling for a customer
-      description: Saves a (possibly incomplete) MIFID questionnaire filling for the specified customer. This can be used to persist progress before final submission.
+      description: Creates a new (possibly incomplete) MIFID questionnaire filling for the specified customer, in DRAFT or COMPLETED status depending on the answers. Also used to start a MIFID renewal for an active customer; the previously submitted filling stays untouched until the new one is submitted. Response ids in the body are ignored.
       operationId: saveMifidFillingForCustomer
       parameters:
         - name: customerId

@@ -92,6 +92,18 @@ docs/                       functional docs (process + diagrams), mirrored from 
 - MiFID flow (agreed with the BE, 2026-10-28): POST `/mifid/save` creates the filling. Status is **server-derived**
   (COMPLETED once every question is answered); never send it. PATCH `/mifid/filling/{id}` edits a DRAFT (send response
   `id`s to update rather than add). POST `/mifid/submit` only when COMPLETED (else 409 INVALID_STATE_TRANSITION).
+- Onboarded customers see their MiFID read-only at `/app/investor-profile` (`GET /customer/{id}/mifid/current`, the
+  latest SUBMITTED filling; 404 = none), never the onboarding step. A MiFID update (`/app/investor-profile/update`)
+  is a **new filling** that supersedes the old one (ESMA suitability guidelines: keep client info current and
+  recorded), never an in-place edit. It is pre-filled client-side from the submitted answers that still fit the
+  current questionnaire (`prefillAnswers`, no response ids), so the first save POSTs a new filling. The BE (2026-10-30)
+  deprecates the previous SUBMITTED filling on submit and skips the onboarding step and AML event for ACTIVE customers.
+- MiFID storage: POST `/mifid/save` always creates a new filling; PATCH works on DRAFT **and** COMPLETED (status
+  recalculated each time); SUBMITTED/DEPRECATED give 409. A PATCH can't clear an answer (answer_option_id NOT NULL),
+  so always send an answerOption per response. `GET /mifid/{fillingId}` returns exactly that filling.
+  Question rendering is shared: `shared/components/mifid-section`.
+- `exitOnboarding()` sends an ACTIVE customer's steps (opened from the dashboard) back to `/app/home` and keeps the
+  client selected; only customers still onboarding leave the client (advisor) or go to the profile list (customer).
 - BE fixes pending a customer-service restart: Gender `NOT_SPECIFIED` accepted again; goal `targetDate` nullable;
   MiFID PATCH orphan-removal 500. CustomerType: INDIVIDUAL, LEGAL_ENTITY, SOLE_PROPRIETOR, JOINT_ACCOUNT, OTHER.
   CustomerStatus adds CLOSED and DELETED. Invalid bodies return 400 REQUEST_VALIDATION_ERROR.
@@ -102,6 +114,11 @@ docs/                       functional docs (process + diagrams), mirrored from 
   `isSample`). Swap the token's provider for a BE-backed implementation later; the pages don't change.
 - **Sample-data rule:** every card fed by the mock shows `<app-sample-badge/>`. Real customer data (goals, financials,
   risk profile, client list) never carries it. Pure helpers live in `core/services/dashboard-stats.ts`.
+- **Coming-soon cards:** a planned home card with no BE endpoint yet (corporate actions, communications, latest news)
+  shows `<app-coming-soon-badge/>`, a dashed border and a one-line description, with **no data** (not even sample).
+  The canvas (`project/CHANGELOG.md`, note `nHome`) holds their target layout and API.
+- The design canvas follows the built FE for anything that exists (names, routes, cards). When it drifts, update the
+  canvas, not the code, unless we decide otherwise.
 - Charts: `lightweight-charts` 5 (v5 API `chart.addSeries(AreaSeries, …)`), wrapped in
   `shared/components/dashboard/value-chart`. Canvas colours are read from `--wmp-*` tokens at runtime and re-applied
   on theme change. Keep the TradingView attribution logo (license). The locale is fixed to `en-GB`.

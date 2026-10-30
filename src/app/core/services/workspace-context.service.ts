@@ -34,8 +34,13 @@ export class WorkspaceContextService {
   /**
    * Leave the onboarding flow; it can be resumed later from the customer list (CustomerSelectionService.open).
    * Advisors leave the client context and go back to their workspace; customers go to their profile list.
+   * An already onboarded customer (a step opened from the dashboard, e.g. goals) stays selected and goes home.
    */
   async exitOnboarding(): Promise<void> {
+    if (this.customerSession.customer()?.customerStatus === 'ACTIVE') {
+      await this.router.navigateByUrl('/app/home');
+      return;
+    }
     if (this.isAdvisor()) {
       await this.exitClient();
       return;

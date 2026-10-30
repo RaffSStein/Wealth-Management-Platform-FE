@@ -25,6 +25,7 @@ const CUSTOMER_SECTIONS: NavSection[] = [
   {
     key: 'account', label: 'Account', path: '/app/home', items: [
       {label: 'Home', icon: 'home', path: '/app/home'},
+      {label: 'Investor profile', icon: 'fact_check', path: '/app/investor-profile', exact: false},
       {label: 'Transactions', icon: 'receipt_long', path: '/app/transactions'},
       {label: 'Assets', icon: 'pie_chart', path: '/app/assets'},
       {label: 'Bank transfers', icon: 'account_balance', path: '/app/bank-transfers'},

@@ -1,22 +1,19 @@
 import {Component, computed, inject, signal} from '@angular/core';
-import {FormsModule} from '@angular/forms';
 import {Router} from '@angular/router';
 import {Button} from 'primeng/button';
-import {InputNumber} from 'primeng/inputnumber';
 import {Message} from 'primeng/message';
-import {RadioButton} from 'primeng/radiobutton';
-import {MifidQuestionDTO} from '../../api/customer-service';
 import {OnboardingProgressService, OnboardingStep} from '../../core/services/onboarding-progress.service';
 import {CustomerSessionService} from '../../core/services/customer-session.service';
-import {isAnswered, MifidQuestionnaireService} from '../../core/services/mifid-questionnaire.service';
+import {firstIncompleteSection, isSectionComplete, MifidQuestionnaireService} from '../../core/services/mifid-questionnaire.service';
 import {busyAction} from '../../core/services/busy-action';
 import {WorkspaceContextService} from '../../core/services/workspace-context.service';
 import {ToastService} from '../../shared/services/toast.service';
 import {OnboardingLayoutComponent} from '../../shared/components/onboarding-layout/onboarding-layout.component';
+import {MifidSectionComponent} from '../../shared/components/mifid-section/mifid-section.component';
 
 @Component({
   selector: 'app-onboarding-mifid-questionnaire',
-  imports: [FormsModule, OnboardingLayoutComponent, Button, InputNumber, Message, RadioButton],
+  imports: [OnboardingLayoutComponent, MifidSectionComponent, Button, Message],
   template: `
     <app-onboarding-layout [step]="step" title="MiFID questionnaire"
                            subtitle="These questions assess your knowledge, experience and attitude to risk, as required by MiFID II. There are no right or wrong answers.">
@@ -32,39 +29,7 @@ import {OnboardingLayoutComponent} from '../../shared/components/onboarding-layo
         }
         @case ('ready') {
           @if (section(); as s) {
-            <div class="progress">
-              <span class="num">Section {{ index() + 1 }} of {{ sections().length }}</span>
-              <span class="progress__title">{{ s.title }}</span>
-              <span class="progress__bar"><span [style.width.%]="answeredPercent()"></span></span>
-              <span class="num progress__count">{{ answeredCount() }}/{{ totalQuestions() }} answered</span>
-            </div>
-
-            @for (q of s.questions; track q.id; let qi = $index) {
-              <fieldset class="wmp-panel question" [class.is-missing]="showMissing() && q.isRequired && !answered(q)">
-                <legend class="question__text">
-                  <span class="num question__n">{{ qi + 1 }}.</span> {{ q.text }}
-                  @if (q.isRequired) { <span class="wmp-req" aria-hidden="true">*</span> }
-                </legend>
-                @if (q.questionType === 'NUMERIC') {
-                  <p-inputnumber [inputId]="'q-' + q.id" [ngModel]="answers()[q.id!]?.numericValue ?? null"
-                                 (ngModelChange)="mifid.setAnswer(q.id!, {numericValue: $event})"
-                                 [min]="0" [fluid]="true" [attr.aria-label]="q.text"/>
-                } @else {
-                  <div class="options">
-                    @for (o of q.answerOptions; track o.id) {
-                      <label class="option" [class.is-selected]="answers()[q.id!]?.optionId === o.id" [for]="'o-' + o.id">
-                        <p-radiobutton [inputId]="'o-' + o.id" [name]="'q-' + q.id" [value]="o.id"
-                                       [ngModel]="answers()[q.id!]?.optionId" (ngModelChange)="mifid.setAnswer(q.id!, {optionId: $event})"/>
-                        <span>{{ o.optionText }}</span>
-                      </label>
-                    }
-                  </div>
-                }
-                @if (showMissing() && q.isRequired && !answered(q)) {
-                  <small class="wmp-field__error">Please answer this question.</small>
-                }
-              </fieldset>
-            }
+            <app-mifid-section [section]="s" [index]="index()" [showMissing]="showMissing()"/>
           }
           @if (errorMsg()) {
             <p-message severity="error">{{ errorMsg() }}</p-message>
@@ -91,27 +56,6 @@ import {OnboardingLayoutComponent} from '../../shared/components/onboarding-layo
   `,
   styles: [`
     .muted { color: var(--wmp-text-muted); }
-    .progress {
-      display: grid; grid-template-columns: auto 1fr auto; gap: .35rem 1rem; align-items: center;
-      margin-bottom: 1rem; font-size: .85rem; color: var(--wmp-text-muted);
-    }
-    .progress__title { color: var(--wmp-text); font-weight: 600; font-size: 1rem; }
-    .progress__bar { grid-column: 1 / -1; height: 4px; border-radius: 2px; background: var(--wmp-surface-raised); overflow: hidden; }
-    .progress__bar span { display: block; height: 100%; background: var(--wmp-primary); transition: width .2s ease; }
-    .progress__count { grid-row: 1; grid-column: 3; }
-    .question { margin: 0 0 1rem; min-width: 0; }
-    .question.is-missing { border-color: var(--wmp-danger); }
-    .question__text { padding: 0; font-weight: 500; line-height: 1.45; float: left; width: 100%; margin-bottom: .75rem; }
-    .question__text + * { clear: both; }
-    .question__n { color: var(--wmp-text-muted); margin-right: .25rem; }
-    .options { display: grid; gap: .5rem; }
-    .option {
-      display: flex; align-items: flex-start; gap: .75rem; padding: .75rem .9rem; cursor: pointer; font-size: .9rem; line-height: 1.45;
-      border: 1px solid var(--wmp-border); border-radius: var(--wmp-radius-md); background: var(--wmp-bg);
-    }
-    .option:hover { border-color: var(--wmp-text-muted); }
-    .option.is-selected { border-color: var(--wmp-primary); background: var(--wmp-primary-soft); }
-    @media (prefers-reduced-motion: reduce) { .progress__bar span { transition: none; } }
   `]
 })
 export class MifidQuestionnaireComponent {
@@ -130,15 +74,8 @@ export class MifidQuestionnaireComponent {
   protected readonly submit = busyAction(() => this.submitQuestionnaire());
   protected readonly errorMsg = signal<string | null>(null);
 
-  protected readonly sections = this.mifid.sections;
-  protected readonly answers = this.mifid.answers;
-  protected readonly section = computed(() => this.sections()[this.index()]);
-  protected readonly isLast = computed(() => this.index() === this.sections().length - 1);
-  private readonly allQuestions = computed(() => this.sections().flatMap(s => s.questions ?? []));
-  protected readonly totalQuestions = computed(() => this.allQuestions().length);
-  protected readonly answeredCount = computed(() => this.allQuestions().filter(q => this.answered(q)).length);
-  protected readonly answeredPercent = computed(() =>
-    this.totalQuestions() ? (this.answeredCount() / this.totalQuestions()) * 100 : 0);
+  protected readonly section = computed(() => this.mifid.sections()[this.index()]);
+  protected readonly isLast = computed(() => this.index() === this.mifid.sections().length - 1);
 
   constructor() {
     const customerId = this.customerSession.customer()?.id;
@@ -146,16 +83,8 @@ export class MifidQuestionnaireComponent {
     else this.mifid.state.set('error');
   }
 
-  protected answered(q: MifidQuestionDTO): boolean {
-    return isAnswered(q, this.answers()[q.id!]);
-  }
-
-  private sectionComplete(): boolean {
-    return (this.section()?.questions ?? []).every(q => !q.isRequired || this.answered(q));
-  }
-
   protected next(): void {
-    if (!this.sectionComplete()) {
+    if (!isSectionComplete(this.section(), this.mifid.answers())) {
       this.showMissing.set(true);
       return;
     }
@@ -188,7 +117,7 @@ export class MifidQuestionnaireComponent {
 
   private async submitQuestionnaire(): Promise<void> {
     this.errorMsg.set(null);
-    const firstIncomplete = this.sections().findIndex(s => (s.questions ?? []).some(q => q.isRequired && !this.answered(q)));
+    const firstIncomplete = firstIncompleteSection(this.mifid.sections(), this.mifid.answers());
     if (firstIncomplete !== -1) {
       this.index.set(firstIncomplete);
       this.showMissing.set(true);

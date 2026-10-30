@@ -16,6 +16,7 @@ import {AllocationSlice, PORTFOLIO_DATA, PortfolioSummary, Position, Quote, Valu
 import {ValueChartComponent} from '../../shared/components/dashboard/value-chart.component';
 import {AllocationBarComponent} from '../../shared/components/dashboard/allocation-bar.component';
 import {SampleBadgeComponent} from '../../shared/components/dashboard/sample-badge.component';
+import {ComingSoonBadgeComponent} from '../../shared/components/dashboard/coming-soon-badge.component';
 
 /**
  * Customer home dashboard. Real data: investor profile, goals and financial snapshot (customer-service).
@@ -24,7 +25,7 @@ import {SampleBadgeComponent} from '../../shared/components/dashboard/sample-bad
 @Component({
   selector: 'app-home',
   imports: [DecimalPipe, FormsModule, RouterLink, Message, SelectButton, Skeleton, TableModule, ValueChartComponent,
-    AllocationBarComponent, SampleBadgeComponent],
+    AllocationBarComponent, SampleBadgeComponent, ComingSoonBadgeComponent],
   template: `
     <div class="dash">
       <header class="head">
@@ -69,7 +70,7 @@ import {SampleBadgeComponent} from '../../shared/components/dashboard/sample-bad
           } @else if (profile(); as p) {
             <p class="profile__label">{{ profileLabel() }}</p>
             @if (p.score != null) { <p class="muted">MiFID score <span class="num">{{ p.score }}</span></p> }
-            <a routerLink="/onboarding/mifid-questionnaire" class="link">Review questionnaire →</a>
+            <a routerLink="/app/investor-profile" class="link">View investor profile →</a>
           } @else {
             <p class="muted">No investor profile yet.</p>
             <a routerLink="/onboarding/mifid-questionnaire" class="link">Complete the MiFID questionnaire →</a>
@@ -155,6 +156,18 @@ import {SampleBadgeComponent} from '../../shared/components/dashboard/sample-bad
           </ul>
         </section>
       </div>
+
+      <div class="row">
+        @for (c of comingSoon; track c.title) {
+          <section class="card card--soon">
+            <header class="card__head"><h2>{{ c.title }} <app-coming-soon-badge/></h2></header>
+            <div class="soon">
+              <span class="material-symbols-outlined" aria-hidden="true">{{ c.icon }}</span>
+              <p class="muted">{{ c.description }}</p>
+            </div>
+          </section>
+        }
+      </div>
     </div>
   `,
   styles: [`
@@ -192,6 +205,10 @@ import {SampleBadgeComponent} from '../../shared/components/dashboard/sample-bad
     .dl div { display: flex; justify-content: space-between; gap: 1rem; font-size: .9rem; }
     .dl dt { color: var(--wmp-text-muted); }
     .dl dd { margin: 0; }
+    .card--soon { border-style: dashed; }
+    .soon { display: flex; gap: .75rem; align-items: flex-start; }
+    .soon .material-symbols-outlined { font-size: 22px; color: var(--wmp-text-muted); }
+    .soon .muted { line-height: 1.5; }
     @media (max-width: 599.98px) { .dash { padding: 1rem; } }
   `]
 })
@@ -229,6 +246,15 @@ export class HomeComponent {
   protected readonly profileLabel = computed(() => profileDisplay(this.config(), this.profile()?.profile));
   protected readonly goals = computed(() => this.customer()?.customerGoals ?? []);
   protected readonly snapshot = computed(() => financialSnapshot(this.customer()?.customerFinancials));
+  /** Planned home cards (design canvas, Account home strip). No data until the BE endpoints exist. */
+  protected readonly comingSoon = [
+    {title: 'Corporate actions', icon: 'event',
+      description: 'Dividends, coupons and other events on the instruments you hold, with ex and payment dates.'},
+    {title: 'Communications', icon: 'campaign',
+      description: 'Notices from WMP and reminders that need your action, such as a MiFID questionnaire review.'},
+    {title: 'Latest news', icon: 'article',
+      description: 'Market and company news relevant to your portfolio.'}
+  ];
   protected readonly horizon = goalHorizon;
   protected readonly abs = Math.abs;
 

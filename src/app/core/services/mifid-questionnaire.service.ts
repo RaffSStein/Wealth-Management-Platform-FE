@@ -6,6 +6,7 @@ import {
   MifidFillingDTO,
   MifidQuestionDTO,
   MifidQuestionnaireConfigDTO,
+  MifidResponseDTO,
   MifidSectionDTO,
   MifidService,
   RiskProfileConfigurationDTO
@@ -58,6 +59,16 @@ export function isAnswered(question: MifidQuestionDTO, answer: MifidAnswer | und
   return question.questionType === 'NUMERIC' ? answer.numericValue != null : answer.optionId != null;
 }
 
+/** True when every required question of the section is answered. */
+export function isSectionComplete(section: MifidSectionDTO | undefined, answers: MifidAnswers): boolean {
+  return (section?.questions ?? []).every(q => !q.isRequired || isAnswered(q, answers[q.id!]));
+}
+
+/** Index of the first section with a required question left unanswered, or -1 when all are complete. */
+export function firstIncompleteSection(sections: MifidSectionDTO[], answers: MifidAnswers): number {
+  return sections.findIndex(s => !isSectionComplete(s, answers));
+}
+
 /**
  * Builds the filling payload from the answers. NUMERIC questions carry a single "free value" option in the config,
  * which is sent as the answerOption together with numericValue. Unanswered questions are left out.
@@ -102,6 +113,69 @@ export function answersFromFilling(filling: MifidFillingDTO): MifidAnswers {
   return answers;
 }
 
+export interface AnsweredQuestion {
+  question: string;
+  /** Option text, or the numeric value as text; null when the question was left unanswered. */
+  answer: string | null;
+}
+
+export interface AnsweredSection {
+  title: string;
+  questions: AnsweredQuestion[];
+}
+
+/**
+ * Read-only view of a filling, for the investor profile page. When the filling belongs to the given questionnaire,
+ * answers follow its sections and order; otherwise (an older questionnaire version) they are listed in one section.
+ */
+export function answeredSections(config: MifidQuestionnaireConfigDTO | null, filling: MifidFillingDTO): AnsweredSection[] {
+  const text = (r: MifidResponseDTO): string | null =>
+    r.question?.questionType === 'NUMERIC' ? (r.numericValue != null ? String(r.numericValue) : null) : r.answerOption?.optionText ?? null;
+  const byQuestion = new Map<number, MifidResponseDTO>();
+  for (const r of filling.responses ?? []) if (r.question?.id != null) byQuestion.set(r.question.id, r);
+
+  if (config && config.questionnaireId === filling.questionnaireId) {
+    return orderedSections(config).map(section => ({
+      title: section.title ?? '',
+      questions: (section.questions ?? []).map(q => {
+        const r = byQuestion.get(q.id!);
+        return {question: q.text ?? '', answer: r ? text(r) : null};
+      })
+    }));
+  }
+  const responses = [...(filling.responses ?? [])].sort((a, b) => (a.question?.orderIndex ?? 0) - (b.question?.orderIndex ?? 0));
+  return [{title: 'Answers', questions: responses.map(r => ({question: r.question?.text ?? '', answer: text(r)}))}];
+}
+
+/**
+ * Answers to start a MiFID update from: the submitted filling's answers that still fit the current questionnaire
+ * (same question, and for choice questions an option that still exists). Anything else is left for the user.
+ */
+export function prefillAnswers(config: MifidQuestionnaireConfigDTO, filling: MifidFillingDTO): MifidAnswers {
+  const questions = new Map(orderedSections(config).flatMap(s => s.questions ?? []).map(q => [q.id!, q]));
+  const answers: MifidAnswers = {};
+  for (const [id, answer] of Object.entries(answersFromFilling(filling))) {
+    const question = questions.get(Number(id));
+    if (!question) continue;
+    const fits = question.questionType === 'NUMERIC' || question.answerOptions?.some(o => o.id === answer.optionId);
+    if (fits && isAnswered(question, answer)) answers[question.id!] = answer;
+  }
+  return answers;
+}
+
+/**
+ * The customer's current (latest SUBMITTED) filling, or null when there is none (404).
+ * Open update drafts are ignored by the BE, so this stays the profile in force while an update is in progress.
+ */
+export async function loadSubmittedFilling(api: MifidService, customerId: string): Promise<MifidFillingDTO | null> {
+  try {
+    return await firstValueFrom(api.getCurrentMifidFillingForCustomer(customerId));
+  } catch (err) {
+    if (err instanceof HttpErrorResponse && err.status === 404) return null;
+    throw err;
+  }
+}
+
 /**
  * MiFID questionnaire state for the onboarding step: config, answers, draft persistence and submit.
  * The draft fillingId is remembered per customer in localStorage so a reload can resume it.
@@ -122,7 +196,11 @@ export class MifidQuestionnaireService {
   private fillingStatus: MifidFillingDTO.StatusEnum | null = null;
   private responseIds: Record<number, number> = {};
 
-  async load(customerId: string): Promise<void> {
+  /**
+   * Loads the config and resumes the customer's draft, if any. For a MiFID update (`prefillFrom` = the submitted
+   * filling) without a draft, the answers start from the submitted ones; the first save then creates a new filling.
+   */
+  async load(customerId: string, options: { prefillFrom?: MifidFillingDTO | null } = {}): Promise<void> {
     this.customerId = customerId;
     this.state.set('loading');
     try {
@@ -131,7 +209,10 @@ export class MifidQuestionnaireService {
       this.sections.set(orderedSections(config));
       this.answers.set({});
       this.fillingId = this.readFillingId(customerId);
+      this.fillingStatus = null;
+      this.responseIds = {};
       if (this.fillingId != null) await this.resumeDraft(customerId, this.fillingId);
+      if (this.fillingId == null && options.prefillFrom) this.answers.set(prefillAnswers(config, options.prefillFrom));
       this.state.set('ready');
     } catch (err) {
       // 404 = no questionnaire valid today (BE returns OBJECT_NOT_FOUND)
@@ -162,10 +243,18 @@ export class MifidQuestionnaireService {
     return submitted;
   }
 
-  /** POST a new filling, or PATCH the current one while it is still a DRAFT (a COMPLETED one can't be edited). */
+  /** True when the customer has a saved, not yet submitted filling (an onboarding or update draft) on this browser. */
+  hasDraft(customerId: string): boolean {
+    return this.readFillingId(customerId) != null;
+  }
+
+  /**
+   * POST a new filling, or PATCH the one being worked on while it isn't submitted (DRAFT or COMPLETED; the BE
+   * recalculates the status on every update). Submitted fillings are never edited: an update is a new filling.
+   */
   private async store(): Promise<MifidFillingDTO> {
     const {config, customerId} = this.requireLoaded();
-    const editable = this.fillingId != null && this.fillingStatus === 'DRAFT';
+    const editable = this.fillingId != null && (this.fillingStatus === 'DRAFT' || this.fillingStatus === 'COMPLETED');
     const payload = toMifidFilling(config, this.answers(), editable ? {fillingId: this.fillingId!, responseIds: this.responseIds} : {});
     const stored = editable
       ? await firstValueFrom(this.api.updateMifidFillingForCustomer(customerId, this.fillingId!, payload))
