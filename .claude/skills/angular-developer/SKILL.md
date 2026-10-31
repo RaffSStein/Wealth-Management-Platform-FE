@@ -20,7 +20,7 @@ metadata:
 If no guidelines are provided by the user, here are some default rules to follow when creating a new Angular project:
 
 1. Use the latest stable version of Angular unless the user specifies otherwise.
-2. Use Signal Forms for form management in new projects (stable in Angular v22 and newer) [Find out more](references/signal-forms.md).
+2. Use Signal Forms for form management in new projects (stable in Angular v22 and newer).
 
 **Execution Rules for `ng new`:**
 When asked to create a new Angular project, you must determine the correct execution command by following these strict steps:
@@ -77,7 +77,6 @@ In most cases for new apps, **prefer signal forms**. When making a forms decisio
 - If the application is using v22 or newer and this is a new form, **prefer Signal Forms**.
 - For older applications or when working with existing forms, use the appropriate form type that matches the applications current form strategy.
 
-- **Signal Forms**: Use signals for form state management. Read [signal-forms.md](references/signal-forms.md)
 - **Template-driven forms**: Use for simple forms. Read [template-driven-forms.md](references/template-driven-forms.md)
 - **Reactive forms**: Use for complex forms. Read [reactive-forms.md](references/reactive-forms.md)
 
@@ -124,7 +123,6 @@ If you require deeper documentation or more context, visit the [official Angular
 
 When implementing styling and animations in Angular, consult the following references:
 
-- **Using Tailwind CSS with Angular**: Integrating Tailwind CSS into Angular projects. Read [tailwind-css.md](references/tailwind-css.md)
 - **Angular Animations**: Using native CSS (recommended) or the legacy DSL for dynamic effects. Read [angular-animations.md](references/angular-animations.md)
 - **Styling components**: Best practices for component styles and encapsulation. Read [component-styling.md](references/component-styling.md)
 
