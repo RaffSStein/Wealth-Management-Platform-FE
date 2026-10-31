@@ -7,6 +7,7 @@ import {AuthService as ApiAuthService, LoginCredentialsDTO} from '../../api/user
 import {UserSessionService} from '../../core/services/user-session.service';
 import {CustomerSessionService} from '../../core/services/customer-session.service';
 import {busyAction} from '../../core/services/busy-action';
+import {SESSION_EXPIRED_PARAM} from '../../core/services/session-expiry.service';
 import {ToastService} from '../../shared/services/toast.service';
 import { firstValueFrom } from 'rxjs';
 import {Button} from 'primeng/button';
@@ -27,6 +28,11 @@ import {AuthLayoutComponent} from '../../shared/components/auth-layout/auth-layo
         <p>Sign in to your account. Secure access with your WMP credentials.</p>
       </header>
 
+      @if (sessionExpired() && !errorOpen()) {
+        <p-message severity="info" role="status" class="head__error">
+          Your session has ended. Please sign in again.
+        </p-message>
+      }
       @if (errorOpen()) {
         <p-message severity="error" role="alert" class="head__error">
           We couldn't sign you in. Check your email and password and try again.
@@ -108,6 +114,7 @@ export class LoginComponent {
 
   readonly onSubmit = busyAction(() => this.submit());
   errorOpen = signal(false);
+  protected readonly sessionExpired = signal(this.route.snapshot.queryParamMap.get(SESSION_EXPIRED_PARAM) === '1');
   protected readonly devMode = isDevMode();
 
   greeting = computed(() => {

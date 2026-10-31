@@ -248,6 +248,10 @@ paths:
   /auth/password/setup:
     post:
       summary: Initial password setup after registration (public)
+      description: >
+        Sets the first password, authorized by the password-setup token from the onboarding link
+        (Authorization: Bearer setup token). The link works once: its token is consumed on the first successful call.
+        Error bodies use the platform ErrorResponse (errorCode, category, errorMessage, traceId).
       operationId: setupPassword
       tags:
         - Auth
@@ -258,10 +262,20 @@ paths:
             schema:
               $ref: '#/components/schemas/SetupPasswordDTO'
       responses:
-        '201':
+        '202':
           description: Password set successfully
         '400':
-          description: Invalid token or password rules violation
+          description: >
+            The password violates the password policy (errorCode REQUEST_VALIDATION_ERROR, errorMessage lists the
+            violated rules). The link is not consumed, so the user can retry.
+        '401':
+          description: >
+            The link can't be used: the setup token is expired, already used, malformed, or not a password-setup
+            token (errorCode PASSWORD_SETUP_TOKEN_INVALID). An expired or badly signed token is rejected before the
+            endpoint, with an empty body.
+        '503':
+          description: >
+            The token store can't be reached (errorCode TOKEN_STORE_UNAVAILABLE). Nothing was changed; retry later.
 
   /auth/password/reset:
     post:

@@ -8,7 +8,7 @@ import { ToastService } from '../../shared/services/toast.service';
 import { PasswordStrengthFieldComponent } from '../../shared/components/password-strength-field/password-strength-field.component';
 import { firstValueFrom } from 'rxjs';
 import { AuthService as ApiAuthService } from '../../api/user-service';
-import { HttpContext } from '@angular/common/http';
+import { HttpContext, HttpErrorResponse } from '@angular/common/http';
 import { ONE_TIME_AUTH_TOKEN } from '../../core/interceptors/auth.context';
 import { busyAction } from '../../core/services/busy-action';
 
@@ -25,11 +25,18 @@ import { busyAction } from '../../core/services/busy-action';
           <p>Your account is ready. Sign in with your email and new password.</p>
           <p-button label="Go to sign in" [loading]="goToLogin.pending()" (onClick)="goToLogin()"/>
         </div>
-      } @else if (!token()) {
+      } @else if (!token() || failure() === 'link') {
         <div class="state" role="alert">
           <span class="material-symbols-outlined state__icon state__icon--err" aria-hidden="true">link_off</span>
-          <h2>This link isn't valid</h2>
-          <p>Open the password link from your activation email, or request a new one.</p>
+          @if (failure() === 'link') {
+            <h2>This link has expired or was already used</h2>
+            <p>Each password link works once and for a limited time. If you already set your password, sign in;
+              otherwise request a new link.</p>
+            <a routerLink="/auth/sign-in">Go to sign in</a>
+          } @else {
+            <h2>This link isn't valid</h2>
+            <p>Open the password link from your activation email, or request a new one.</p>
+          }
           <a routerLink="/auth/forgot-password">Request a new link</a>
         </div>
       } @else {
@@ -39,9 +46,10 @@ import { busyAction } from '../../core/services/busy-action';
         </header>
         <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate class="wmp-form">
           <app-password-strength-field [group]="form" [submitted]="onSubmit.pending()"/>
-          @if (failed()) {
-            <p class="wmp-field__error" role="alert">We couldn't set your password. The link may be invalid or expired;
-              <a routerLink="/auth/forgot-password">request a new one</a>.</p>
+          @if (failure() === 'policy') {
+            <p class="wmp-field__error" role="alert">{{ policyMessage() }}</p>
+          } @else if (failure() === 'retry') {
+            <p class="wmp-field__error" role="alert">We couldn't set your password right now. Please try again in a moment.</p>
           }
           <p-button type="submit" label="Set password" [loading]="onSubmit.pending()" [disabled]="form.invalid" [fluid]="true"/>
         </form>
@@ -71,7 +79,9 @@ export class SetupPasswordPage implements OnInit {
   readonly onSubmit = busyAction(() => this.submit());
   readonly goToLogin = busyAction(() => this.router.navigateByUrl('/auth/sign-in'));
   success = signal(false);
-  failed = signal(false);
+  /** Why the last attempt failed: the link is spent, the password breaks the policy, or a retry may work. */
+  readonly failure = signal<'link' | 'policy' | 'retry' | null>(null);
+  readonly policyMessage = signal('');
 
   form: FormGroup<{
     password: FormControl<string>;
@@ -102,7 +112,7 @@ export class SetupPasswordPage implements OnInit {
       this.form.markAllAsTouched();
       return;
     }
-    this.failed.set(false);
+    this.failure.set(null);
 
     const payload = { token: this.token()!, password: this.form.get('password')!.value };
     const context = new HttpContext().set(ONE_TIME_AUTH_TOKEN, this.token()!);
@@ -112,8 +122,21 @@ export class SetupPasswordPage implements OnInit {
         this.toast.success('Password set successfully. You can now sign in.');
         this.success.set(true);
       })
-      .catch(() => {
-        this.failed.set(true);
+      .catch((err: unknown) => {
+        const status = err instanceof HttpErrorResponse ? err.status : 0;
+        if (status === 400) {
+          // Policy violation: the link is not consumed, so the user can retry here
+          const detail = (err as HttpErrorResponse).error?.errorMessage;
+          this.policyMessage.set(typeof detail === 'string' && detail.trim()
+            ? detail : "This password doesn't meet the password policy. Choose a different one.");
+          this.failure.set('policy');
+        } else if (status === 401) {
+          // Used, expired or malformed link (expired ones come back with an empty body)
+          this.failure.set('link');
+        } else {
+          // 503 (token store down), network or server error: nothing changed, retry
+          this.failure.set('retry');
+        }
       });
   }
 }

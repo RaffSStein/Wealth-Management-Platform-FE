@@ -150,6 +150,14 @@ docs/                       functional docs (process + diagrams), mirrored from 
   workspace home, since everything loaded belongs to the previous bank. Revocation is per service instance on the BE,
   so never rely on a 401 to detect a revoked token. The onboarding password-setup token (`purpose=PASSWORD_SETUP`)
   works only on `POST /auth/password/setup`: send it via `ONE_TIME_AUTH_TOKEN`, never store it as the session token.
+  Setup answers: 202 done; 401 = link used/expired/malformed (expired ones have an empty body, so key on the status);
+  400 REQUEST_VALIDATION_ERROR = password policy (`errorMessage` lists the rules; the link is not consumed, retry on
+  the page); 503 TOKEN_STORE_UNAVAILABLE = retry.
+- Session end: revocation is shared across BE services (Redis), so a token logged out or switched away elsewhere gets
+  401 everywhere. `authInterceptor` hands a 401 on the **current** session token to `SessionExpiryService` (clears
+  token, user and customer, full reload of `/auth/sign-in?expired=1&returnUrl=…`, where a notice explains it). A 401
+  for a token already replaced (in flight across a branch switch) and the login/logout calls are ignored. 503 means
+  the BE can't check revocation: a temporary error, never a logout.
 - `WorkspaceContextService`: `actingAsClient()` (an advisor with a selected customer in `CustomerSessionService`),
   `clientName()`, `homePath()`, `exitClient()`. Customer selection (`/onboarding/disambiguation`) sets the customer.
 - Login routing: advisors go to `returnUrl` or `/app/advisor`. Customers go to customer selection unless a customer is
