@@ -2,8 +2,9 @@ import {inject} from '@angular/core';
 import {Route, Router, Routes} from '@angular/router';
 import {onboardingStepGuard} from './core/guards/onboarding-step.guard';
 import {authGuard} from './core/guards/auth.guard';
-import {membershipGuard} from './core/guards/membership.guard';
+import {roleAssignmentGuard} from './core/guards/role-assignment.guard';
 import {roleGuard} from './core/guards/role.guard';
+import {RoutePermission, permissionGuard} from './core/guards/permission.guard';
 
 /**
  * Sections not built yet. They show the shared work-in-progress page instead of sample data. Concepts for them
@@ -62,7 +63,7 @@ export const routes: Routes = [
   // Public onboarding entry points, rendered without the app shell: sign-up and the one-time password link
   {path: 'onboarding/start', loadComponent: () => import('./pages/onboarding/register.component').then(m => m.OnboardingStartComponent)},
   {path: 'onboarding/setup-password', loadComponent: () => import('./pages/onboarding/setup-password.page').then(m => m.SetupPasswordPage)},
-  // Signed in, but the token has no bank membership: no bank data is reachable yet
+  // Signed in, but the token has no role assignment: no bank data is reachable yet
   {
     path: 'onboarding/not-linked',
     loadComponent: () => import('./pages/onboarding/not-linked.page').then(m => m.NotLinkedPage),
@@ -73,7 +74,7 @@ export const routes: Routes = [
   {
     path: 'onboarding',
     loadComponent: () => import('./layout/app-shell.component').then(m => m.AppShellComponent),
-    canActivate: [authGuard, membershipGuard],
+    canActivate: [authGuard, roleAssignmentGuard],
     children: [
       {
         path: 'personal-details',
@@ -117,7 +118,8 @@ export const routes: Routes = [
   {
     path: 'app',
     loadComponent: () => import('./layout/app-shell.component').then(m => m.AppShellComponent),
-    canActivate: [authGuard, membershipGuard],
+    canActivate: [authGuard, roleAssignmentGuard],
+    canActivateChild: [permissionGuard],
     children: [
       {path: 'home', loadComponent: () => import('./pages/home/home.component').then(m => m.HomeComponent)},
       {
@@ -126,7 +128,19 @@ export const routes: Routes = [
       },
       {
         path: 'investor-profile/update',
-        loadComponent: () => import('./pages/investor-profile/investor-profile-update.component').then(m => m.InvestorProfileUpdateComponent)
+        loadComponent: () => import('./pages/investor-profile/investor-profile-update.component').then(m => m.InvestorProfileUpdateComponent),
+        data: {permission: {section: 'ACCOUNT', feature: 'INVESTOR_PROFILE', code: 'EDIT'} satisfies RoutePermission}
+      },
+      // Admin area for bank and platform admins (profiler-service role assignments)
+      {
+        path: 'admin',
+        canActivate: [roleGuard('BANK_ADMIN', 'PLATFORM_ADMIN')],
+        children: [
+          {path: '', loadComponent: () => import('./pages/admin/admin-home.component').then(m => m.AdminHomeComponent)},
+          {path: 'approvals', loadComponent: () => import('./pages/admin/approvals.component').then(m => m.ApprovalsComponent)},
+          wip('assignments', 'Role assignments',
+            'Give people a role in a branch of your bank, and remove it. Waiting for the user search in the back end.')
+        ]
       },
       // Advisor workspace (advisor-service is still a BE skeleton: sub-pages are placeholders)
       {

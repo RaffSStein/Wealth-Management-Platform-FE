@@ -2,6 +2,7 @@ import {Injectable, computed, inject} from '@angular/core';
 import {Router} from '@angular/router';
 import {UserSessionService} from './user-session.service';
 import {CustomerSessionService} from './customer-session.service';
+import {homePathFor} from './home-path';
 
 /**
  * WorkspaceContextService
@@ -29,7 +30,7 @@ export class WorkspaceContextService {
   readonly clientId = computed(() => this.customerSession.customer()?.id ?? '');
 
   /** Landing page for the current user/context. */
-  readonly homePath = computed(() => this.isAdvisor() && !this.actingAsClient() ? '/app/advisor' : '/app/home');
+  readonly homePath = computed(() => homePathFor(this.userSession.roles(), !!this.customerSession.customer()));
 
   /**
    * Leave the onboarding flow; it can be resumed later from the customer list (CustomerSelectionService.open).

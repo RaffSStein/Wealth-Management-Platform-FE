@@ -4,6 +4,8 @@ import {CustomerDTO} from '../../api/customer-service';
 import {CustomerSessionService} from './customer-session.service';
 import {UserSessionService} from './user-session.service';
 import {WorkspaceContextService} from './workspace-context.service';
+import {AuthService} from './auth.service';
+import {testToken} from './role-assignment.spec';
 
 describe('WorkspaceContextService.exitOnboarding', () => {
   let service: WorkspaceContextService;
@@ -12,7 +14,7 @@ describe('WorkspaceContextService.exitOnboarding', () => {
   let router: jasmine.SpyObj<Router>;
 
   const customer = (customerStatus: string) => ({id: 'c1', firstName: 'Ada', customerStatus} as CustomerDTO);
-  const asAdvisor = () => userSession.setProfile({id: 'u1', userBranchRoles: [{role: 'ADVISOR'}]} as any);
+  const asAdvisor = () => TestBed.inject(AuthService).setToken(testToken({tenantId: 'BANK_A', branchCode: 'BR_01', roles: ['ADVISOR']}));
 
   beforeEach(() => {
     router = jasmine.createSpyObj<Router>('Router', ['navigateByUrl']);
@@ -25,6 +27,7 @@ describe('WorkspaceContextService.exitOnboarding', () => {
   });
 
   afterEach(() => {
+    TestBed.inject(AuthService).setToken(null);
     customerSession.setCustomer(null);
     userSession.clear();
   });

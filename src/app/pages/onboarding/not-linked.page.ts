@@ -8,7 +8,7 @@ import {UserSessionService} from '../../core/services/user-session.service';
 import {AuthLayoutComponent} from '../../shared/components/auth-layout/auth-layout.component';
 
 /**
- * Shown to a signed-in user with no bank membership: their token can't reach any bank data yet. A bank (admin flow)
+ * Shown to a signed-in user with no role assignment: their token can't reach any bank data yet. A bank (admin flow)
  * or the customer onboarding links them to a branch; a new sign-in then issues a token for it.
  */
 @Component({

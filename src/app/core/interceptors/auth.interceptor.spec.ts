@@ -56,7 +56,7 @@ describe('authInterceptor session expiry', () => {
     await call('/customer-service/customer/c1', 503);
     await call('/customer-service/customer/c1', 403);
     await call('/user-service/auth/logout', 401);
-    // a token without a bank membership: the session is valid, the user just isn't linked to a bank yet
+    // a token without a role assignment: the session is valid, the user just isn't linked to a bank yet
     await call('/customer-service/customer/c1', 401, undefined, {errorCode: 'MISSING_HEADER_TOKEN_FIELD'});
     // an admin action that needs a recent sign-in: re-prompt, don't end the session
     await call('/user-service/admin/memberships', 401, undefined, {errorCode: 'REAUTHENTICATION_REQUIRED'});

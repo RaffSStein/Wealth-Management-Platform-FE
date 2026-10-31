@@ -3,7 +3,8 @@ import {HttpErrorResponse} from '@angular/common/http';
 import {firstValueFrom} from 'rxjs';
 import {AuthService as ApiAuthService} from '../../api/user-service';
 import {AuthService} from './auth.service';
-import {BranchMembership, sameBranch} from './branch-membership';
+import {ActiveBranch, sameBranch} from './role-assignment';
+import {homePathFor} from './home-path';
 import {CustomerSessionService} from './customer-session.service';
 import {OnboardingProgressService} from './onboarding-progress.service';
 import {ToastService} from '../../shared/services/toast.service';
@@ -24,16 +25,16 @@ export class BranchSwitchService {
   private readonly toast = inject(ToastService);
   private readonly document = inject(DOCUMENT);
 
-  async switchTo(target: BranchMembership): Promise<void> {
+  async switchTo(target: ActiveBranch): Promise<void> {
     if (sameBranch(target, this.userSession.activeBranch())) return;
     let token: string | undefined;
     try {
       const response = await firstValueFrom(this.api.switchBranch({branchCode: target.branchCode, bankCode: target.bankCode}));
       token = response?.token;
     } catch (e) {
-      // 403: not a member there; the current token stays valid
+      // 403: no role assignment there any more; the current token stays valid
       this.toast.error(e instanceof HttpErrorResponse && e.status === 403
-        ? 'You are no longer a member of that branch.'
+        ? 'You no longer have a role in that branch.'
         : 'Could not switch branch. Please try again.');
       return;
     }
@@ -42,11 +43,11 @@ export class BranchSwitchService {
       return;
     }
     this.auth.setToken(token);
-    // Refresh /me so the cached memberships' active flags follow the new token (roles read the token itself)
+    // Refresh /me so the cached role assignments' active flags follow the new token (roles read the token itself)
     await this.userSession.ensureLoaded(true).catch(() => undefined);
     this.customerSession.setCustomer(null);
     this.progress.reset();
     // A full reload drops every in-memory cache, poll and notification of the previous bank
-    this.document.location.assign(this.userSession.isAdvisor() ? '/app/advisor' : '/onboarding/disambiguation');
+    this.document.location.assign(homePathFor(this.userSession.roles(), false));
   }
 }

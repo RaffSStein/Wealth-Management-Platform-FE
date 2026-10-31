@@ -12,6 +12,7 @@ import { AuthService as CoreAuthService } from '../../core/services/auth.service
 class MockUserSessionService {
   profile: { id?: string } | null = { id: 'u1' };
   isAdvisor = signal(false);
+  isAdmin = signal(false);
   ensureLoaded() { return Promise.resolve(this.profile); }
 }
 class MockCustomerSessionService { customer = signal<object | null>(null); }

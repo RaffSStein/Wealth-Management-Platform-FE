@@ -3,8 +3,9 @@ import { signal } from '@angular/core';
 import { ActivatedRouteSnapshot, Router, RouterStateSnapshot, UrlTree, provideRouter } from '@angular/router';
 import { authGuard } from './auth.guard';
 import { roleGuard } from './role.guard';
-import { membershipGuard } from './membership.guard';
-import { ActiveBranch } from '../services/branch-membership';
+import { roleAssignmentGuard } from './role-assignment.guard';
+import { ActiveBranch } from '../services/role-assignment';
+import { CustomerSessionService } from '../services/customer-session.service';
 import { AuthService } from '../services/auth.service';
 import { UserSessionService, WmpRole } from '../services/user-session.service';
 
@@ -26,21 +27,22 @@ describe('guards', () => {
       providers: [
         provideRouter([]),
         { provide: AuthService, useValue: { token } },
-        { provide: UserSessionService, useValue: { roles, ensureLoaded, activeBranch } }
+        { provide: UserSessionService, useValue: { roles, ensureLoaded, activeBranch } },
+        { provide: CustomerSessionService, useValue: { customer: signal({ id: 'c1' }) } }
       ]
     });
   });
 
   const serialize = (result: unknown) => TestBed.inject(Router).serializeUrl(result as UrlTree);
 
-  describe('membershipGuard', () => {
-    it('allows a token issued for a bank membership', () => {
+  describe('roleAssignmentGuard', () => {
+    it('allows a token issued for a role assignment', () => {
       activeBranch.set({ bankCode: 'BANK_A', branchCode: 'BR_01' });
-      expect(TestBed.runInInjectionContext(() => membershipGuard(route, state('/app/home')))).toBeTrue();
+      expect(TestBed.runInInjectionContext(() => roleAssignmentGuard(route, state('/app/home')))).toBeTrue();
     });
 
-    it('sends a user with no membership to the not-linked page', () => {
-      const result = TestBed.runInInjectionContext(() => membershipGuard(route, state('/app/home')));
+    it('sends a user with no role assignment to the not-linked page', () => {
+      const result = TestBed.runInInjectionContext(() => roleAssignmentGuard(route, state('/app/home')));
       expect(serialize(result)).toBe('/onboarding/not-linked');
     });
   });
@@ -64,7 +66,19 @@ describe('guards', () => {
       expect(result).toBeTrue();
     });
 
-    it('sends other users to the customer home', async () => {
+    it('allows users holding any of the roles', async () => {
+      roles.set(new Set<WmpRole>(['PLATFORM_ADMIN']));
+      const result = await TestBed.runInInjectionContext(() => roleGuard('BANK_ADMIN', 'PLATFORM_ADMIN')(route, state('/app/admin')));
+      expect(result).toBeTrue();
+    });
+
+    it('sends admins without the role to the admin area', async () => {
+      roles.set(new Set<WmpRole>(['BANK_ADMIN']));
+      const result = await TestBed.runInInjectionContext(() => roleGuard('ADVISOR')(route, state('/app/advisor')));
+      expect(serialize(result)).toBe('/app/admin');
+    });
+
+    it('sends other users to their home', async () => {
       const result = await TestBed.runInInjectionContext(() => roleGuard('ADVISOR')(route, state('/app/advisor')));
       expect(serialize(result)).toBe('/app/home');
     });

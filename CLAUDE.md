@@ -8,7 +8,7 @@ BE or a decision we made, add it here. Facts tied to a BE change carry its date 
 ## Project
 
 Front end of **WMP** (Wealth Management Platform; working name, no final brand yet). Used by two main roles:
-**customer** and **advisor** (BE also has `ADMIN`). Work in progress; also meant as a personal portfolio piece.
+**customer** and **advisor**, plus bank and platform admins who manage access (admin area). Work in progress; also meant as a personal portfolio piece.
 Built so far: foundation, app shell, auth + onboarding, home dashboard. The remaining sections (investments, markets,
 orders, advisor tools) wait on BE services that don't exist yet.
 
@@ -74,9 +74,10 @@ docs/                       functional docs (process + diagrams), mirrored from 
 ```
 
 - Routes: public `/`, `/auth/*`, `/terms`, `/onboarding/start` (sign-up) and `/onboarding/setup-password` (one-time
-  email link). Every other `/onboarding/*` step uses `authGuard` + `membershipGuard` + `onboardingStepGuard`
-  (`data.step`). `/app/*` uses `authGuard` (token present, else `/auth/sign-in?returnUrl=`) + `membershipGuard`.
-  `/app/advisor/**` uses `roleGuard('ADVISOR')`.
+  email link). Every other `/onboarding/*` step uses `authGuard` + `roleAssignmentGuard` + `onboardingStepGuard`
+  (`data.step`). `/app/*` uses `authGuard` (token present, else `/auth/sign-in?returnUrl=`) + `roleAssignmentGuard`,
+  and `permissionGuard` on its children. `/app/advisor/**` uses `roleGuard('ADVISOR')`, `/app/admin/**`
+  `roleGuard('BANK_ADMIN', 'PLATFORM_ADMIN')`.
 - Render modes (`app.routes.server.ts`): public routes are prerendered; `app/**`, `onboarding/**`, `dev/**` render on the
   client (session lives in sessionStorage; also avoids the PrimeNG p-motion hydration bug below).
 - Components currently carry **inline templates and styles** in the `.ts` file; many pages under `/app` are placeholders.
@@ -164,13 +165,21 @@ docs/                       functional docs (process + diagrams), mirrored from 
   in the design canvas row "Future sections" (`F-*.dc.html` artboards; see the `wmp-mockup` skill).
 
 ### Roles, workspace and shell
-- Roles: `UserSessionService.roles()` / `isAdvisor()` come from `/me` → `userBranchRoles[].role` (BE `WmpRole`:
-  `CUSTOMER`, `ADVISOR`; no roles means CUSTOMER, like the BE).
+- Roles (BE `WmpRole`, least to most privileged): `CUSTOMER`, `ADVISOR`, `BANK_ADMIN`, `PLATFORM_ADMIN`. The BE says
+  **role assignment** (a user holds a role in one branch of one bank; profiler-service owns them), never
+  "membership". `UserSessionService.roles()` reads the token's `roles` claim (else `/me` roles of the token's
+  branch), parsed exactly: an unknown name grants nothing. `isAdvisor()`, `isBankAdmin()`, `isPlatformAdmin()`,
+  `isAdmin()`. Rules and flows: BE `docs/domain/process/security/roles-and-permissions.md` and
+  `docs/domain/process/platform/first-platform-run.md`.
 - Multi-tenancy (BE, 2026-10-30; guide: BE `docs/domain/process/security/jwt-authentication.md`): a session token is
-  issued for **one membership** (bank + branch) and carries `tenantId` (bank code), `branchCode` and only that
-  membership's `roles`. `/me` lists every membership, each with an `active` flag. Roles are therefore scoped to the
-  active membership (`UserSessionService.activeBranch()` reads the token claims, `core/services/branch-membership.ts`);
-  a token without a membership falls back to every branch role. Another bank's resources answer 404, like missing ones.
+  issued for **one role assignment** (bank + branch) and carries `tenantId` (bank code), `branchCode` and only that
+  assignment's `roles`. `/me` lists every role assignment, each with an `active` flag. Roles are therefore scoped to
+  the active one (`UserSessionService.activeBranch()` reads the token claims, `core/services/role-assignment.ts`).
+  Another bank's resources answer 404, like missing ones. Platform admins hold the pseudo bank/branch `PLATFORM`
+  (shown as "Platform", `bankLabel`): it owns no bank data.
+- Landing pages: `homePathFor(roles, customerSelected)` (`core/services/home-path.ts`) for login, branch switch,
+  role/permission guard redirects and `WorkspaceContextService.homePath()`: admins `/app/admin` (most privileged role
+  wins), advisors `/app/advisor` unless acting for a client, customers their profile or customer selection.
 - Branch switcher: header chip + account menu (`BranchSwitchService`): `POST /auth/switch-branch` returns a new token
   and revokes the old one. Replace it (never keep a copy), drop the selected customer and do a full reload of the
   workspace home, since everything loaded belongs to the previous bank. The onboarding password-setup token (`purpose=PASSWORD_SETUP`)
@@ -178,12 +187,29 @@ docs/                       functional docs (process + diagrams), mirrored from 
   Setup answers: 202 done; 401 = link used/expired/malformed (expired ones have an empty body, so key on the status);
   400 REQUEST_VALIDATION_ERROR = password policy (`errorMessage` lists the rules; the link is not consumed, retry on
   the page); 503 TOKEN_STORE_UNAVAILABLE = retry.
-- No membership: public `POST /auth/register` no longer accepts `branchRoles` (BE, 2026-10-31), so a self-registered
-  user has no membership: a CUSTOMER token without `tenantId`, which every bank-owned endpoint rejects with 401
-  `MISSING_HEADER_TOKEN_FIELD`. `membershipGuard` (on `/app` and `/onboarding`) sends them to `/onboarding/not-linked`,
-  and the interceptor never treats that 401 as a session end (nor 401 `REAUTHENTICATION_REQUIRED`, which
-  admin actions return when the sign-in is older than 10 minutes: re-prompt sign-in instead). Memberships will come
-  from an admin flow and the customer onboarding (contract pending); until then self-signup stops at that page.
+- No role assignment: public `POST /auth/register` no longer accepts `branchRoles` (BE, 2026-10-31), so a
+  self-registered user has none: a CUSTOMER token without `tenantId`, which every bank-owned endpoint rejects with 401
+  `MISSING_HEADER_TOKEN_FIELD`. `roleAssignmentGuard` (on `/app` and `/onboarding`) sends them to
+  `/onboarding/not-linked`, and the interceptor never treats that 401 as a session end. An advisor of the branch (or a
+  bank admin) assigns CUSTOMER (`POST /role-assignments`, immediate); the user gets it at the next sign-in. The FE
+  "link customer" action waits for a BE user lookup by email (not designed yet).
+- Re-sign-in: assigning or revoking staff roles and deciding requests need a sign-in at most 10 minutes old, else 401
+  `REAUTHENTICATION_REQUIRED` (not a session end). Wrap such calls in `ReauthService.run()`: it opens the "Confirm
+  it's you" dialog (`shared/components/reauth-dialog`, mounted in the shell), logs in again on the same bank and branch
+  (`loginUser` with `bankCode`/`branchCode`), revokes the old token (logout ends only the token it is sent with) then
+  replaces it, and retries the call once. Cancel resolves `run()` with undefined: abandon quietly.
+- Admin area (`/app/admin`, `pages/admin`): overview and the four-eyes approvals queue
+  (`GET /role-assignment-requests?status=`, approve, reject with a reason; profiler-service). A requester can't approve
+  its own request nor its own role (shown as blocked; BE answers 403). 409 = already decided or EXPIRED (7 days).
+  "Role assignments" (assign, list, revoke) is a placeholder until the user lookup exists. Revoking a role ends every
+  session of that user.
+- Permissions: `PermissionStore` (`core/services/permission-store.service.ts`) loads the BE catalogue
+  (`GET /permissions/getUserSitemapByClaims`: section codes ACCOUNT, INVESTMENTS, NEWS_MARKETS, WORKSPACE; feature
+  codes such as HOME, ORDERS; permission codes VIEW, USE, EDIT, DOWNLOAD) once per bank + roles. Codes live on the
+  navigation model (`NavSection.code`, `NavItem.feature`): the menu drops what the user can't VIEW,
+  `permissionGuard` blocks typed URLs (`data.permission` for other codes, e.g. investor profile update needs EDIT),
+  and buttons use `can()`. Admins have no catalogue entries (their section isn't permission-driven). If the
+  catalogue can't load, everything is allowed and the role-based menu shows: the BE checks every call anyway.
 - Session end: revocation is shared across BE services (Redis), so a token logged out or switched away elsewhere gets
   401 everywhere. `authInterceptor` hands a 401 on the **current** session token to `SessionExpiryService` (clears
   token, user and customer, full reload of `/auth/sign-in?expired=1&returnUrl=…`, where a notice explains it). A 401
@@ -191,9 +217,11 @@ docs/                       functional docs (process + diagrams), mirrored from 
   the BE can't check revocation: a temporary error, never a logout.
 - `WorkspaceContextService`: `actingAsClient()` (an advisor with a selected customer in `CustomerSessionService`),
   `clientName()`, `homePath()`, `exitClient()`. Customer selection (`/onboarding/disambiguation`) sets the customer.
-- Login routing: advisors go to `returnUrl` or `/app/advisor`. Customers go to customer selection unless a customer is
-  already selected (then `returnUrl` or `/app/home`).
-- Navigation model: `layout/navigation.ts` (`navigationFor({isAdvisor, actingAsClient})`, `activeSection(url)`). Add
+- Login routing: admins go to `returnUrl` (only under `/app/admin`) or `/app/admin`; advisors to `returnUrl` or
+  `/app/advisor`. Customers go to customer selection unless a customer is already selected (then `returnUrl` or
+  `/app/home`).
+- Navigation model: `layout/navigation.ts` (`navigationFor({isAdvisor, isAdmin, actingAsClient, can})`,
+  `activeSection(url)`, `featureOf(path)`). Add
   pages there, not in the shell. The advisor workspace pages are placeholders (`shared/components/page-placeholder` via
   route `data`) until advisor-service exists.
 - Loading feedback: `<app-loading-bar>` (in `app.html`) shows a top bar while a navigation is pending or a foreground

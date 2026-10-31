@@ -2,10 +2,9 @@ import {Injectable, computed, inject, signal} from '@angular/core';
 import {UserService, UserDTO} from '../../api/user-service';
 import {firstValueFrom} from 'rxjs';
 import {AuthService} from './auth.service';
-import {activeBranchFromToken, membershipsOf, sameBranch} from './branch-membership';
+import {WmpRole, parseRole, roleAssignmentsOf, sameBranch, tokenAssignment} from './role-assignment';
 
-/** Platform roles; mirrors the BE `WmpRole` enum (user-service). */
-export type WmpRole = 'CUSTOMER' | 'ADVISOR';
+export type {WmpRole} from './role-assignment';
 
 /**
  * Holds the logged-in user's profile for the whole browser session.
@@ -24,27 +23,29 @@ export class UserSessionService {
 
   private readonly auth = inject(AuthService);
 
-  /** Branches the user belongs to (from /me), one entry per bank + branch. */
-  readonly memberships = computed(() => membershipsOf(this._profile()?.userBranchRoles));
-  /** Bank and branch the current token is issued for (null for a token without a membership). */
-  readonly activeBranch = computed(() => activeBranchFromToken(this.auth.token()));
+  /** Branches the user holds roles in (from /me), one entry per bank + branch. */
+  readonly roleAssignments = computed(() => roleAssignmentsOf(this._profile()?.userBranchRoles));
+  /** Bank, branch and roles the current token is issued for (null for a token without a role assignment). */
+  readonly activeBranch = computed(() => tokenAssignment(this.auth.token()));
 
   /**
-   * Roles in the active membership: the token carries only those, so roles from other branches would show
-   * pages whose calls the BE rejects. A token without a membership falls back to every branch role.
-   * Like the BE, a user without branch roles is treated as CUSTOMER.
+   * Roles of the active role assignment: the token carries only those, so roles from other branches would show
+   * pages whose calls the BE rejects. Read from the token's `roles` claim, else from /me for the token's branch.
+   * Names are parsed exactly (an unknown role grants nothing). A token without a role assignment can only be a
+   * CUSTOMER without a bank (the BE issues those to users nobody has linked yet).
    */
   readonly roles = computed<ReadonlySet<WmpRole>>(() => {
-    const roles = new Set<WmpRole>();
     const active = this.activeBranch();
-    const branchRoles = this._profile()?.userBranchRoles ?? [];
-    for (const r of active ? branchRoles.filter(b => sameBranch(active, b)) : branchRoles) {
-      roles.add(r.role?.toUpperCase() === 'ADVISOR' ? 'ADVISOR' : 'CUSTOMER');
-    }
-    if (roles.size === 0) roles.add('CUSTOMER');
-    return roles;
+    if (!active) return new Set<WmpRole>(['CUSTOMER']);
+    if (active.roles.length) return new Set(active.roles);
+    const branchRoles = (this._profile()?.userBranchRoles ?? []).filter(b => sameBranch(active, b));
+    return new Set(branchRoles.map(r => parseRole(r.role)).filter((r): r is WmpRole => r != null));
   });
   readonly isAdvisor = computed(() => this.roles().has('ADVISOR'));
+  readonly isBankAdmin = computed(() => this.roles().has('BANK_ADMIN'));
+  readonly isPlatformAdmin = computed(() => this.roles().has('PLATFORM_ADMIN'));
+  /** Bank and platform admins work in the admin area, never on customers. */
+  readonly isAdmin = computed(() => this.isBankAdmin() || this.isPlatformAdmin());
 
   constructor(private readonly userApi: UserService) {
   }

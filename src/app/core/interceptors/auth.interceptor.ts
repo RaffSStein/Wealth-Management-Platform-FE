@@ -28,7 +28,7 @@ const LOCAL_TARGET_HOSTS = [
 // Calls whose 401 means wrong credentials or a session already ending, not an expired session
 const SESSION_EXEMPT_PATHS = ['/user-service/auth/login', '/user-service/auth/logout'];
 
-// 401s that leave the session valid: a token without a bank membership (membershipGuard shows the not-linked page),
+// 401s that leave the session valid: a token without a role assignment (roleAssignmentGuard shows the not-linked page),
 // and an admin action that needs a recent sign-in (the caller asks the user to sign in again)
 const SESSION_VALID_401_CODES: unknown[] = ['MISSING_HEADER_TOKEN_FIELD', 'REAUTHENTICATION_REQUIRED'];
 

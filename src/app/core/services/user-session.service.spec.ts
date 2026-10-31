@@ -4,7 +4,7 @@ import { UserService, UserDTO } from '../../api/user-service';
 import { of } from 'rxjs';
 import { provideHttpClient } from '@angular/common/http';
 import { AuthService } from './auth.service';
-import { testToken } from './branch-membership.spec';
+import { testToken } from './role-assignment.spec';
 
 class MockUserApi {
   getCurrentUser() { return of({ id: 'u1', email: 'user@example.com' } as UserDTO); }
@@ -70,18 +70,25 @@ describe('UserSessionService', () => {
       service.clear();
     });
 
-    it('come only from the membership the token is issued for', () => {
+    it('come only from the role assignment the token is issued for', () => {
       auth.setToken(testToken({ tenantId: 'BANK-B', branchCode: 'BR-01' }));
-      expect(service.activeBranch()).toEqual({ bankCode: 'BANK-B', branchCode: 'BR-01' });
+      expect(service.activeBranch()).toEqual({ bankCode: 'BANK-B', branchCode: 'BR-01', roles: [] });
       expect(service.isAdvisor()).toBeFalse();
       auth.setToken(testToken({ tenantId: 'BANK-A', branchCode: 'BR-01' }));
       expect(service.isAdvisor()).toBeTrue();
-      expect(service.memberships().length).toBe(2);
+      expect(service.roleAssignments().length).toBe(2);
     });
 
-    it('fall back to every branch role for a token without a membership', () => {
-      auth.setToken(testToken({ sub: 'u1' }));
-      expect(service.isAdvisor()).toBeTrue();
+    it('prefer the roles claim of the token', () => {
+      auth.setToken(testToken({ tenantId: 'BANK-B', branchCode: 'BR-01', roles: ['BANK_ADMIN'] }));
+      expect(service.isBankAdmin()).toBeTrue();
+      expect(service.isAdmin()).toBeTrue();
+      expect(service.isAdvisor()).toBeFalse();
+    });
+
+    it('are CUSTOMER only for a token without a role assignment', () => {
+      auth.setToken(testToken({ sub: 'u1', roles: ['CUSTOMER'] }));
+      expect([...service.roles()]).toEqual(['CUSTOMER']);
     });
   });
 });

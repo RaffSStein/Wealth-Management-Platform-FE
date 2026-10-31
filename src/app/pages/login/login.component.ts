@@ -16,6 +16,7 @@ import {InputText} from 'primeng/inputtext';
 import {Message} from 'primeng/message';
 import {Password} from 'primeng/password';
 import {AuthLayoutComponent} from '../../shared/components/auth-layout/auth-layout.component';
+import {ADMIN_HOME, ADVISOR_HOME} from '../../core/services/home-path';
 
 @Component({
   selector: 'app-login',
@@ -168,6 +169,7 @@ export class LoginComponent {
 
   /**
    * Where to go after a successful login:
+   * - admins: back to the requested admin page (returnUrl) or the admin area;
    * - advisors: back to the requested page (returnUrl) or their workspace;
    * - customers: customer selection first unless a customer profile is already selected,
    *   since /app screens operate on the selected customer.
@@ -176,7 +178,8 @@ export class LoginComponent {
     const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
     // Only same-app absolute paths (no protocol-relative "//host" redirects)
     const safeReturnUrl = returnUrl && returnUrl.startsWith('/') && !returnUrl.startsWith('//') ? returnUrl : null;
-    if (this.userSession.isAdvisor()) return safeReturnUrl ?? '/app/advisor';
+    if (this.userSession.isAdmin()) return safeReturnUrl?.startsWith(ADMIN_HOME) ? safeReturnUrl : ADMIN_HOME;
+    if (this.userSession.isAdvisor()) return safeReturnUrl ?? ADVISOR_HOME;
     if (!this.customerSession.customer()) return '/onboarding/disambiguation';
     return safeReturnUrl ?? '/app/home';
   }

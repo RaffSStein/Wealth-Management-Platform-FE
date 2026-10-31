@@ -5,7 +5,7 @@ import {of, throwError} from 'rxjs';
 import {AuthService as ApiAuthService, UserService} from '../../api/user-service';
 import {ToastService} from '../../shared/services/toast.service';
 import {AuthService} from './auth.service';
-import {testToken} from './branch-membership.spec';
+import {testToken} from './role-assignment.spec';
 import {BranchSwitchService} from './branch-switch.service';
 import {CustomerSessionService} from './customer-session.service';
 import {UserSessionService} from './user-session.service';
@@ -73,7 +73,7 @@ describe('BranchSwitchService', () => {
   });
 
   it('does nothing for the branch already active', async () => {
-    await service.switchTo({bankCode: 'BANK-A', branchCode: 'BR-01', roles: ['ADVISOR']});
+    await service.switchTo({bankCode: 'BANK-A', branchCode: 'BR-01'});
     expect(api.switchBranch).not.toHaveBeenCalled();
   });
 });

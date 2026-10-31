@@ -6,6 +6,7 @@ import {Message} from 'primeng/message';
 import {Skeleton} from 'primeng/skeleton';
 import {MifidFillingDTO, MifidQuestionnaireConfigDTO, MifidService} from '../../api/customer-service';
 import {CustomerSessionService} from '../../core/services/customer-session.service';
+import {PermissionStore} from '../../core/services/permission-store.service';
 import {
   answeredSections, findBand, loadSubmittedFilling, MifidQuestionnaireService, profileDisplay
 } from '../../core/services/mifid-questionnaire.service';
@@ -50,7 +51,7 @@ type State = 'loading' | 'ready' | 'none' | 'error';
                 @if (submittedOn()) { <div><dt>Submitted</dt><dd class="num">{{ submittedOn() }}</dd></div> }
               </dl>
             </div>
-            @if (onboarded()) {
+            @if (onboarded() && canUpdate()) {
               <div class="summary__action">
                 <a pButton routerLink="/app/investor-profile/update" severity="secondary" [outlined]="true">
                   <span pButtonLabel>{{ hasDraft() ? 'Continue update' : 'Update questionnaire' }}</span>
@@ -117,6 +118,9 @@ type State = 'loading' | 'ready' | 'none' | 'error';
 export class InvestorProfileComponent {
   private readonly mifidApi = inject(MifidService);
   private readonly customerSession = inject(CustomerSessionService);
+  private readonly permissions = inject(PermissionStore);
+  /** Updating the questionnaire needs EDIT on the investor profile (BE permission catalogue). */
+  protected readonly canUpdate = computed(() => this.permissions.can('ACCOUNT', 'INVESTOR_PROFILE', 'EDIT'));
 
   private readonly mifid = inject(MifidQuestionnaireService);
 

@@ -59,12 +59,17 @@ export class AuthService {
   }
 
   async logout(): Promise<void> {
+    await this.revokeCurrentToken();
+    this.clear();
+  }
+
+  /** Ends the current token on the BE (logout revokes only the token it is sent with) and keeps local state. */
+  async revokeCurrentToken(): Promise<void> {
     try {
       await firstValueFrom(this.http.post('/user-service/auth/logout', {}));
     } catch {
       // ignore server errors on logout; proceed to clear client state
     }
-    this.clear();
   }
 
   private readFromStorage(): string | null {

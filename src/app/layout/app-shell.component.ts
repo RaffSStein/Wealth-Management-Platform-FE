@@ -10,7 +10,7 @@ import {InputText} from 'primeng/inputtext';
 import {Menu} from 'primeng/menu';
 import {Tooltip} from 'primeng/tooltip';
 import {AuthService} from '../core/services/auth.service';
-import {sameBranch} from '../core/services/branch-membership';
+import {ActiveBranch, PLATFORM_TENANT, WMP_ROLES, bankLabel, roleLabel, sameBranch} from '../core/services/role-assignment';
 import {BranchSwitchService} from '../core/services/branch-switch.service';
 import {CustomerSessionService} from '../core/services/customer-session.service';
 import {ThemeService} from '../core/services/theme.service';
@@ -19,6 +19,8 @@ import {WorkspaceContextService} from '../core/services/workspace-context.servic
 import {NotificationBellComponent} from '../shared/components/notification-bell/notification-bell.component';
 import {ActingAsBannerComponent} from './acting-as-banner.component';
 import {activeSection, navigationFor} from './navigation';
+import {PermissionStore} from '../core/services/permission-store.service';
+import {ReauthDialogComponent} from '../shared/components/reauth-dialog.component';
 import {SideNavComponent} from './side-nav.component';
 import {BrandComponent} from '../shared/components/brand/brand.component';
 
@@ -32,7 +34,7 @@ const COLLAPSED_KEY = 'wmp.sidenav.collapsed';
  */
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, Avatar, ButtonDirective, ButtonIcon, Drawer, InputText, Menu,
+  imports: [ReauthDialogComponent, RouterOutlet, RouterLink, RouterLinkActive, Avatar, ButtonDirective, ButtonIcon, Drawer, InputText, Menu,
     Tooltip, BrandComponent, NotificationBellComponent, ActingAsBannerComponent, SideNavComponent],
   template: `
     <div class="shell" [class.shell--onboarding]="isOnboarding()" [class.shell--collapsed]="collapsed()">
@@ -74,10 +76,10 @@ const COLLAPSED_KEY = 'wmp.sidenav.collapsed';
           @if (isAuthenticated()) {
             @if (activeBranch(); as branch) {
               <button type="button" class="branch" aria-haspopup="menu"
-                      [attr.aria-label]="'Active branch ' + branch.branchCode + ', bank ' + branch.bankCode + '. Open account menu'"
+                      [attr.aria-label]="branchAriaLabel()"
                       (click)="userMenu.toggle($event)">
                 <span class="material-symbols-outlined" aria-hidden="true">account_balance</span>
-                <span class="branch__code">{{ branch.branchCode }}</span>
+                <span class="branch__code">{{ branchText(branch) }}</span>
                 @if (canSwitchBranch()) {
                   <span class="material-symbols-outlined branch__caret" aria-hidden="true">expand_more</span>
                 }
@@ -124,6 +126,7 @@ const COLLAPSED_KEY = 'wmp.sidenav.collapsed';
         }
         <main class="content">
           <router-outlet/>
+          <app-reauth-dialog/>
         </main>
       </div>
     </div>
@@ -221,6 +224,7 @@ export class AppShellComponent {
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
   private readonly userSession = inject(UserSessionService);
+  private readonly permissions = inject(PermissionStore);
   private readonly customerSession = inject(CustomerSessionService);
   private readonly branchSwitch = inject(BranchSwitchService);
   protected readonly theme = inject(ThemeService);
@@ -239,7 +243,9 @@ export class AppShellComponent {
   protected readonly isAuthenticated = computed(() => !!this.auth.token());
   protected readonly sections = computed(() => navigationFor({
     isAdvisor: this.workspace.isAdvisor(),
-    actingAsClient: this.workspace.actingAsClient()
+    isAdmin: this.userSession.isAdmin(),
+    actingAsClient: this.workspace.actingAsClient(),
+    can: this.permissions.navigationCheck()
   }));
   protected readonly section = computed(() => activeSection(this.url(), this.sections()));
 
@@ -259,23 +265,37 @@ export class AppShellComponent {
   });
 
   protected readonly activeBranch = this.userSession.activeBranch;
-  protected readonly canSwitchBranch = computed(() => this.userSession.memberships().length > 1);
+  protected readonly canSwitchBranch = computed(() => this.userSession.roleAssignments().length > 1);
+  protected readonly branchAriaLabel = computed(() => {
+    const b = this.activeBranch();
+    return b ? `Active branch ${this.branchText(b)}, ${b.bankCode === PLATFORM_TENANT ? 'platform' : 'bank ' + b.bankCode}. Open account menu` : '';
+  });
+  /** The most privileged role of the active role assignment. */
+  protected readonly roleLabel = computed(() => {
+    const roles = this.userSession.roles();
+    return roleLabel([...WMP_ROLES].reverse().find(r => roles.has(r)));
+  });
+
+  /** The platform admins' pseudo branch reads "Platform"; real branches show their code. */
+  protected branchText(b: ActiveBranch): string {
+    return b.bankCode === PLATFORM_TENANT ? bankLabel(b.bankCode) : b.branchCode;
+  }
 
   // Item icons are Material Symbols ligatures, rendered by the menu's item template
   protected readonly userMenuItems = computed<MenuItem[]>(() => {
     const active = this.activeBranch();
-    const memberships = this.userSession.memberships();
+    const assignments = this.userSession.roleAssignments();
     const branches: MenuItem[] = this.canSwitchBranch()
-      ? memberships.map(m => {
-        const current = sameBranch(m, active);
+      ? assignments.map(a => {
+        const current = sameBranch(a, active);
         return {
-          label: m.branchCode, title: `Bank ${m.bankCode}`, icon: current ? 'check' : '', disabled: current,
-          state: {current}, command: () => void this.branchSwitch.switchTo(m)
+          label: this.branchText(a), title: `Bank ${bankLabel(a.bankCode)}`, icon: current ? 'check' : '', disabled: current,
+          state: {current}, command: () => void this.branchSwitch.switchTo(a)
         };
       })
-      : active ? [{label: active.branchCode, title: `Bank ${active.bankCode}`, disabled: true}] : [];
+      : active ? [{label: this.branchText(active), title: `Bank ${bankLabel(active.bankCode)}`, disabled: true}] : [];
     const groups: MenuItem[] = [
-      {label: this.displayName(), items: [{label: this.userSession.isAdvisor() ? 'Advisor' : 'Customer', disabled: true}]},
+      {label: this.displayName(), items: [{label: this.roleLabel(), disabled: true}]},
       ...(branches.length ? [{label: this.canSwitchBranch() ? 'Switch branch' : 'Branch', items: branches}] : [])
     ];
     // Top-level items without children render as group labels, so Log out closes the last group
