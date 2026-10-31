@@ -5,6 +5,25 @@ info:
   description: API for managing bank information.
 
 paths:
+  /bank/banks:
+    get:
+      tags:
+        - Bank
+      summary: List the banks
+      description: >-
+        One entry per bank, sorted by bank code. A PLATFORM_ADMIN sees every bank; any other role only the bank of its
+        token; a token without a bank sees none.
+      operationId: getBanks
+      responses:
+        '200':
+          description: Banks visible to the caller
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BankDto'
+
   /bank/branches:
     post:
       tags:
@@ -33,13 +52,41 @@ paths:
       description: >-
         Returns a paged list of bank branches. Optional query parameters allow filtering
         by multiple attributes. Filters are combined with logical AND. Pagination is zero-based.
+        Scoped: a PLATFORM_ADMIN searches every bank; any other role only the bank of its token, whatever bankCode it
+        sends.
       operationId: getBankBranches
       parameters:
-        - name: pageable
+        - name: page
           in: query
           required: false
+          description: Zero-based page number.
           schema:
-            $ref: '#/components/schemas/Pageable'
+            type: integer
+            minimum: 0
+            default: 0
+        - name: size
+          in: query
+          required: false
+          description: Page size (1 to 100).
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: sort
+          in: query
+          required: false
+          description: "Sorting criteria: property,asc|desc (e.g. branchCode,asc). Repeat for several criteria."
+          schema:
+            type: string
+          example: "branchCode,asc"
+        - name: status
+          in: query
+          required: false
+          description: Exact status filter (e.g. ACTIVE, the branches roles can be assigned in).
+          schema:
+            type: string
+          example: "ACTIVE"
         - name: bankCode
           in: query
           required: false
@@ -108,6 +155,36 @@ paths:
         '400':
           description: Invalid filter combination or parameter format
 
+  /bank/{bankCode}/branches/{branchCode}:
+    get:
+      tags:
+        - Bank
+      summary: Get a branch of a bank
+      description: >
+        Branch codes are unique only within a bank, so a branch is identified by bank code and branch code.
+        Used by profiler-service to validate role assignments. A non-platform caller only finds branches of the bank
+        of its token (another bank answers 404).
+      operationId: getBankBranchOfBank
+      parameters:
+        - name: bankCode
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: branchCode
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Bank branch found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BankBranchDto'
+        '404':
+          description: No branch with this code in this bank
   /bank/branches/{branchCode}:
     get:
       tags:
@@ -231,28 +308,39 @@ components:
               items:
                 $ref: '#/components/schemas/BankBranchDto'
 
-    Pageable:
-      description: Pageable query parameters
+    Page:
+      description: >-
+        Page metadata. A page serializes as {content: [...], page: {size, number, totalElements, totalPages}}
+        (Spring Data PagedModel).
       type: object
       properties:
         page:
-          type: integer
+          $ref: '#/components/schemas/PageMetadata'
+
+    PageMetadata:
+      type: object
+      properties:
         size:
           type: integer
-        sort:
-          type: string
-          description: "Sorting criteria in the format: property,asc|desc. Default sort order is ascending. Multiple sort criteria are supported."
-          example: "branchName,desc"
+        number:
+          type: integer
+          description: Zero-based page number
         totalElements:
           type: integer
+          format: int64
         totalPages:
           type: integer
 
-    Page:
-      description: Page response without content property
+    BankDto:
       type: object
+      description: A bank (tenant), derived from its branches
       properties:
-        number:
-          type: integer
-        size:
-          type: integer
+        bankCode:
+          type: string
+          example: "BANK_A"
+        bankName:
+          type: string
+        countryCode:
+          type: string
+        bankType:
+          type: string

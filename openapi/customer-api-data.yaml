@@ -350,7 +350,7 @@ paths:
   /customer/{customerId}/mifid/filling/{fillingId}:
     patch:
       summary: Update (partial) MIFID questionnaire filling for a customer
-      description: Updates a (possibly incomplete) MIFID questionnaire filling for the specified customer and fillingId. This can be used to persist progress before final submission.
+      description: Updates a DRAFT or COMPLETED MIFID questionnaire filling for the specified customer and fillingId. The status is recalculated from the answers on every update. SUBMITTED and DEPRECATED fillings are read-only (409).
       operationId: updateMifidFillingForCustomer
       parameters:
         - name: customerId

@@ -190,9 +190,16 @@ docs/                       functional docs (process + diagrams), mirrored from 
 - No role assignment: public `POST /auth/register` no longer accepts `branchRoles` (BE, 2026-10-31), so a
   self-registered user has none: a CUSTOMER token without `tenantId`, which every bank-owned endpoint rejects with 401
   `MISSING_HEADER_TOKEN_FIELD`. `roleAssignmentGuard` (on `/app` and `/onboarding`) sends them to
-  `/onboarding/not-linked`, and the interceptor never treats that 401 as a session end. An advisor of the branch (or a
-  bank admin) assigns CUSTOMER (`POST /role-assignments`, immediate); the user gets it at the next sign-in. The FE
-  "link customer" action waits for a BE user lookup by email (not designed yet).
+  `/onboarding/not-linked`, and the interceptor never treats that 401 as a session end. Linking them is a **bank
+  admin** task (admin "Role assignments": `GET /user/search?linked=false`, then `POST /role-assignments` CUSTOMER at a
+  branch, immediate); the user gets it at the next sign-in. Advisors can't see unlinked users (no advisor "link
+  customer" action).
+- User lookup (user-service, BE 2026-10-31): `GET /user/lookup?email=` (exact, case-insensitive; ADVISOR and admins)
+  and `GET /user/search?query=&linked=&page=&size=` (admins; query ≥ 3 chars, zero-based pages, size ≤ 50, by email)
+  return `UserSummaryDTO` with `roleAssignments` (id = profiler assignment id, only those in the caller's scope).
+  Scope, also for `GET /user/{id}`: yourself; ADVISOR its bank + branch; BANK_ADMIN its bank plus unlinked users;
+  PLATFORM_ADMIN everyone. Out of scope answers 404, like not found. A role calling an endpoint it isn't allowed gets
+  403 `ACCESS_DENIED` (was 500): "not allowed", never a session end.
 - Re-sign-in: assigning or revoking staff roles and deciding requests need a sign-in at most 10 minutes old, else 401
   `REAUTHENTICATION_REQUIRED` (not a session end). Wrap such calls in `ReauthService.run()`: it opens the "Confirm
   it's you" dialog (`shared/components/reauth-dialog`, mounted in the shell), logs in again on the same bank and branch
@@ -201,8 +208,16 @@ docs/                       functional docs (process + diagrams), mirrored from 
 - Admin area (`/app/admin`, `pages/admin`): overview and the four-eyes approvals queue
   (`GET /role-assignment-requests?status=`, approve, reject with a reason; profiler-service). A requester can't approve
   its own request nor its own role (shown as blocked; BE answers 403). 409 = already decided or EXPIRED (7 days).
-  "Role assignments" (assign, list, revoke) is a placeholder until the user lookup exists. Revoking a role ends every
-  session of that user.
+  "Role assignments" (`role-assignments.component` + `person-roles.component`): search people (`GET /user/search`,
+  All / Linked / Not linked yet), then in the side panel their roles from profiler (`GET /role-assignments?userId=`,
+  the source of truth: user-service's copy follows through Kafka), assign and revoke. Who may assign/revoke what:
+  `core/services/role-assignment-policy.ts`. Bank and branch pickers come from `BankDirectoryService` (bank-service, BE
+  58e5f20): `GET /bank/banks` and `GET /bank/branches?bankCode=&status=ACTIVE` (flat `page`/`size`/`sort`, size ≤ 100;
+  response `{content, page: {number, totalPages, ...}}`). Both are scoped by role: PLATFORM_ADMIN sees every bank,
+  anyone else only the bank of its token (another bank answers an empty page, a single branch 404). Platform admins
+  pick the bank then its branch, bank admins a branch of their bank. When the lists can't load, the codes are typed
+  (the BE validates them). Revoking a role ends
+  every session of that user.
 - Permissions: `PermissionStore` (`core/services/permission-store.service.ts`) loads the BE catalogue
   (`GET /permissions/getUserSitemapByClaims`: section codes ACCOUNT, INVESTMENTS, NEWS_MARKETS, WORKSPACE; feature
   codes such as HOME, ORDERS; permission codes VIEW, USE, EDIT, DOWNLOAD) once per bank + roles. Codes live on the

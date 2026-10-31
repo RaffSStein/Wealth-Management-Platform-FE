@@ -119,9 +119,98 @@ paths:
         '401':
           description: Unauthorized
 
+  /user/lookup:
+    get:
+      summary: Find one user by exact email
+      description: >
+        Case-insensitive exact match on the whole email. Scoped: an ADVISOR finds users with a role assignment in the
+        bank and branch of its token; a BANK_ADMIN users with one in its bank, plus users not linked to any bank; a
+        PLATFORM_ADMIN anyone. A user outside the caller's scope answers 404, like an unknown email, so the existence
+        of an account isn't revealed. roleAssignments lists only the assignments the caller may see.
+      operationId: lookupUserByEmail
+      tags:
+        - User
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: email
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSummaryDTO'
+        '400':
+          description: Missing or blank email (REQUEST_VALIDATION_ERROR)
+        '403':
+          description: The caller's role can't look users up (CUSTOMER)
+        '404':
+          description: No such user in the caller's scope (OBJECT_NOT_FOUND)
+
+  /user/search:
+    get:
+      summary: Search users by email or name (admins)
+      description: >
+        Case-insensitive "contains" on email, first name and last name (at least 3 characters), paged (page, size) and
+        sorted by email. Scoped like /user/lookup: a BANK_ADMIN sees users with a role assignment in its bank plus
+        unlinked users; a PLATFORM_ADMIN everyone. linked=false lists only users with no role assignment (to link
+        new customers), linked=true only users with one in the caller's scope. Page size 1 to 50 (default 20).
+      operationId: searchUsers
+      tags:
+        - User
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 3
+        - name: linked
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - name: page
+          in: query
+          required: false
+          description: Zero-based page number
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        '200':
+          description: One page of users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSummaryPageDTO'
+        '400':
+          description: Query shorter than 3 characters (REQUEST_VALIDATION_ERROR)
+        '403':
+          description: Only BANK_ADMIN and PLATFORM_ADMIN can search
+
   /user/{id}:
     get:
       summary: Get user by ID
+      description: >
+        A user can read itself; staff only users in their scope (same rule as /user/lookup). Outside the scope the
+        answer is 404, like an unknown id.
       operationId: getUserById
       tags:
         - User
@@ -460,3 +549,40 @@ components:
           type: string
         theme:
           type: string
+
+    UserSummaryDTO:
+      type: object
+      description: Enough to find and link a user; not a profile (no phone, address or birth date)
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        roleAssignments:
+          type: array
+          description: The user's role assignments the caller may see; empty when unlinked or none in the caller's scope
+          items:
+            $ref: '#/components/schemas/UserBranchRoleDTO'
+
+    UserSummaryPageDTO:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserSummaryDTO'
+        page:
+          type: integer
+          description: Zero-based page number
+        size:
+          type: integer
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer

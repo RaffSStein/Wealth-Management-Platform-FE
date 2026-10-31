@@ -43,8 +43,8 @@ import {UserSessionService} from '../../core/services/user-session.service';
         </section>
         <section class="card">
           <header class="card__head"><h2>Role assignments</h2></header>
-          <p class="muted">Giving and removing roles will be available here soon. Revoking a role signs the person
-            out everywhere at once.</p>
+          <p class="muted">{{ assignmentsText() }} Revoking a role signs the person out everywhere at once.</p>
+          <a pButton routerLink="/app/admin/assignments" [outlined]="true" class="cta"><span pButtonLabel>Manage roles</span></a>
         </section>
       </div>
     </section>
@@ -89,6 +89,10 @@ export class AdminHomeComponent {
   protected readonly approvalsText = computed(() => this.userSession.isPlatformAdmin()
     ? 'Bank admin requests from the other platform admins wait here.'
     : 'Advisor requests from the other admins of your bank wait here.');
+
+  protected readonly assignmentsText = computed(() => this.userSession.isPlatformAdmin()
+    ? 'Find people and request bank admin roles for them.'
+    : 'Find people, link new customers to a branch and request advisor roles.');
 
   constructor() {
     void this.load();

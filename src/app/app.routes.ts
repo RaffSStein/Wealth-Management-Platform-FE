@@ -138,8 +138,10 @@ export const routes: Routes = [
         children: [
           {path: '', loadComponent: () => import('./pages/admin/admin-home.component').then(m => m.AdminHomeComponent)},
           {path: 'approvals', loadComponent: () => import('./pages/admin/approvals.component').then(m => m.ApprovalsComponent)},
-          wip('assignments', 'Role assignments',
-            'Give people a role in a branch of your bank, and remove it. Waiting for the user search in the back end.')
+          {
+            path: 'assignments',
+            loadComponent: () => import('./pages/admin/role-assignments.component').then(m => m.RoleAssignmentsComponent)
+          }
         ]
       },
       // Advisor workspace (advisor-service is still a BE skeleton: sub-pages are placeholders)
