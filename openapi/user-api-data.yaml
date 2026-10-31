@@ -29,6 +29,10 @@ paths:
   /auth/login:
     post:
       summary: User login (public)
+      description: >
+        Authenticates the user and issues a JWT for one active branch membership. The token carries the
+        tenantId (bank code) and branchCode claims of that membership, and only the roles held in it.
+        Without branchCode the user's first membership is used.
       operationId: loginUser
       tags:
         - Auth
@@ -47,6 +51,37 @@ paths:
                 $ref: '#/components/schemas/AuthResponseDTO'
         '401':
           description: Invalid credentials
+        '403':
+          description: The user has no membership in the requested branch
+
+  /auth/switch-branch:
+    post:
+      summary: Switch the active branch
+      description: >
+        Issues a new JWT for another branch membership of the current user (possibly in another bank) and revokes
+        the current token. The client must replace its token with the returned one.
+      operationId: switchBranch
+      tags:
+        - Auth
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SwitchBranchRequestDTO'
+      responses:
+        '200':
+          description: New JWT for the requested branch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponseDTO'
+        '401':
+          description: Unauthorized
+        '403':
+          description: The user has no membership in the requested branch
 
   /auth/logout:
     post:
@@ -265,7 +300,24 @@ components:
           format: email
         password:
           type: string
+        bankCode:
+          type: string
+          description: Optional bank of the membership to log in to; needed only if the branch code exists in several banks
+        branchCode:
+          type: string
+          description: Optional branch to log in to; defaults to the user's first membership
 
+    SwitchBranchRequestDTO:
+      type: object
+      required:
+        - branchCode
+      properties:
+        bankCode:
+          type: string
+          description: Optional bank of the membership; needed only if the branch code exists in several banks
+        branchCode:
+          type: string
+          description: Branch of one of the current user's memberships
 
     RegisterRequestDTO:
       type: object
@@ -293,13 +345,15 @@ components:
       type: object
       required:
         - bankCode
-        - bankId
+        - branchCode
         - role
       properties:
         bankCode:
           type: string
-        bankId:
+          description: Bank (tenant) of the membership
+        branchCode:
           type: string
+          description: Branch of the membership, within the bank
         role:
           type: string
 
@@ -382,6 +436,14 @@ components:
       properties:
         bankCode:
           type: string
+        branchCode:
+          type: string
+        active:
+          type: boolean
+          readOnly: true
+          description: >
+            True for the membership the current token was issued for (its tenantId/branchCode).
+            Use this membership's role for UI decisions; switch with POST /auth/switch-branch.
         role:
           type: string
 

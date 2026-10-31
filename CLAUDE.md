@@ -140,6 +140,16 @@ docs/                       functional docs (process + diagrams), mirrored from 
 ### Roles, workspace and shell
 - Roles: `UserSessionService.roles()` / `isAdvisor()` come from `/me` → `userBranchRoles[].role` (BE `WmpRole`:
   `CUSTOMER`, `ADVISOR`; no roles means CUSTOMER, like the BE).
+- Multi-tenancy (BE, 2026-10-30; guide: BE `docs/domain/process/security/jwt-authentication.md`): a session token is
+  issued for **one membership** (bank + branch) and carries `tenantId` (bank code), `branchCode` and only that
+  membership's `roles`. `/me` lists every membership, each with an `active` flag. Roles are therefore scoped to the
+  active membership (`UserSessionService.activeBranch()` reads the token claims, `core/services/branch-membership.ts`);
+  a token without a membership falls back to every branch role. Another bank's resources answer 404, like missing ones.
+- Branch switcher: header chip + account menu (`BranchSwitchService`): `POST /auth/switch-branch` returns a new token
+  and revokes the old one. Replace it (never keep a copy), drop the selected customer and do a full reload of the
+  workspace home, since everything loaded belongs to the previous bank. Revocation is per service instance on the BE,
+  so never rely on a 401 to detect a revoked token. The onboarding password-setup token (`purpose=PASSWORD_SETUP`)
+  works only on `POST /auth/password/setup`: send it via `ONE_TIME_AUTH_TOKEN`, never store it as the session token.
 - `WorkspaceContextService`: `actingAsClient()` (an advisor with a selected customer in `CustomerSessionService`),
   `clientName()`, `homePath()`, `exitClient()`. Customer selection (`/onboarding/disambiguation`) sets the customer.
 - Login routing: advisors go to `returnUrl` or `/app/advisor`. Customers go to customer selection unless a customer is

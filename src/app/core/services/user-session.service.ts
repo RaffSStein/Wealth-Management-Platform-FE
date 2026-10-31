@@ -1,6 +1,8 @@
-import {Injectable, computed, signal} from '@angular/core';
+import {Injectable, computed, inject, signal} from '@angular/core';
 import {UserService, UserDTO} from '../../api/user-service';
 import {firstValueFrom} from 'rxjs';
+import {AuthService} from './auth.service';
+import {activeBranchFromToken, membershipsOf, sameBranch} from './branch-membership';
 
 /** Platform roles; mirrors the BE `WmpRole` enum (user-service). */
 export type WmpRole = 'CUSTOMER' | 'ADVISOR';
@@ -20,12 +22,23 @@ export class UserSessionService {
   readonly profile = computed(() => this._profile());
   readonly isLoaded = computed(() => this._profile() != null);
 
+  private readonly auth = inject(AuthService);
+
+  /** Branches the user belongs to (from /me), one entry per bank + branch. */
+  readonly memberships = computed(() => membershipsOf(this._profile()?.userBranchRoles));
+  /** Bank and branch the current token is issued for (null for a token without a membership). */
+  readonly activeBranch = computed(() => activeBranchFromToken(this.auth.token()));
+
   /**
-   * Roles across all branch associations. Like the BE, a user without branch roles is treated as CUSTOMER.
+   * Roles in the active membership: the token carries only those, so roles from other branches would show
+   * pages whose calls the BE rejects. A token without a membership falls back to every branch role.
+   * Like the BE, a user without branch roles is treated as CUSTOMER.
    */
   readonly roles = computed<ReadonlySet<WmpRole>>(() => {
     const roles = new Set<WmpRole>();
-    for (const r of this._profile()?.userBranchRoles ?? []) {
+    const active = this.activeBranch();
+    const branchRoles = this._profile()?.userBranchRoles ?? [];
+    for (const r of active ? branchRoles.filter(b => sameBranch(active, b)) : branchRoles) {
       roles.add(r.role?.toUpperCase() === 'ADVISOR' ? 'ADVISOR' : 'CUSTOMER');
     }
     if (roles.size === 0) roles.add('CUSTOMER');

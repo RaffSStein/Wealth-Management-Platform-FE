@@ -10,6 +10,8 @@ import {InputText} from 'primeng/inputtext';
 import {Menu} from 'primeng/menu';
 import {Tooltip} from 'primeng/tooltip';
 import {AuthService} from '../core/services/auth.service';
+import {sameBranch} from '../core/services/branch-membership';
+import {BranchSwitchService} from '../core/services/branch-switch.service';
 import {CustomerSessionService} from '../core/services/customer-session.service';
 import {ThemeService} from '../core/services/theme.service';
 import {UserSessionService} from '../core/services/user-session.service';
@@ -70,10 +72,35 @@ const COLLAPSED_KEY = 'wmp.sidenav.collapsed';
             </span>
           </button>
           @if (isAuthenticated()) {
+            @if (activeBranch(); as branch) {
+              <button type="button" class="branch" aria-haspopup="menu"
+                      [attr.aria-label]="'Active branch ' + branch.branchCode + ', bank ' + branch.bankCode + '. Open account menu'"
+                      (click)="userMenu.toggle($event)">
+                <span class="material-symbols-outlined" aria-hidden="true">account_balance</span>
+                <span class="branch__code">{{ branch.branchCode }}</span>
+                @if (canSwitchBranch()) {
+                  <span class="material-symbols-outlined branch__caret" aria-hidden="true">expand_more</span>
+                }
+              </button>
+            }
             <button type="button" class="user" aria-label="Account menu" aria-haspopup="menu" (click)="userMenu.toggle($event)">
               <p-avatar [label]="initials()" shape="circle" class="user__avatar"/>
             </button>
-            <p-menu #userMenu [model]="userMenuItems()" [popup]="true" appendTo="body" ariaLabel="Account menu"/>
+            <p-menu #userMenu [model]="userMenuItems()" [popup]="true" appendTo="body" ariaLabel="Account menu">
+              <ng-template #item let-item>
+                <a class="p-menu-item-link account-item" [attr.aria-current]="item.state?.current ? 'true' : null">
+                  @if (item.icon !== undefined) {
+                    <span class="material-symbols-outlined account-item__icon" aria-hidden="true">{{ item.icon }}</span>
+                  }
+                  <span class="account-item__text">
+                    <span class="p-menu-item-label">{{ item.label }}</span>
+                    @if (item.title) {
+                      <span class="account-item__hint">{{ item.title }}</span>
+                    }
+                  </span>
+                </a>
+              </ng-template>
+            </p-menu>
           }
         </div>
       </header>
@@ -138,6 +165,15 @@ const COLLAPSED_KEY = 'wmp.sidenav.collapsed';
     .search__input { width: 100%; height: 36px; padding-left: 2.1rem; font-size: .85rem; }
     .topbar__actions { display: flex; align-items: center; gap: .25rem; }
     .shell--onboarding .topbar__actions { margin-left: auto; }
+    .branch {
+      height: 32px; padding: 0 .55rem; margin-left: .25rem; display: flex; align-items: center; gap: .35rem;
+      border: 1px solid var(--wmp-border); border-radius: var(--wmp-radius-md); background: transparent;
+      color: var(--wmp-text-muted); font-weight: 400; cursor: pointer;
+    }
+    .branch:hover { color: var(--wmp-text); background: var(--wmp-surface); }
+    .branch .material-symbols-outlined { font-size: 18px; }
+    .branch__code { font-family: var(--wmp-font-mono); font-size: .78rem; }
+    .branch .branch__caret { font-size: 16px; }
     .user { height: auto; padding: 0; margin-left: .25rem; border: 0; background: transparent; border-radius: 50%; cursor: pointer; display: flex; }
     .user__avatar { background: var(--wmp-primary-soft); color: var(--wmp-primary); font-weight: 600; font-size: .8rem; }
 
@@ -168,9 +204,13 @@ const COLLAPSED_KEY = 'wmp.sidenav.collapsed';
       .search { width: auto; flex: 1; min-width: 0; }
     }
     @media (max-width: 479.98px) {
-      .search { display: none; }
+      .search, .branch { display: none; }
       .topbar__actions { margin-left: auto; }
     }
+    .account-item { display: flex; align-items: center; gap: .6rem; }
+    .account-item__icon { width: 20px; font-size: 18px; color: var(--wmp-primary); }
+    .account-item__text { display: flex; flex-direction: column; line-height: 1.2; }
+    .account-item__hint { font-size: .75rem; color: var(--wmp-text-muted); }
     .sr-only {
       position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
       clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
@@ -182,6 +222,7 @@ export class AppShellComponent {
   private readonly auth = inject(AuthService);
   private readonly userSession = inject(UserSessionService);
   private readonly customerSession = inject(CustomerSessionService);
+  private readonly branchSwitch = inject(BranchSwitchService);
   protected readonly theme = inject(ThemeService);
   protected readonly workspace = inject(WorkspaceContextService);
 
@@ -217,14 +258,30 @@ export class AppShellComponent {
     return (fromName || this.displayName()[0] || '?').toUpperCase();
   });
 
-  protected readonly userMenuItems = computed<MenuItem[]>(() => [{
-    label: this.displayName(),
-    items: [
-      {label: this.userSession.isAdvisor() ? 'Advisor' : 'Customer', disabled: true},
-      {separator: true},
-      {label: 'Log out', command: () => void this.logout()}
-    ]
-  }]);
+  protected readonly activeBranch = this.userSession.activeBranch;
+  protected readonly canSwitchBranch = computed(() => this.userSession.memberships().length > 1);
+
+  // Item icons are Material Symbols ligatures, rendered by the menu's item template
+  protected readonly userMenuItems = computed<MenuItem[]>(() => {
+    const active = this.activeBranch();
+    const memberships = this.userSession.memberships();
+    const branches: MenuItem[] = this.canSwitchBranch()
+      ? memberships.map(m => {
+        const current = sameBranch(m, active);
+        return {
+          label: m.branchCode, title: `Bank ${m.bankCode}`, icon: current ? 'check' : '', disabled: current,
+          state: {current}, command: () => void this.branchSwitch.switchTo(m)
+        };
+      })
+      : active ? [{label: active.branchCode, title: `Bank ${active.bankCode}`, disabled: true}] : [];
+    const groups: MenuItem[] = [
+      {label: this.displayName(), items: [{label: this.userSession.isAdvisor() ? 'Advisor' : 'Customer', disabled: true}]},
+      ...(branches.length ? [{label: this.canSwitchBranch() ? 'Switch branch' : 'Branch', items: branches}] : [])
+    ];
+    // Top-level items without children render as group labels, so Log out closes the last group
+    groups[groups.length - 1].items!.push({separator: true}, {label: 'Log out', command: () => void this.logout()});
+    return groups;
+  });
 
   protected toggleCollapsed(): void {
     const next = !this.collapsed();
