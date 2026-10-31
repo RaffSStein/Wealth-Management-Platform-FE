@@ -2,6 +2,7 @@ import {inject} from '@angular/core';
 import {Route, Router, Routes} from '@angular/router';
 import {onboardingStepGuard} from './core/guards/onboarding-step.guard';
 import {authGuard} from './core/guards/auth.guard';
+import {membershipGuard} from './core/guards/membership.guard';
 import {roleGuard} from './core/guards/role.guard';
 
 /**
@@ -61,12 +62,18 @@ export const routes: Routes = [
   // Public onboarding entry points, rendered without the app shell: sign-up and the one-time password link
   {path: 'onboarding/start', loadComponent: () => import('./pages/onboarding/register.component').then(m => m.OnboardingStartComponent)},
   {path: 'onboarding/setup-password', loadComponent: () => import('./pages/onboarding/setup-password.page').then(m => m.SetupPasswordPage)},
+  // Signed in, but the token has no bank membership: no bank data is reachable yet
+  {
+    path: 'onboarding/not-linked',
+    loadComponent: () => import('./pages/onboarding/not-linked.page').then(m => m.NotLinkedPage),
+    canActivate: [authGuard]
+  },
 
   // Onboarding flow (AppShell in onboarding mode); requires a session
   {
     path: 'onboarding',
     loadComponent: () => import('./layout/app-shell.component').then(m => m.AppShellComponent),
-    canActivate: [authGuard],
+    canActivate: [authGuard, membershipGuard],
     children: [
       {
         path: 'personal-details',
@@ -110,7 +117,7 @@ export const routes: Routes = [
   {
     path: 'app',
     loadComponent: () => import('./layout/app-shell.component').then(m => m.AppShellComponent),
-    canActivate: [authGuard],
+    canActivate: [authGuard, membershipGuard],
     children: [
       {path: 'home', loadComponent: () => import('./pages/home/home.component').then(m => m.HomeComponent)},
       {

@@ -52,7 +52,8 @@ function makeProxy(context, target) {
 
 module.exports = [
   makeProxy('/user-service', 'http://localhost:8083'),
-  makeProxy('/order-service', 'http://localhost:8082'),
+  makeProxy('/order-service', 'http://localhost:8085'),
+  makeProxy('/profiler-service', 'http://localhost:8082'),
   makeProxy('/document-service', 'http://localhost:8091'),
   makeProxy('/customer-service', 'http://localhost:8090'),
   makeProxy('/bank-service', 'http://localhost:8089')

@@ -33,11 +33,11 @@ describe('authInterceptor session expiry', () => {
   });
 
   /** Sends a GET, answers it with `status` and returns the request's Authorization header. */
-  async function call(url: string, status: number, beforeReply?: () => void): Promise<string | null> {
+  async function call(url: string, status: number, beforeReply?: () => void, body: object = {}): Promise<string | null> {
     const response = firstValueFrom(http.get(url)).catch(() => undefined);
     const req = backend.expectOne(url);
     beforeReply?.();
-    req.flush({}, {status, statusText: 'x'});
+    req.flush(body, {status, statusText: 'x'});
     await response;
     return req.request.headers.get('Authorization');
   }
@@ -56,6 +56,10 @@ describe('authInterceptor session expiry', () => {
     await call('/customer-service/customer/c1', 503);
     await call('/customer-service/customer/c1', 403);
     await call('/user-service/auth/logout', 401);
+    // a token without a bank membership: the session is valid, the user just isn't linked to a bank yet
+    await call('/customer-service/customer/c1', 401, undefined, {errorCode: 'MISSING_HEADER_TOKEN_FIELD'});
+    // an admin action that needs a recent sign-in: re-prompt, don't end the session
+    await call('/user-service/admin/memberships', 401, undefined, {errorCode: 'REAUTHENTICATION_REQUIRED'});
     expect(expiry.expire).not.toHaveBeenCalled();
   });
 });

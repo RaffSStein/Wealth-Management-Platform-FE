@@ -74,8 +74,9 @@ docs/                       functional docs (process + diagrams), mirrored from 
 ```
 
 - Routes: public `/`, `/auth/*`, `/terms`, `/onboarding/start` (sign-up) and `/onboarding/setup-password` (one-time
-  email link). Every other `/onboarding/*` step uses `authGuard` + `onboardingStepGuard` (`data.step`). `/app/*` uses
-  `authGuard` (token present, else `/auth/sign-in?returnUrl=`). `/app/advisor/**` uses `roleGuard('ADVISOR')`.
+  email link). Every other `/onboarding/*` step uses `authGuard` + `membershipGuard` + `onboardingStepGuard`
+  (`data.step`). `/app/*` uses `authGuard` (token present, else `/auth/sign-in?returnUrl=`) + `membershipGuard`.
+  `/app/advisor/**` uses `roleGuard('ADVISOR')`.
 - Render modes (`app.routes.server.ts`): public routes are prerendered; `app/**`, `onboarding/**`, `dev/**` render on the
   client (session lives in sessionStorage; also avoids the PrimeNG p-motion hydration bug below).
 - Components currently carry **inline templates and styles** in the `.ts` file; many pages under `/app` are placeholders.
@@ -177,6 +178,12 @@ docs/                       functional docs (process + diagrams), mirrored from 
   Setup answers: 202 done; 401 = link used/expired/malformed (expired ones have an empty body, so key on the status);
   400 REQUEST_VALIDATION_ERROR = password policy (`errorMessage` lists the rules; the link is not consumed, retry on
   the page); 503 TOKEN_STORE_UNAVAILABLE = retry.
+- No membership: public `POST /auth/register` no longer accepts `branchRoles` (BE, 2026-10-31), so a self-registered
+  user has no membership: a CUSTOMER token without `tenantId`, which every bank-owned endpoint rejects with 401
+  `MISSING_HEADER_TOKEN_FIELD`. `membershipGuard` (on `/app` and `/onboarding`) sends them to `/onboarding/not-linked`,
+  and the interceptor never treats that 401 as a session end (nor 401 `REAUTHENTICATION_REQUIRED`, which
+  admin actions return when the sign-in is older than 10 minutes: re-prompt sign-in instead). Memberships will come
+  from an admin flow and the customer onboarding (contract pending); until then self-signup stops at that page.
 - Session end: revocation is shared across BE services (Redis), so a token logged out or switched away elsewhere gets
   401 everywhere. `authInterceptor` hands a 401 on the **current** session token to `SessionExpiryService` (clears
   token, user and customer, full reload of `/auth/sign-in?expired=1&returnUrl=…`, where a notice explains it). A 401
@@ -208,7 +215,7 @@ docs/                       functional docs (process + diagrams), mirrored from 
 - Java 21 / Spring Boot microservices, Kafka events, Postgres per service, `docker compose up -d` for local infra.
 - API-first: specs live in BE `business-modules/<x>-service/<x>-api-data/`. When a spec changes there, copy it into
   `openapi/` here and run `npm run openapi:gen:<x>`.
-- Dev proxy (`proxy.conf.js`): user-service :8083, order-service :8082, document-service :8091,
+- Dev proxy (`proxy.conf.js`): user-service :8083, order-service :8085, profiler-service :8082, document-service :8091,
   customer-service :8090, bank-service :8089. Each service is served under context path `/<service-name>`.
 - Auth: JWT bearer, attached by `authInterceptor`. Roles are checked with `@PreAuthorize("hasRole('ADVISOR')")` etc.;
   in user-service roles are branch-scoped strings (`UserBranchRoleDTO.role`).

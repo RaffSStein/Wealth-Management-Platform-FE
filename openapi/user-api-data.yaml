@@ -9,6 +9,10 @@ paths:
   /auth/register:
     post:
       summary: Self-signup registration (public)
+      description: >
+        Creates a user without any role assignment: a public endpoint can't grant roles or bank access. Until a role
+        is assigned (profiler-service, POST /role-assignments), login issues a CUSTOMER token without tenant, which
+        can't access bank data.
       operationId: registerUser
       tags:
         - Auth
@@ -30,9 +34,9 @@ paths:
     post:
       summary: User login (public)
       description: >
-        Authenticates the user and issues a JWT for one active branch membership. The token carries the
-        tenantId (bank code) and branchCode claims of that membership, and only the roles held in it.
-        Without branchCode the user's first membership is used.
+        Authenticates the user and issues a JWT for one active role assignment. The token carries the
+        tenantId (bank code) and branchCode claims of that role assignment, and only the roles held in it.
+        Without branchCode the user's first role assignment is used.
       operationId: loginUser
       tags:
         - Auth
@@ -52,13 +56,13 @@ paths:
         '401':
           description: Invalid credentials
         '403':
-          description: The user has no membership in the requested branch
+          description: The user has no role assignment in the requested branch
 
   /auth/switch-branch:
     post:
       summary: Switch the active branch
       description: >
-        Issues a new JWT for another branch membership of the current user (possibly in another bank) and revokes
+        Issues a new JWT for another role assignment of the current user (possibly in another bank) and revokes
         the current token. The client must replace its token with the returned one.
       operationId: switchBranch
       tags:
@@ -81,7 +85,7 @@ paths:
         '401':
           description: Unauthorized
         '403':
-          description: The user has no membership in the requested branch
+          description: The user has no role assignment in the requested branch
 
   /auth/logout:
     post:
@@ -316,10 +320,10 @@ components:
           type: string
         bankCode:
           type: string
-          description: Optional bank of the membership to log in to; needed only if the branch code exists in several banks
+          description: Optional bank of the role assignment to log in to; needed only if the branch code exists in several banks
         branchCode:
           type: string
-          description: Optional branch to log in to; defaults to the user's first membership
+          description: Optional branch to log in to; defaults to the user's first role assignment
 
     SwitchBranchRequestDTO:
       type: object
@@ -328,10 +332,10 @@ components:
       properties:
         bankCode:
           type: string
-          description: Optional bank of the membership; needed only if the branch code exists in several banks
+          description: Optional bank of the role assignment; needed only if the branch code exists in several banks
         branchCode:
           type: string
-          description: Branch of one of the current user's memberships
+          description: Branch of one of the current user's role assignments
 
     RegisterRequestDTO:
       type: object
@@ -350,27 +354,6 @@ components:
           type: string
         phoneNumber:
           type: string
-        branchRoles:
-          type: array
-          items:
-            $ref: '#/components/schemas/BranchRoleDTO'
-
-    BranchRoleDTO:
-      type: object
-      required:
-        - bankCode
-        - branchCode
-        - role
-      properties:
-        bankCode:
-          type: string
-          description: Bank (tenant) of the membership
-        branchCode:
-          type: string
-          description: Branch of the membership, within the bank
-        role:
-          type: string
-
 
     SetupPasswordDTO:
       type: object
@@ -440,6 +423,10 @@ components:
           type: string
         userBranchRoles:
           type: array
+          readOnly: true
+          description: >
+            Role assignments of the user (bank, branch, role). Ignored on create and update: they are managed in
+            profiler-service (POST/DELETE /role-assignments).
           items:
             $ref: '#/components/schemas/UserBranchRoleDTO'
         userSettings:
@@ -448,6 +435,11 @@ components:
     UserBranchRoleDTO:
       type: object
       properties:
+        id:
+          type: integer
+          format: int64
+          readOnly: true
+          description: Role assignment id in profiler-service (DELETE /role-assignments/{id} revokes it)
         bankCode:
           type: string
         branchCode:
@@ -456,8 +448,8 @@ components:
           type: boolean
           readOnly: true
           description: >
-            True for the membership the current token was issued for (its tenantId/branchCode).
-            Use this membership's role for UI decisions; switch with POST /auth/switch-branch.
+            True for the role assignment the current token was issued for (its tenantId/branchCode).
+            Use this role assignment's role for UI decisions; switch with POST /auth/switch-branch.
         role:
           type: string
 

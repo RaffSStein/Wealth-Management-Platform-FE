@@ -1,0 +1,503 @@
+openapi: 3.1.0
+info:
+  title: Profiler APIs
+  version: 1.0.0
+  description: |
+    API for managing and retrieving the sitemap, sections, features, and permissions for applications and users.
+    
+    The following APIs (capabilities) are exposed by the profiler:
+    - API to retrieve the sitemap of an application
+    - API to retrieve the sitemap, including permissions, for a given user
+    - API to modify the sitemap/permissions for a given user
+
+servers:
+  - url: https://WIP
+
+paths:
+  /sitemap/{application}:
+    get:
+      summary: Get the complete sitemap for a specific application
+      operationId: getSitemap
+      tags:
+        - Sitemap
+      parameters:
+        - name: application
+          in: path
+          required: true
+          description: Application identifier (e.g. "b2c", "backoffice")
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Sitemap for the requested application
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SitemapResponseDTO'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+
+  /permissions/getUserSitemapByClaims:
+    get:
+      summary: Get the sitemap for a user based on their claims
+      description: >
+        Sections, features and permission codes the caller may use, in FE navigation order: those of the role(s) in its
+        token (the active role assignment), read from the role permission catalogue on each request. A token without
+        bank or branch (user not linked to a bank yet) gets an empty result.
+      operationId: getUserSitemapByClaims
+      tags:
+        - Permissions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User-specific sitemap with permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPermissionDTO'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /role-assignments:
+    post:
+      summary: Assign a role to a user in a bank branch
+      description: >
+        The bank is taken from the caller's token; only a PLATFORM_ADMIN may name a bank (bankCode).
+        ADVISOR may assign CUSTOMER in its own branch; BANK_ADMIN may assign CUSTOMER directly and ADVISOR with
+        four-eyes approval; PLATFORM_ADMIN may assign BANK_ADMIN with four-eyes approval. Nobody assigns to themselves.
+        Staff assignments require a login within the last 10 minutes. The branch must exist and be ACTIVE in
+        bank-service. The user gets the new role in the token at the next login or branch switch.
+        Error bodies use the platform ErrorResponse.
+      operationId: assignRole
+      tags:
+        - RoleAssignment
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignRoleRequestDTO'
+      responses:
+        '201':
+          description: Role assigned (outcome ASSIGNED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssignRoleResultDTO'
+        '202':
+          description: Approval requested from a second admin (outcome PENDING_APPROVAL)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssignRoleResultDTO'
+        '400':
+          description: Invalid input, or the branch is not ACTIVE (REQUEST_VALIDATION_ERROR)
+        '401':
+          description: Not authenticated, or REAUTHENTICATION_REQUIRED (sign in again, then retry)
+        '403':
+          description: The caller may not assign this role here (ROLE_ASSIGNMENT_NOT_ALLOWED)
+        '404':
+          description: Unknown user, or the branch doesn't exist in that bank (OBJECT_NOT_FOUND)
+        '409':
+          description: The user already has this role there, or a pending request for it (ROLE_ASSIGNMENT_ALREADY_EXISTS)
+        '503':
+          description: bank-service is unavailable (DEPENDENCY_UNAVAILABLE); nothing was changed
+    get:
+      summary: List the role assignments of a user
+      description: >
+        ADVISOR sees assignments in its branch, BANK_ADMIN in its bank, PLATFORM_ADMIN everywhere.
+      operationId: listRoleAssignments
+      tags:
+        - RoleAssignment
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Assignments of the user visible to the caller
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RoleAssignmentDTO'
+        '403':
+          description: The caller's role can't manage role assignments
+
+  /role-assignments/{assignmentId}:
+    delete:
+      summary: Revoke a role assignment
+      description: >
+        Removes the assignment and ends every session of the user (all tokens issued until now are rejected).
+        ADVISOR may revoke CUSTOMER in its own branch; BANK_ADMIN may revoke CUSTOMER or ADVISOR in its bank;
+        PLATFORM_ADMIN may revoke BANK_ADMIN. Admin revocations require a login within the last 10 minutes.
+      operationId: revokeRoleAssignment
+      tags:
+        - RoleAssignment
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: assignmentId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Assignment revoked, the user's sessions ended
+        '401':
+          description: Not authenticated, or REAUTHENTICATION_REQUIRED
+        '403':
+          description: The caller may not revoke this assignment (ROLE_ASSIGNMENT_NOT_ALLOWED)
+        '404':
+          description: No such assignment
+        '503':
+          description: The token store is unavailable (TOKEN_STORE_UNAVAILABLE); nothing was changed
+
+  /role-assignment-requests:
+    get:
+      summary: List role assignment requests
+      description: BANK_ADMIN sees its bank's requests, PLATFORM_ADMIN sees all. Newest first.
+      operationId: listRoleAssignmentRequests
+      tags:
+        - RoleAssignment
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/RoleAssignmentRequestStatusDTO'
+      responses:
+        '200':
+          description: Requests, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RoleAssignmentRequestDTO'
+        '403':
+          description: Only BANK_ADMIN and PLATFORM_ADMIN can list requests
+
+  /role-assignment-requests/{requestId}/approve:
+    post:
+      summary: Approve a pending role assignment request (four-eyes)
+      description: >
+        The approver must differ from the requester and from the target: a BANK_ADMIN of the same bank for ADVISOR,
+        a PLATFORM_ADMIN for BANK_ADMIN. Requires a login within the last 10 minutes. A request older than 7 days
+        becomes EXPIRED instead (409).
+      operationId: approveRoleAssignmentRequest
+      tags:
+        - RoleAssignment
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Approved; the assignment now exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleAssignmentDTO'
+        '401':
+          description: Not authenticated, or REAUTHENTICATION_REQUIRED
+        '403':
+          description: The caller may not decide this request (ROLE_ASSIGNMENT_NOT_ALLOWED)
+        '404':
+          description: No such request
+        '409':
+          description: The request is not PENDING (ROLE_ASSIGNMENT_REQUEST_NOT_PENDING), or the assignment already exists
+        '503':
+          description: bank-service is unavailable; nothing was changed
+
+  /role-assignment-requests/{requestId}/reject:
+    post:
+      summary: Reject a pending role assignment request
+      description: Same authority and login-age rules as approve.
+      operationId: rejectRoleAssignmentRequest
+      tags:
+        - RoleAssignment
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RejectRoleAssignmentRequestDTO'
+      responses:
+        '200':
+          description: Rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleAssignmentRequestDTO'
+        '401':
+          description: Not authenticated, or REAUTHENTICATION_REQUIRED
+        '403':
+          description: The caller may not decide this request (ROLE_ASSIGNMENT_NOT_ALLOWED)
+        '404':
+          description: No such request
+        '409':
+          description: The request is not PENDING (ROLE_ASSIGNMENT_REQUEST_NOT_PENDING)
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    SitemapResponseDTO:
+      type: object
+      properties:
+        application:
+          type: string
+        sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/SectionDTO'
+
+    SectionDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+        sectionCode:
+          type: string
+        sectionName:
+          type: string
+        features:
+          type: array
+          items:
+            $ref: '#/components/schemas/FeatureDTO'
+
+
+    FeatureDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+        featureCode:
+          type: string
+        featureName:
+          type: string
+
+    PermissionDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+        permissionCode:
+          type: string
+          description: VIEW, USE, EDIT or DOWNLOAD
+        permissionName:
+          type: string
+
+    UserPermissionDTO:
+      type: object
+      properties:
+        userEmail:
+          type: string
+        bankCode:
+          type: string
+        sectionPermissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/SectionPermissionsDTO'
+
+    SectionPermissionsDTO:
+      type: object
+      description: A section of the FE navigation (top bar), in display order
+      properties:
+        sectionCode:
+          type: string
+          description: ACCOUNT, INVESTMENTS, NEWS_MARKETS, WORKSPACE (the FE navigation key in UPPER_SNAKE)
+        sectionName:
+          type: string
+        featurePermissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/FeaturePermissionsDTO'
+
+    FeaturePermissionsDTO:
+      type: object
+      description: A feature of the section (FE side-nav item), in display order, with the permission codes granted
+      properties:
+        featureCode:
+          type: string
+          description: e.g. HOME, INVESTOR_PROFILE, ORDERS; unique within the section
+        featureName:
+          type: string
+        permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PermissionDTO'
+
+    RoleDTO:
+      type: string
+      description: Platform role. PLATFORM_ADMIN can't be assigned through the API (bootstrap only).
+      enum:
+        - CUSTOMER
+        - ADVISOR
+        - BANK_ADMIN
+        - PLATFORM_ADMIN
+
+    AssignRoleRequestDTO:
+      type: object
+      required:
+        - userId
+        - branchCode
+        - role
+      properties:
+        userId:
+          type: string
+          format: uuid
+        branchCode:
+          type: string
+        role:
+          $ref: '#/components/schemas/RoleDTO'
+        bankCode:
+          type: string
+          description: Only for PLATFORM_ADMIN (assigning BANK_ADMIN of a bank); otherwise the caller's bank is used
+
+    AssignRoleResultDTO:
+      type: object
+      required:
+        - outcome
+      properties:
+        outcome:
+          type: string
+          enum:
+            - ASSIGNED
+            - PENDING_APPROVAL
+        assignment:
+          $ref: '#/components/schemas/RoleAssignmentDTO'
+        request:
+          $ref: '#/components/schemas/RoleAssignmentRequestDTO'
+
+    RoleAssignmentDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        userId:
+          type: string
+          format: uuid
+        userEmail:
+          type: string
+        bankCode:
+          type: string
+        branchCode:
+          type: string
+        role:
+          $ref: '#/components/schemas/RoleDTO'
+        grantedBy:
+          type: string
+          description: Email of whoever assigned it (the requester, for approved requests), or bootstrap
+        approvedBy:
+          type: string
+          description: Email of the second admin, for four-eyes assignments
+        grantedAt:
+          type: string
+          format: date-time
+
+    RoleAssignmentRequestStatusDTO:
+      type: string
+      enum:
+        - PENDING
+        - APPROVED
+        - REJECTED
+        - EXPIRED
+
+    RoleAssignmentRequestDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        userId:
+          type: string
+          format: uuid
+        userEmail:
+          type: string
+        bankCode:
+          type: string
+        branchCode:
+          type: string
+        role:
+          $ref: '#/components/schemas/RoleDTO'
+        status:
+          $ref: '#/components/schemas/RoleAssignmentRequestStatusDTO'
+        requestedBy:
+          type: string
+        requestedAt:
+          type: string
+          format: date-time
+        decidedBy:
+          type: string
+        decidedAt:
+          type: string
+          format: date-time
+        reason:
+          type: string
+
+    RejectRoleAssignmentRequestDTO:
+      type: object
+      required:
+        - reason
+      properties:
+        reason:
+          type: string
+          maxLength: 500

@@ -12,8 +12,9 @@
     "openapi:gen:customer": "openapi-generator-cli generate -i openapi/customer-api-data.yaml -g typescript-angular -o src/app/api/customer-service --additional-properties=providedInRoot=true,withInterfaces=true,ngVersion=20.0.0,enumNameSuffix=Enum",
     "openapi:gen:document": "openapi-generator-cli generate -i openapi/document-api-data.yaml -g typescript-angular -o src/app/api/document-service --additional-properties=providedInRoot=true,withInterfaces=true,ngVersion=20.0.0,enumNameSuffix=Enum",
     "openapi:gen:user": "openapi-generator-cli generate -i openapi/user-api-data.yaml -g typescript-angular -o src/app/api/user-service --additional-properties=providedInRoot=true,withInterfaces=true,ngVersion=20.0.0,enumNameSuffix=Enum",
+    "openapi:gen:profiler": "openapi-generator-cli generate -i openapi/profiler-api-data.yaml -g typescript-angular -o src/app/api/profiler-service --additional-properties=providedInRoot=true,withInterfaces=true,ngVersion=20.0.0,enumNameSuffix=Enum",
     "openapi:gen:bank": "openapi-generator-cli generate -i openapi/bank-api-data.yaml -g typescript-angular -o src/app/api/bank-service --additional-properties=providedInRoot=true,withInterfaces=true,ngVersion=20.0.0,enumNameSuffix=Enum",
-    "openapi:gen:all": "npm run openapi:gen:customer && npm run openapi:gen:document && npm run openapi:gen:user && npm run openapi:gen:bank"
+    "openapi:gen:all": "npm run openapi:gen:customer && npm run openapi:gen:document && npm run openapi:gen:user && npm run openapi:gen:profiler && npm run openapi:gen:bank"
   },
   "prettier": {
     "printWidth": 100,

@@ -9,6 +9,7 @@ import {provideApi as provideUserApi} from './api/user-service';
 import {provideApi as provideCustomerApi} from './api/customer-service';
 import {provideApi as provideDocumentApi} from './api/document-service';
 import {provideApi as provideBankApi} from './api/bank-service';
+import {provideApi as provideProfilerApi} from './api/profiler-service';
 // interceptor which adds auth token to requests
 import {authInterceptor} from './core/interceptors/auth.interceptor';
 // counts foreground requests for the global loading bar
@@ -43,6 +44,7 @@ export const appConfig: ApplicationConfig = {
     provideUserApi('/user-service'),
     provideCustomerApi('/customer-service'),
     provideDocumentApi('/document-service'),
-    provideBankApi('/bank-service')
+    provideBankApi('/bank-service'),
+    provideProfilerApi('/profiler-service')
   ]
 };
