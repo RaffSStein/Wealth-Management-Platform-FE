@@ -6,6 +6,10 @@
       "env": {
         "NG_DISABLE_VERSION_CHECK": "true"
       }
+    },
+    "primeng": {
+      "command": "npx",
+      "args": ["-y", "@primeng/mcp@21.1.10"]
     }
   }
 }

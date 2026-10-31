@@ -1,13 +1,16 @@
 # CLAUDE.md
 
-Context for Claude Code when working in this repository. Longer-form references: `README.md`,
-`.github/copilot-instructions.md` (coding conventions, auth/login patterns), `openapi/README.md`, `docs/`.
-Keep this file current: when we learn something non-obvious about the repo, the BE or a decision we made, add it here.
+Context for Claude Code when working in this repository. Longer-form references:
+`.github/copilot-instructions.md` (coding conventions, auth/login patterns), `openapi/README.md`, `docs/` (`README.md`
+is still the Angular CLI boilerplate). Keep this file current: when we learn something non-obvious about the repo, the
+BE or a decision we made, add it here. Facts tied to a BE change carry its date or commit.
 
 ## Project
 
 Front end of **WMP** (Wealth Management Platform; working name, no final brand yet). Used by two main roles:
 **customer** and **advisor** (BE also has `ADMIN`). Work in progress; also meant as a personal portfolio piece.
+Built so far: foundation, app shell, auth + onboarding, home dashboard. The remaining sections (investments, markets,
+orders, advisor tools) wait on BE services that don't exist yet.
 
 - Angular 21: standalone components, signals, `inject()`, lazy `loadComponent` routes, SSR (`@angular/ssr` + Express).
   Zone-based change detection is kept explicitly (`provideZoneChangeDetection`, added by the v21 migration).
@@ -17,7 +20,9 @@ Front end of **WMP** (Wealth Management Platform; working name, no final brand y
 - **No deprecated APIs** (user requirement): check `@deprecated` in typings before using a library API. E.g. no
   `@angular/animations`/`provideAnimationsAsync`, no `label`/`icon` inputs on the `pButton` directive (use `p-button`
   or `pButtonLabel`), `class` instead of `styleClass`, no PrimeNG `*TransitionOptions` (use `motionOptions`).
-- Don't upgrade to PrimeNG 22+: it moved to the commercial PrimeUI license.
+- Don't upgrade to PrimeNG 22+: it moved to the commercial PrimeUI license. (Angular went 20 → 21 for PrimeNG 21,
+  because PrimeNG 20 needs the deprecated `@angular/animations`.)
+- Initial bundle budget is 700 kB warning / 1.2 MB error: the PrimeNG theme engine and preset load at startup.
 
 ## Commands
 
@@ -36,6 +41,23 @@ npm run openapi:gen:all   # regenerate API clients from openapi/*.yaml
 - No Chrome on this machine: run tests headless with Edge via
   `CHROME_BIN="C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe" npx ng test --watch=false --browsers=ChromeHeadless`.
 
+## Skills and MCP
+
+Project skills live in `.claude/skills/` (committed); MCP servers in `.mcp.json`. Use them instead of memory for
+library APIs, since our versions (Angular 21, PrimeNG 21) lag the current docs (v22).
+
+| When | Use | Notes |
+|---|---|---|
+| Any Angular code: components, signals, DI, routing, SSR, forms, tests | `angular-developer` skill + `angular-cli` MCP (`get_best_practices`, `search_documentation`) | Official skill, written for v22. **Overrides for WMP:** keep reactive forms (no Signal Forms), keep Karma + Jasmine (no Vitest), keep zone-based change detection, inline templates/styles. Don't run `ng new`/`ng update` from its guidance. |
+| PrimeNG components, tokens, pass-through, preset | `primeng` skill + `primeng` MCP (pinned `@primeng/mcp@21.1.10`) | Our own skill (the official PrimeUI plugin pins the v22 MCP). Never use v22 docs or bump the pin past 21.x. |
+| Value charts | `lightweight-charts` skill (TradingView, official) | Resolves APIs from `node_modules` typings, so it follows v5. |
+| Chart colours, KPI tiles, dashboard layout | `dataviz` skill (user-level) | Palette checker for `--wmp-chart-1..4`. |
+| Mockups, the design canvas | `wmp-mockup` skill | Canvas location, Ledger Pro rules, CHANGELOG entries. |
+| Return figures (TWR, MWR, CAGR, annualising, linking periods) | `return-calculations` skill | From joellewis/finance_skills (MIT): math only. Platform concepts come from the BE and the canvas, not from it. |
+
+- Vendored skills carry a `SOURCE.md` (repo, commit, license). Update by re-copying from upstream, never edit them in
+  place; put WMP-specific rules here or in our own skills.
+
 ## Repository layout
 
 ```
@@ -44,8 +66,11 @@ src/app/core/               services (auth, user-session, onboarding state), gua
 src/app/layout/             AppShell (header + side nav + drawer), navigation.ts (nav model), acting-as banner
 src/app/pages/              one folder per route area (auth, login, onboarding, home, investments, markets, advisor...)
 src/app/shared/             reusable components (notification-bell, page-placeholder, stepper, password-strength, ...)
-src/styles/                 global SCSS partials: _variables (tokens), _base, _forms, _icons, _surfaces
+src/styles/                 global SCSS partials: _tokens (--wmp-*), _ui (form/layout utilities), _base, _forms,
+                            _icons, _surfaces, _variables (legacy aliases)
+src/app/theme/              ledger.preset.ts (PrimeNG preset)
 docs/                       functional docs (process + diagrams), mirrored from the BE repo style
+.claude/skills/             project skills (see "Skills and MCP")
 ```
 
 - Routes: public `/`, `/auth/*`, `/terms`, `/onboarding/start` (sign-up) and `/onboarding/setup-password` (one-time
@@ -89,19 +114,18 @@ docs/                       functional docs (process + diagrams), mirrored from 
 - Public routes `/onboarding/start` and `/onboarding/setup-password` are top-level (no shell). `/auth/set-password` is
   client-rendered and redirects with a function that keeps `?token` (a prerendered redirect drops query params, and a
   relative `redirectTo` is resolved against `/auth/` on the SSR server).
-- MiFID flow (agreed with the BE, 2026-10-28): POST `/mifid/save` creates the filling. Status is **server-derived**
-  (COMPLETED once every question is answered); never send it. PATCH `/mifid/filling/{id}` edits a DRAFT (send response
-  `id`s to update rather than add). POST `/mifid/submit` only when COMPLETED (else 409 INVALID_STATE_TRANSITION).
+- MiFID flow (agreed with the BE, 2026-10-28): POST `/mifid/save` always creates a new filling. Status is
+  **server-derived** (COMPLETED once every question is answered); never send it. PATCH `/mifid/filling/{id}` edits a
+  DRAFT **or** COMPLETED filling (status recalculated each time; send response `id`s to update rather than add);
+  SUBMITTED/DEPRECATED give 409. A PATCH can't clear an answer (answer_option_id NOT NULL), so always send an
+  answerOption per response. POST `/mifid/submit` only when COMPLETED (else 409 INVALID_STATE_TRANSITION).
+  `GET /mifid/{fillingId}` returns exactly that filling. Question rendering is shared: `shared/components/mifid-section`.
 - Onboarded customers see their MiFID read-only at `/app/investor-profile` (`GET /customer/{id}/mifid/current`, the
   latest SUBMITTED filling; 404 = none), never the onboarding step. A MiFID update (`/app/investor-profile/update`)
   is a **new filling** that supersedes the old one (ESMA suitability guidelines: keep client info current and
   recorded), never an in-place edit. It is pre-filled client-side from the submitted answers that still fit the
   current questionnaire (`prefillAnswers`, no response ids), so the first save POSTs a new filling. The BE (2026-10-30)
   deprecates the previous SUBMITTED filling on submit and skips the onboarding step and AML event for ACTIVE customers.
-- MiFID storage: POST `/mifid/save` always creates a new filling; PATCH works on DRAFT **and** COMPLETED (status
-  recalculated each time); SUBMITTED/DEPRECATED give 409. A PATCH can't clear an answer (answer_option_id NOT NULL),
-  so always send an answerOption per response. `GET /mifid/{fillingId}` returns exactly that filling.
-  Question rendering is shared: `shared/components/mifid-section`.
 - `exitOnboarding()` sends an ACTIVE customer's steps (opened from the dashboard) back to `/app/home` and keeps the
   client selected; only customers still onboarding leave the client (advisor) or go to the profile list (customer).
 - BE fixes pending a customer-service restart: Gender `NOT_SPECIFIED` accepted again; goal `targetDate` nullable;
@@ -131,11 +155,12 @@ docs/                       functional docs (process + diagrams), mirrored from 
   (BE notification-service is an empty skeleton): `VerificationWatcherService` polls GET /customer/{id} in the
   background (1.5 s, then 5 s after 20 s, then 30 s after 2 min; gives up after 30 min) for as long as the app is open,
   resumes for a selected PENDING_VERIFICATION customer, and reports the outcome as toast + notification. The risk
-  step reads its state from it; a REJECTED onboarding can't be finished (Exit instead). `riskProfile.profile` is the configured **label**, so match bands with `findBand` / `profileDisplay`
-  (code or label). `onboarding/active` returns ordered steps (DONE/REJECTED).
+  step reads its state from it; a REJECTED onboarding can't be finished (Exit instead).
+- `riskProfile.profile` is the configured **label**, so match bands with `findBand` / `profileDisplay` (code or label).
+  `onboarding/active` returns ordered steps (DONE/REJECTED).
 - Unbuilt sections (investments, markets, account sub-pages, advisor clients/reviews/proposals/orders) use the shared
   work-in-progress page (`wip()` in app.routes.ts). **No sample data there.** Their concepts and data/API needs live
-  in the design canvas row "Future sections": https://claude.ai/artifact/RAG8XaL8fkESVMKvt1F2AA
+  in the design canvas row "Future sections" (`F-*.dc.html` artboards; see the `wmp-mockup` skill).
 
 ### Roles, workspace and shell
 - Roles: `UserSessionService.roles()` / `isAdvisor()` come from `/me` → `userBranchRoles[].role` (BE `WmpRole`:
@@ -147,8 +172,7 @@ docs/                       functional docs (process + diagrams), mirrored from 
   a token without a membership falls back to every branch role. Another bank's resources answer 404, like missing ones.
 - Branch switcher: header chip + account menu (`BranchSwitchService`): `POST /auth/switch-branch` returns a new token
   and revokes the old one. Replace it (never keep a copy), drop the selected customer and do a full reload of the
-  workspace home, since everything loaded belongs to the previous bank. Revocation is per service instance on the BE,
-  so never rely on a 401 to detect a revoked token. The onboarding password-setup token (`purpose=PASSWORD_SETUP`)
+  workspace home, since everything loaded belongs to the previous bank. The onboarding password-setup token (`purpose=PASSWORD_SETUP`)
   works only on `POST /auth/password/setup`: send it via `ONE_TIME_AUTH_TOKEN`, never store it as the session token.
   Setup answers: 202 done; 401 = link used/expired/malformed (expired ones have an empty body, so key on the status);
   400 REQUEST_VALIDATION_ERROR = password policy (`errorMessage` lists the rules; the link is not consumed, retry on
@@ -192,8 +216,9 @@ docs/                       functional docs (process + diagrams), mirrored from 
 
 ## UI / visual identity
 
-Chosen direction: **"Ledger Pro"** (dark-first, data-dense). Mockups: https://claude.ai/artifact/RAG8XaL8fkESVMKvt1F2AA
-(row C). Palette may be refined later.
+Chosen direction: **"Ledger Pro"** (dark-first, data-dense). Design canvas: https://claude.ai/artifact/RAG8XaL8fkESVMKvt1F2AA
+(Design canvas artifact type, slug `c3a65888-1e1a-430f-8bd6-fa68b52efc87`; how to read and change it: `wmp-mockup`
+skill). Palette may be refined later. Dark values below; light values live in `_tokens.scss`.
 
 | Token | Value | Use |
 |---|---|---|
@@ -218,21 +243,12 @@ Chosen direction: **"Ledger Pro"** (dark-first, data-dense). Mockups: https://cl
   Global element rules (`_forms.scss` `button {}`, `input {}`) live in `wmp-legacy`, so they never override PrimeNG.
   Component styles are unlayered and can still customise PrimeNG.
 - Dark is the default: `index.html` ships `<html class="wmp-dark">`, and an inline script removes it before paint when
-  `localStorage['wmp.theme'] === 'light'`. `ThemeService` (`core/services/theme.service.ts`) toggles and persists it.
-  The toggle UI comes in Phase 1 (shell header). Later, sync with user-service `UserSettingsDTO.theme`.
+  `localStorage['wmp.theme'] === 'light'`. `ThemeService` (`core/services/theme.service.ts`) toggles and persists it;
+  the toggle is in the shell header. Not yet synced with user-service `UserSettingsDTO.theme`.
 - `/dev/ui-kit` (`pages/dev/ui-kit.component.ts`): living style guide of tokens + PrimeNG components in both themes.
 - **PrimeNG 21 + SSR bug:** `<p-motion>` (used by Stepper/Accordion panels) keeps the server-rendered `display: none`
   after hydration, so initially-expanded panels stay hidden. All app/onboarding/dev routes are client-rendered, so this
   only matters if a prerendered public page ever uses such a panel.
-
-## Decisions log
-
-- 2026-10-28 — Visual identity C "Ledger Pro" chosen; product name **WMP** for now.
-- 2026-10-28 — UI library: **PrimeNG 21** (styled mode, custom design-token preset for Ledger Pro, dark default).
-  Angular upgraded 20 → 21 for it (PrimeNG 20 needs the deprecated `@angular/animations`; 22 is commercially licensed).
-- 2026-10-28 — Initial bundle budget raised to 700 kB warning / 1.2 MB error (PrimeNG theme engine + preset load at startup).
-- Redesign is phased: 0 foundation (library, tokens, fonts, brand) → 1 app shell (role-aware nav) →
-  2 auth + onboarding → 3 dashboard → 4 remaining pages.
 
 ## Conventions
 
