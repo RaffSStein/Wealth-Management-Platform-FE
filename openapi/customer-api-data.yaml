@@ -11,10 +11,14 @@ paths:
     post:
       summary: Initialize a new customer onboarding
       description: >-
-        Receives the personal data of a customer to start the onboarding process. A CUSTOMER creates its own record:
-        userId comes from the token and may be left out, and the bank allows one record per customer. An ADVISOR must
-        send userId. Admin roles can't create customers. The record always starts as DRAFT, and only the onboarding
-        steps change its status.
+        Receives the personal data of a customer to start the onboarding process. The record belongs to the bank and
+        branch of the token. A CUSTOMER creates its own record: userId comes from the token and may be left out, and
+        the bank allows one record per customer. An ADVISOR must send the client's email, firstName, lastName and
+        phoneNumber: userId is ignored, and the record starts with no user. The client's login is created from them if
+        it doesn't exist, with a password setup email,
+        and the record is linked asynchronously once the client holds the CUSTOMER role in that branch. Revoking the
+        role removes the link. Admin roles can't create customers. The record always starts as DRAFT, and only the
+        onboarding steps change its status.
       operationId: initCustomer
       requestBody:
         required: true
@@ -30,13 +34,95 @@ paths:
               schema:
                 $ref: '#/components/schemas/CustomerDTO'
         '400':
-          description: Invalid input data
+          description: Invalid input data, or an ADVISOR without email, firstName, lastName or phoneNumber
         '403':
-          description: The caller is an admin, or a CUSTOMER sending another user's userId
+          description: The caller is an admin, a CUSTOMER sending another user's userId, or an ADVISOR using its own email
         '409':
-          description: A CUSTOMER already has a customer record in this bank
+          description: >-
+            CUSTOMER_ALREADY_EXISTS: the bank already has a record for this user or email, also in another branch
         '500':
           description: Internal server error
+      tags:
+        - Customer
+
+  /customer:
+    get:
+      summary: List the customers the caller can reach
+      description: >-
+        Paged list of customer rows. An ADVISOR gets the customers of the bank and branch of its token, a BANK_ADMIN
+        those of its bank, a PLATFORM_ADMIN those of every bank. A CUSTOMER gets 403. DELETED records are never
+        returned. Filters are combined with logical AND.
+      operationId: getCustomers
+      parameters:
+        - name: page
+          in: query
+          required: false
+          description: Zero-based page number.
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: size
+          in: query
+          required: false
+          description: Page size. Default 10; a value over 100 is capped at 100.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+        - name: sort
+          in: query
+          required: false
+          description: >-
+            Sorting criteria: property,asc|desc (e.g. lastName,asc). Repeat for several criteria. An unknown property
+            answers 400. Default: by name.
+          schema:
+            type: string
+          example: "lastName,asc"
+        - name: query
+          in: query
+          required: false
+          description: Case-insensitive contains on name, company name and tax ID.
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          description: "Statuses to include. Repeat for several. Default: all except DELETED."
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/CustomerStatus'
+      responses:
+        '200':
+          description: One page of customers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageCustomerSummaryDTO'
+        '400':
+          description: Invalid page, size, sort or status
+        '403':
+          description: The caller is a CUSTOMER, or an ADVISOR whose token has no branch
+      tags:
+        - Customer
+
+  /customer/advisor-dashboard-statistics:
+    get:
+      summary: Count the customers of the advisor's active branch
+      description: >-
+        ADVISOR only: other roles answer 403. DELETED records are excluded; total also includes REJECTED and CLOSED ones.
+      operationId: getAdvisorDashboardStatistics
+      responses:
+        '200':
+          description: The counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdvisorDashboardStatisticsDTO'
+        '403':
+          description: The caller isn't an ADVISOR, or its token has no branch
       tags:
         - Customer
 
@@ -45,7 +131,8 @@ paths:
       summary: Get customer by ID
       description: >-
         Returns the customer details for the specified customerId. A CUSTOMER only reaches its own record, an ADVISOR
-        or BANK_ADMIN any customer in its bank, a PLATFORM_ADMIN any customer in every bank.
+        any customer in the bank and branch of its token, a BANK_ADMIN any customer in its bank, a PLATFORM_ADMIN any
+        customer in every bank. Out of scope answers 404.
       operationId: getCustomerById
       parameters:
         - name: customerId
@@ -71,7 +158,8 @@ paths:
       summary: Get a list of customers for this userId
       description: >-
         Returns the customer list associated with the specified userId, an empty list when there are none. A CUSTOMER
-        may only ask for its own userId. The other roles ask for any user, within the customers they can read.
+        may only ask for its own userId. The other roles ask for any user, within the customers they can read: for an
+        ADVISOR, the bank and branch of its token.
       operationId: getCustomersByUserId
       parameters:
         - name: userId
@@ -516,8 +604,18 @@ components:
           type: string
           format: uuid
           description: >-
-            Unique identifier for the user associated with the customer. On init a CUSTOMER may leave it out (the token
-            decides); an ADVISOR must send it.
+            The client's login, null until the record is linked. On init a CUSTOMER may leave it out (the token
+            decides) and an ADVISOR's value is ignored.
+        email:
+          type: string
+          format: email
+          description: >-
+            The client's email, which links the record to a login. Required on an ADVISOR's init; a CUSTOMER's comes
+            from its token. Can't be changed after init.
+        branchCode:
+          type: string
+          readOnly: true
+          description: The branch the customer belongs to, set from the token on init. Ignored on input.
         customerType:
           $ref: '#/components/schemas/CustomerType'
         firstName:
@@ -568,6 +666,95 @@ components:
             $ref: '#/components/schemas/CustomerGoalDTO'
         riskProfile:
           $ref: '#/components/schemas/CustomerRiskProfileDTO'
+
+    CustomerSummaryDTO:
+      type: object
+      description: A list row, not the full record. GET /customer/{customerId} returns the full record.
+      properties:
+        id:
+          type: string
+          format: uuid
+        firstName:
+          type: string
+        lastName:
+          type: string
+        companyName:
+          type: string
+        taxId:
+          type: string
+        customerType:
+          $ref: '#/components/schemas/CustomerType'
+        customerStatus:
+          $ref: '#/components/schemas/CustomerStatus'
+        riskProfile:
+          $ref: '#/components/schemas/CustomerRiskProfileDTO'
+
+    PageCustomerSummaryDTO:
+      type: object
+      description: Paged result wrapper for CustomerSummaryDTO.
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          properties:
+            content:
+              type: array
+              items:
+                $ref: '#/components/schemas/CustomerSummaryDTO'
+
+    Page:
+      description: >-
+        Page metadata. A page serializes as {content: [...], page: {size, number, totalElements, totalPages}}
+        (Spring Data PagedModel).
+      type: object
+      properties:
+        page:
+          $ref: '#/components/schemas/PageMetadata'
+
+    PageMetadata:
+      type: object
+      properties:
+        size:
+          type: integer
+        number:
+          type: integer
+          description: Zero-based page number
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+
+    AdvisorDashboardStatisticsDTO:
+      type: object
+      description: The counts behind the advisor home, over the customers of the advisor's active branch.
+      properties:
+        total:
+          type: integer
+          format: int64
+        active:
+          type: integer
+          format: int64
+        onboarding:
+          type: integer
+          format: int64
+          description: Customers in DRAFT
+        pendingVerification:
+          type: integer
+          format: int64
+        riskProfiles:
+          type: array
+          description: Customers per risk profile, as stored. Customers with no profile aren't listed.
+          items:
+            $ref: '#/components/schemas/CustomerRiskProfileCountDTO'
+
+    CustomerRiskProfileCountDTO:
+      type: object
+      properties:
+        profile:
+          type: string
+        count:
+          type: integer
+          format: int64
 
     CustomerType:
       type: string
@@ -620,7 +807,6 @@ components:
       required:
           - financialType
           - amount
-          - date
       properties:
         id:
           type: integer

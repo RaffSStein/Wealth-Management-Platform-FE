@@ -1,4 +1,4 @@
-import {CustomerDTO, CustomerFinancialDTO, CustomerGoalDTO} from '../../api/customer-service';
+import {AdvisorDashboardStatisticsDTO, CustomerFinancialDTO, CustomerGoalDTO} from '../../api/customer-service';
 
 export interface AdvisorStats {
   total: number;
@@ -9,17 +9,19 @@ export interface AdvisorStats {
   byProfile: Record<string, number>;
 }
 
-/** Aggregates the advisor's client list (CustomerDTOs from the disambiguation endpoint). */
-export function advisorStats(customers: CustomerDTO[]): AdvisorStats {
-  const stats: AdvisorStats = {total: customers.length, active: 0, onboarding: 0, pendingVerification: 0, byProfile: {}};
-  for (const c of customers) {
-    if (c.customerStatus === 'ACTIVE') stats.active++;
-    else if (c.customerStatus === 'DRAFT') stats.onboarding++;
-    else if (c.customerStatus === 'PENDING_VERIFICATION') stats.pendingVerification++;
-    const profile = c.riskProfile?.profile;
-    if (profile && profile.toUpperCase() !== 'UNDEFINED') stats.byProfile[profile] = (stats.byProfile[profile] ?? 0) + 1;
+/** The advisor's counts from the BE. UNDEFINED is stored when no band matched a MiFID score: it counts as no profile. */
+export function advisorStats(dto?: AdvisorDashboardStatisticsDTO | null): AdvisorStats {
+  const byProfile: Record<string, number> = {};
+  for (const {profile, count} of dto?.riskProfiles ?? []) {
+    if (profile && profile.toUpperCase() !== 'UNDEFINED') byProfile[profile] = (byProfile[profile] ?? 0) + (count ?? 0);
   }
-  return stats;
+  return {
+    total: dto?.total ?? 0,
+    active: dto?.active ?? 0,
+    onboarding: dto?.onboarding ?? 0,
+    pendingVerification: dto?.pendingVerification ?? 0,
+    byProfile
+  };
 }
 
 const TIMELINE_YEARS: Record<string, string> = {SHORT_TERM: '< 3 years', MEDIUM_TERM: '3–10 years', LONG_TERM: '> 10 years'};

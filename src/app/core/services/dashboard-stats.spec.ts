@@ -3,14 +3,25 @@ import { MockPortfolioDataService, seededRandom } from './mock-portfolio-data.se
 import { firstValueFrom } from 'rxjs';
 
 describe('dashboard stats', () => {
-  it('aggregates the advisor client list', () => {
-    const stats = advisorStats([
-      { customerStatus: 'ACTIVE', riskProfile: { profile: 'BALANCED', score: 100 } },
-      { customerStatus: 'ACTIVE', riskProfile: { profile: 'BALANCED', score: 104 } },
-      { customerStatus: 'DRAFT' },
-      { customerStatus: 'PENDING_VERIFICATION', riskProfile: { profile: 'UNDEFINED' } }
-    ] as any);
+  it('reads the advisor statistics, with UNDEFINED as no profile', () => {
+    const stats = advisorStats({
+      total: 4, active: 2, onboarding: 1, pendingVerification: 1,
+      riskProfiles: [{ profile: 'BALANCED', count: 2 }, { profile: 'UNDEFINED', count: 1 }]
+    });
     expect(stats).toEqual({ total: 4, active: 2, onboarding: 1, pendingVerification: 1, byProfile: { BALANCED: 2 } });
+  });
+
+  it('shows zeros when the statistics are empty', () => {
+    expect(advisorStats(null)).toEqual({ total: 0, active: 0, onboarding: 0, pendingVerification: 0, byProfile: {} });
+  });
+
+  it('values a client book deterministically, by its size', async () => {
+    const mock = new MockPortfolioDataService();
+    const three = await firstValueFrom(mock.getBookTotal(3));
+    expect(three).toBeGreaterThan(0);
+    expect(await firstValueFrom(mock.getBookTotal(3))).toBe(three);
+    expect(await firstValueFrom(mock.getBookTotal(4))).toBeGreaterThan(three);
+    expect(await firstValueFrom(mock.getBookTotal(0))).toBe(0);
   });
 
   it('describes a goal horizon from its date, else its timeline', () => {

@@ -236,14 +236,26 @@ docs/                       functional docs (process + diagrams), mirrored from 
   A customer user never sees a list: `ownCustomerGuard` (on `/app` and `/onboarding`, `OwnCustomerService`) sets their own
   record from `GET /customer/disambiguation/{own id}`, and `/app/home` shows the dashboard only for an ACTIVE customer,
   otherwise a next-step card (`homeNoticeFor`: start, continue, verifying, rejected), never sample data.
-- Customer data access (BE f51bc18, 2026-11-01, `CustomerAccessPolicy`; step 1, the active role in the token decides):
-  CUSTOMER reads and writes only its own record (else 404); `disambiguation/{own id}` gives 200 (`[]` if none), another
-  id 404; init takes `userId` from the token, a different one gives 403, a second record in the bank 409 (FE: continue
-  from the existing one). ADVISOR: any customer in its bank, read and write, and must send `userId` on init. BANK_ADMIN
-  reads its bank, PLATFORM_ADMIN every bank; writes and init give 403. Config endpoints are open to any token.
-- **Step 2, not built (agree the contract with the BE first):** `customers.user_id` becomes the client (today it stores
-  the advisor for clients an advisor onboarded, so that person can't see them), advisors get scoped by a new
-  `branch_code`, plus a paged client list and linking a client to a login. Until then keep sending `userId` as today.
+- Customer data access (BE, 2026-11-01; the active role in the token decides): CUSTOMER reads and writes only its own
+  record (else 404); `disambiguation/{own id}` gives 200 (`[]` if none), another id 404; init takes `userId` and email
+  from the token. It answers 200 with an existing record when an unlinked one in its branch has its email (the record's
+  data wins), and 409 `CUSTOMER_ALREADY_EXISTS` on a real conflict (FE: continue from the existing one). ADVISOR: only
+  customers of the bank and active branch of its token, read and write, else a plain 404. BANK_ADMIN reads its bank,
+  PLATFORM_ADMIN every bank; writes and init give 403.
+- `customers.user_id` is the client's login, null until linked. An advisor's init sends no `userId`, and requires
+  `email`, `firstName`, `lastName`, `phoneNumber` (403 for its own email, 409 `CUSTOMER_ALREADY_EXISTS` if the bank has
+  that email, also in another branch: inline message, no resume). Linking is **automatic through events**, with no UI
+  and never waited for: a new person gets the password-setup email at init (72 hours, `/onboarding/setup-password`), and
+  the link appears once they hold the CUSTOMER role; revoking the role removes the link. Keep working by customer id.
+- Personal details, advisor with a new client: email + confirm, then `GET /user/lookup?email=`. The result shows before
+  the save (the first save only runs the check). 404 can't tell "no account" from "account outside the branch", which
+  gets no email, so its wording never promises one.
+- Advisor lists: `GET /customer` (`CustomerPage`, `page`, `size` capped at 100, `sort`, `query`, repeatable `status`, no
+  DELETED) and counts from `GET /customer/advisor-dashboard-statistics` (ADVISOR only; `total` includes REJECTED and
+  CLOSED; `riskProfiles` can hold `UNDEFINED`, which we show as no profile). The sample AUM is `getBookTotal(count)`.
+- A selected client answering 404 (`clientAccessInterceptor`, only on the record and its saves, never `/mifid/current`
+  or `/mifid/{id}`): toast, selection cleared, back to `/app/advisor`. Customer-service enforces the spec at runtime
+  (`required`, `maxLength`, enums: 400 `REQUEST_VALIDATION_ERROR`). Its errors carry `errorCode` and `errorMessage`.
 - Login routing: admins go to `returnUrl` (only under `/app/admin`) or `/app/admin`; advisors to `returnUrl` or
   `/app/advisor`. Customers go to `returnUrl` or `/app/home`.
 - Navigation model: `layout/navigation.ts` (`navigationFor({isAdvisor, isAdmin, actingAsClient, can})`,

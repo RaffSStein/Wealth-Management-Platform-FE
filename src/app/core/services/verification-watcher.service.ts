@@ -1,6 +1,6 @@
 import { Injectable, NgZone, PLATFORM_ID, effect, inject, signal, untracked } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
-import { HttpContext } from '@angular/common/http';
+import { HttpContext, HttpErrorResponse } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { CustomerDTO, CustomerService } from '../../api/customer-service';
@@ -95,7 +95,12 @@ export class VerificationWatcherService {
         let customer: CustomerDTO | null = null;
         try {
           customer = await firstValueFrom(this.customerApi.getCustomerById(customerId, 'body', false, {context}));
-        } catch {
+        } catch (e) {
+          // 404: the customer is gone or out of this branch, so there is nothing left to follow
+          if (e instanceof HttpErrorResponse && e.status === 404) {
+            this.setState(customerId, null);
+            return;
+          }
           // transient error: keep checking
         }
         const status = customer?.customerStatus;

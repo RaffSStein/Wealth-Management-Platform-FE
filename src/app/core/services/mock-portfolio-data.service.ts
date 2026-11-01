@@ -66,6 +66,13 @@ export class MockPortfolioDataService implements PortfolioDataSource {
     });
   }
 
+  /** The list is paged, so no client ids here: a sample value per client, stable for a given number of clients. */
+  getBookTotal(clientCount: number): Observable<number> {
+    let total = 0;
+    for (let i = 0; i < clientCount; i++) total += this.positions(`book:${i}`).reduce((s, p) => s + p.value, 0) + this.cash(`book:${i}`);
+    return of(total);
+  }
+
   /** Random walk ending at today's total value. */
   getValueHistory(customerId: string, range: ValueRange): Observable<ValuePoint[]> {
     const rnd = seededRandom(customerId + ':history');

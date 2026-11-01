@@ -5,10 +5,10 @@ import {firstValueFrom} from 'rxjs';
 import {Button, ButtonDirective, ButtonLabel} from 'primeng/button';
 import {Message} from 'primeng/message';
 import {Skeleton} from 'primeng/skeleton';
-import {TableModule} from 'primeng/table';
+import {TableLazyLoadEvent, TableModule} from 'primeng/table';
 import {Tag} from 'primeng/tag';
-import {CustomerDTO, MifidQuestionnaireConfigDTO, MifidService} from '../../api/customer-service';
-import {CustomerDisambiguationService} from '../../core/services/customer-disambiguation.service';
+import {AdvisorDashboardStatisticsDTO, CustomerService, CustomerSummaryDTO, MifidQuestionnaireConfigDTO, MifidService} from '../../api/customer-service';
+import {CustomerPage} from '../../core/services/customer-page';
 import {CustomerSelectionService} from '../../core/services/customer-selection.service';
 import {UserSessionService} from '../../core/services/user-session.service';
 import {profileDisplay, riskBands} from '../../core/services/mifid-questionnaire.service';
@@ -25,8 +25,8 @@ interface ProfileBar {
 }
 
 /**
- * Advisor workspace overview (/app/advisor). Client figures are real (the advisor's customer list);
- * AUM is summed from the sample portfolio source until portfolio services exist.
+ * Advisor workspace overview (/app/advisor). Client figures are real (the customers of the advisor's active branch);
+ * AUM comes from the sample portfolio source until portfolio services exist.
  */
 @Component({
   selector: 'app-advisor-home',
@@ -75,9 +75,11 @@ interface ProfileBar {
 
           <section class="card card--wide">
             <header class="card__head"><h2>Onboarding in progress</h2></header>
-            @if (drafts().length) {
+            @if (drafts.rows().length) {
               <div class="table-wrap">
-                <p-table [value]="drafts()" [rows]="5" [paginator]="drafts().length > 5" [tableStyle]="{'min-width': '28rem'}">
+                <p-table [value]="drafts.rows()" [lazy]="true" (onLazyLoad)="page(drafts, $event)" [rows]="drafts.size"
+                         [totalRecords]="drafts.total()" [first]="drafts.first()" [loading]="drafts.loading()"
+                         [paginator]="drafts.total() > drafts.size" [tableStyle]="{'min-width': '28rem'}">
                   <ng-template #header><tr><th>Client</th><th>Tax ID</th><th><span class="wmp-sr-only">Actions</span></th></tr></ng-template>
                   <ng-template #body let-c>
                     <tr>
@@ -98,7 +100,9 @@ interface ProfileBar {
         <section class="card">
           <header class="card__head"><h2>Clients</h2><a routerLink="/onboarding/disambiguation" class="link">All clients →</a></header>
           <div class="table-wrap">
-            <p-table [value]="active()" [rows]="8" [paginator]="active().length > 8" [tableStyle]="{'min-width': '36rem'}">
+            <p-table [value]="clients.rows()" [lazy]="true" (onLazyLoad)="page(clients, $event)" [rows]="clients.size"
+                     [totalRecords]="clients.total()" [first]="clients.first()" [loading]="clients.loading()"
+                     [paginator]="clients.total() > clients.size" [tableStyle]="{'min-width': '36rem'}">
               <ng-template #header><tr><th>Client</th><th>Tax ID</th><th>Profile</th><th>Status</th><th><span class="wmp-sr-only">Actions</span></th></tr></ng-template>
               <ng-template #body let-c>
                 <tr>
@@ -150,7 +154,7 @@ interface ProfileBar {
 })
 export class AdvisorHomeComponent {
   private readonly userSession = inject(UserSessionService);
-  private readonly disamb = inject(CustomerDisambiguationService);
+  private readonly customerApi = inject(CustomerService);
   private readonly selection = inject(CustomerSelectionService);
   private readonly mifidApi = inject(MifidService);
   private readonly data = inject(PORTFOLIO_DATA);
@@ -159,7 +163,9 @@ export class AdvisorHomeComponent {
   protected readonly loading = signal(true);
   protected readonly error = signal(false);
   protected readonly openingId = signal<string | null>(null);
-  private readonly customers = signal<CustomerDTO[]>([]);
+  protected readonly drafts = new CustomerPage(this.customerApi, 5, ['DRAFT']);
+  protected readonly clients = new CustomerPage(this.customerApi, 8, ['PENDING_VERIFICATION', 'ACTIVE', 'REJECTED', 'CLOSED']);
+  private readonly statistics = signal<AdvisorDashboardStatisticsDTO | null>(null);
   private readonly config = signal<MifidQuestionnaireConfigDTO | null>(null);
   protected readonly aum = signal(0);
 
@@ -167,9 +173,7 @@ export class AdvisorHomeComponent {
     const first = this.userSession.profile()?.firstName;
     return first ? `Hello, ${first}` : 'Hello';
   });
-  protected readonly stats = computed(() => advisorStats(this.customers()));
-  protected readonly drafts = computed(() => this.customers().filter(c => c.customerStatus === 'DRAFT'));
-  protected readonly active = computed(() => this.customers().filter(c => c.customerStatus !== 'DRAFT'));
+  protected readonly stats = computed(() => advisorStats(this.statistics()));
   protected readonly profiledCount = computed(() => Object.values(this.stats().byProfile).reduce((s, n) => s + n, 0));
 
   /** One bar per configured band (in score order), plus any profile code outside the config. */
@@ -189,13 +193,16 @@ export class AdvisorHomeComponent {
   }
 
   private async load(): Promise<void> {
-    const userId = this.userSession.profile()?.id;
     try {
-      if (!userId) throw new Error('no user');
-      const list = (await firstValueFrom(this.disamb.listByUser(userId))) as unknown as CustomerDTO[];
-      this.customers.set(list ?? []);
-      const totals = await Promise.all(this.active().map(c => firstValueFrom(this.data.getSummary(c.id ?? ''))));
-      this.aum.set(totals.reduce((s, t) => s + t.total, 0));
+      const [statistics] = await Promise.all([
+        firstValueFrom(this.customerApi.getAdvisorDashboardStatistics()),
+        this.drafts.load(),
+        this.clients.load()
+      ]);
+      if (this.drafts.failed() || this.clients.failed()) throw new Error('client list not loaded');
+      this.statistics.set(statistics);
+      const stats = this.stats();
+      this.aum.set(await firstValueFrom(this.data.getBookTotal(stats.total - stats.onboarding)));
     } catch {
       this.error.set(true);
     } finally {
@@ -208,7 +215,12 @@ export class AdvisorHomeComponent {
     }
   }
 
-  protected name(c: CustomerDTO): string {
+  protected page(list: CustomerPage, event: TableLazyLoadEvent): void {
+    const first = event.first ?? 0;
+    if (first !== list.first()) void list.load(first);
+  }
+
+  protected name(c: CustomerSummaryDTO): string {
     return `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim() || c.companyName || 'Unnamed client';
   }
 
@@ -220,7 +232,7 @@ export class AdvisorHomeComponent {
     return status ? status.charAt(0) + status.slice(1).toLowerCase().replace(/_/g, ' ') : '—';
   }
 
-  protected async open(c: CustomerDTO): Promise<void> {
+  protected async open(c: CustomerSummaryDTO): Promise<void> {
     // One client at a time: ignore clicks on other rows while one is opening
     if (!c.id || this.openingId()) return;
     this.openingId.set(c.id);

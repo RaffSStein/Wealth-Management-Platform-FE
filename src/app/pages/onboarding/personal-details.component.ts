@@ -3,6 +3,7 @@ import {HttpErrorResponse} from '@angular/common/http';
 import {Router} from '@angular/router';
 import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
 import {firstValueFrom} from 'rxjs';
+import {UserService} from '../../api/user-service';
 import {Button, ButtonDirective, ButtonLabel} from 'primeng/button';
 import {DatePicker} from 'primeng/datepicker';
 import {InputText} from 'primeng/inputtext';
@@ -22,6 +23,14 @@ import {OnboardingLayoutComponent} from '../../shared/components/onboarding-layo
 
 const ISO2 = /^[A-Z]{2}$/;
 
+interface EmailCheck {
+  email: string;
+  outcome: 'found' | 'not-found' | 'self' | 'unavailable';
+  name?: string;
+}
+
+const normalizedEmail = (email: string | null | undefined) => (email ?? '').trim().toLowerCase();
+
 @Component({
   selector: 'app-onboarding-personal-details',
   imports: [ReactiveFormsModule, OnboardingLayoutComponent, DatePicker, InputText, Message, Select, Button, ButtonDirective, ButtonLabel],
@@ -29,6 +38,38 @@ const ISO2 = /^[A-Z]{2}$/;
     <app-onboarding-layout [step]="step" title="Personal details"
                            subtitle="Tell us who the account holder is. We use this to identify the customer and meet our regulatory obligations.">
       <form id="personal-details-form" class="wmp-form" [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+        @if (newClient) {
+          <section class="wmp-panel">
+            <h2 class="wmp-panel__title">Client's email</h2>
+            <div class="wmp-form-grid">
+              <div class="wmp-field">
+                <label for="email">Email<span class="wmp-req" aria-hidden="true">*</span></label>
+                <input pInputText id="email" type="email" formControlName="email" autocomplete="off" (blur)="checkEmail()"/>
+                @if (showError('email')) { <small class="wmp-field__error">Enter a valid email address.</small> }
+              </div>
+              <div class="wmp-field">
+                <label for="emailConfirm">Confirm email<span class="wmp-req" aria-hidden="true">*</span></label>
+                <input pInputText id="emailConfirm" type="email" formControlName="emailConfirm" autocomplete="off" (blur)="checkEmail()"/>
+                @if (emailMismatch()) { <small class="wmp-field__error">The two addresses don't match.</small> }
+              </div>
+            </div>
+            @switch (emailCheck()?.outcome) {
+              @case ('found') {
+                <p-message severity="info">This is {{ emailCheck()?.name }}. Check that this is the right client before you continue.</p-message>
+              }
+              @case ('not-found') {
+                <p-message severity="info">No client with this email in this branch. If this person has no account yet, a setup email goes to this address.</p-message>
+              }
+              @case ('self') {
+                <p-message severity="error">This is your own email. Enter the client's address.</p-message>
+              }
+              @case ('unavailable') {
+                <p-message severity="warn">The address could not be checked. Make sure it is correct before you continue.</p-message>
+              }
+            }
+          </section>
+        }
+
         <section class="wmp-panel">
           <h2 class="wmp-panel__title">Identity</h2>
           <div class="wmp-form-grid">
@@ -74,8 +115,9 @@ const ISO2 = /^[A-Z]{2}$/;
           <h2 class="wmp-panel__title">Contact &amp; address</h2>
           <div class="wmp-form-grid">
             <div class="wmp-field">
-              <label for="phoneNumber">Phone</label>
+              <label for="phoneNumber">Phone@if (newClient) {<span class="wmp-req" aria-hidden="true">*</span>}</label>
               <input pInputText id="phoneNumber" type="tel" formControlName="phoneNumber" autocomplete="tel"/>
+              @if (showError('phoneNumber')) { <small class="wmp-field__error">Enter the phone number.</small> }
             </div>
             <div class="wmp-field">
               <label for="country">Country of residence</label>
@@ -145,6 +187,11 @@ export class PersonalDetailsComponent {
   private readonly toast = inject(ToastService);
   private readonly ownCustomer = inject(OwnCustomerService);
   private readonly selection = inject(CustomerSelectionService);
+  private readonly userApi = inject(UserService);
+
+  /** An advisor creating a client: the email and phone are required, as the BE creates the client's login from them. */
+  protected readonly newClient = this.userSession.isAdvisor() && !this.customerSession.customer()?.id;
+  private readonly checkedEmail = signal<EmailCheck | null>(null);
 
   readonly onSubmit = busyAction(async () => {
     if (await this.save()) await this.router.navigateByUrl(this.progress.pathFor(OnboardingStep.FinancialInformation));
@@ -166,6 +213,8 @@ export class PersonalDetailsComponent {
   ];
 
   form = this.fb.group({
+    email: this.fb.control<string>(''),
+    emailConfirm: this.fb.control<string>(''),
     taxId: this.fb.control<string>('', {validators: [Validators.required]}),
     firstName: this.fb.control<string>('', {validators: [Validators.required]}),
     lastName: this.fb.control<string>('', {validators: [Validators.required]}),
@@ -181,6 +230,12 @@ export class PersonalDetailsComponent {
   });
 
   constructor() {
+    if (this.newClient) {
+      this.form.controls.email.setValidators([Validators.required, Validators.email]);
+      this.form.controls.emailConfirm.setValidators([Validators.required, Validators.email]);
+      this.form.controls.phoneNumber.setValidators([Validators.required]);
+      this.form.updateValueAndValidity();
+    }
     void this.prefill();
   }
 
@@ -221,6 +276,44 @@ export class PersonalDetailsComponent {
     return !!c && c.touched && c.invalid;
   }
 
+  protected emailMismatch(): boolean {
+    const {emailConfirm} = this.form.controls;
+    return emailConfirm.touched && (emailConfirm.invalid || !this.emailsMatch());
+  }
+
+  private emailsMatch(): boolean {
+    return this.typedEmail() === normalizedEmail(this.form.controls.emailConfirm.value);
+  }
+
+  private typedEmail(): string {
+    return normalizedEmail(this.form.controls.email.value);
+  }
+
+  /** The check result, only while it is for the address typed now. */
+  protected emailCheck(): EmailCheck | null {
+    const check = this.checkedEmail();
+    return check?.email === this.typedEmail() ? check : null;
+  }
+
+  /** Catches a mistyped address before the login and setup email are created from it. */
+  protected async checkEmail(): Promise<void> {
+    const {email, emailConfirm} = this.form.controls;
+    const typed = this.typedEmail();
+    if (email.invalid || emailConfirm.invalid || !this.emailsMatch() || this.emailCheck()) return;
+    if (typed === normalizedEmail(this.userSession.profile()?.email)) {
+      this.checkedEmail.set({email: typed, outcome: 'self'});
+      return;
+    }
+    try {
+      const user = await firstValueFrom(this.userApi.lookupUserByEmail(typed));
+      const name = `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim() || user?.email || typed;
+      this.checkedEmail.set({email: typed, outcome: 'found', name});
+    } catch (err: unknown) {
+      const notFound = err instanceof HttpErrorResponse && err.status === 404;
+      this.checkedEmail.set({email: typed, outcome: notFound ? 'not-found' : 'unavailable'});
+    }
+  }
+
   uppercase(evt: Event, control: string) {
     const input = evt.target as HTMLInputElement;
     const v = (input.value || '').toUpperCase();
@@ -237,6 +330,15 @@ export class PersonalDetailsComponent {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return false;
+    }
+    if (this.newClient && !this.customerSession.customer()?.id) {
+      if (!this.emailsMatch()) return false;
+      // The advisor reads the result first, so an address not checked yet stops the save once
+      if (!this.emailCheck()) {
+        await this.checkEmail();
+        return false;
+      }
+      if (this.emailCheck()?.outcome === 'self') return false;
     }
     const raw = this.form.getRawValue();
     const existingId = this.customerSession.customer()?.id;
@@ -259,15 +361,16 @@ export class PersonalDetailsComponent {
         const updated = await firstValueFrom(this.customerApi.updateCustomerPersonalDetails(existingId, details));
         if (updated?.id) this.customerSession.setCustomer(updated);
       } else {
-        const userId = this.userSession.profile()?.id; // take id from /me profile
-        if (!userId) {
+        // An advisor's client gets its own login from the email; a customer's record takes the signed-in user
+        const userId = this.userSession.profile()?.id;
+        if (!this.newClient && !userId) {
           this.errorMsg.set('User profile not loaded. Please sign in again.');
           return false;
         }
         const dto = {
           customerType: 'INDIVIDUAL',
           taxId: raw.taxId,
-          userId,
+          ...(this.newClient ? {email: raw.email?.trim()} : {userId}),
           firstName: raw.firstName,
           lastName: raw.lastName,
           dateOfBirth: raw.dateOfBirth,
@@ -285,14 +388,25 @@ export class PersonalDetailsComponent {
         this.formState.clear('personal-details');
         // The next steps operate on the selected customer
         if (created?.id) this.customerSession.setCustomer(created);
+        // A customer's init can return a record an advisor already took further: resume it, don't restart
+        if (created?.id && created.customerStatus !== 'DRAFT') {
+          await this.selection.open(created.id);
+          return false;
+        }
       }
       this.formState.clear('personal-details');
       this.progress.markPersonalDetailsSubmitted();
       return true;
     } catch (err: unknown) {
-      if (err instanceof HttpErrorResponse && err.status === 409 && await this.resumeExistingRecord()) return false;
-      const message = (err as { error?: { message?: string } })?.error?.message;
-      this.errorMsg.set(message || 'Unable to save the personal details. Please try again.');
+      if (err instanceof HttpErrorResponse && err.status === 409) {
+        if (this.newClient) {
+          this.errorMsg.set('This email already belongs to a client of this bank.');
+          return false;
+        }
+        if (await this.resumeExistingRecord()) return false;
+      }
+      const error = (err as { error?: { errorMessage?: string; message?: string } })?.error;
+      this.errorMsg.set(error?.errorMessage || error?.message || 'Unable to save the personal details. Please try again.');
       return false;
     }
   }

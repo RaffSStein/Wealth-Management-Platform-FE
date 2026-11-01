@@ -1,25 +1,27 @@
-import {Component, computed, inject, signal} from '@angular/core';
+import {Component, inject, signal} from '@angular/core';
+import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {Router} from '@angular/router';
-import {firstValueFrom} from 'rxjs';
+import {Subject, debounceTime} from 'rxjs';
 import {Button} from 'primeng/button';
 import {InputText} from 'primeng/inputtext';
 import {Message} from 'primeng/message';
-import {TableModule} from 'primeng/table';
+import {TableLazyLoadEvent, TableModule} from 'primeng/table';
 import {Tag} from 'primeng/tag';
-import {CustomerDTO} from '../../api/customer-service';
+import {CustomerService, CustomerSummaryDTO} from '../../api/customer-service';
 import {CustomerSelectionService} from '../../core/services/customer-selection.service';
-import {CustomerDisambiguationService} from '../../core/services/customer-disambiguation.service';
-import {UserSessionService} from '../../core/services/user-session.service';
+import {CustomerPage} from '../../core/services/customer-page';
 import {CustomerSessionService} from '../../core/services/customer-session.service';
 import {OnboardingProgressService} from '../../core/services/onboarding-progress.service';
 import {busyAction} from '../../core/services/busy-action';
 import {OnboardingFormStateService} from '../../core/services/onboarding-form-state.service';
 import {ToastService} from '../../shared/services/toast.service';
 
-type Row = CustomerDTO & { displayName: string };
+const PAGE_SIZE = 10;
+const SEARCH_DELAY_MS = 300;
 
 /**
  * Customer selection, for advisors only (roleGuard): they pick the client to act for, or onboard a new one.
+ * The list holds the customers of the advisor's active branch, paged and searched by the BE.
  * Draft customers resume onboarding at their first incomplete step.
  */
 @Component({
@@ -36,7 +38,7 @@ type Row = CustomerDTO & { displayName: string };
                   (onClick)="startNewCustomerOnboarding()"/>
       </header>
 
-      @if (loadError()) {
+      @if (clients.failed()) {
         <p-message severity="error">The client list could not be loaded. Reload the page to try again.</p-message>
       } @else {
         <div class="wmp-panel">
@@ -44,11 +46,12 @@ type Row = CustomerDTO & { displayName: string };
             <span class="material-symbols-outlined" aria-hidden="true">search</span>
             <span class="wmp-sr-only">Search clients</span>
             <input pInputText type="search" placeholder="Search by name or tax ID" [value]="query()"
-                   (input)="query.set($any($event.target).value)"/>
+                   (input)="search($any($event.target).value)"/>
           </label>
 
-          <p-table [value]="filtered()" [loading]="loading()" [paginator]="filtered().length > 10" [rows]="10"
-                   [tableStyle]="{'min-width': '40rem'}" dataKey="id">
+          <p-table [value]="clients.rows()" [lazy]="true" (onLazyLoad)="page($event)" [loading]="clients.loading()"
+                   [paginator]="clients.total() > clients.size" [rows]="clients.size" [totalRecords]="clients.total()"
+                   [first]="clients.first()" [tableStyle]="{'min-width': '40rem'}" dataKey="id">
             <ng-template #header>
               <tr>
                 <th>Name</th>
@@ -60,7 +63,7 @@ type Row = CustomerDTO & { displayName: string };
             </ng-template>
             <ng-template #body let-row>
               <tr>
-                <td class="name">{{ row.displayName }}</td>
+                <td class="name">{{ displayName(row) }}</td>
                 <td class="num">{{ row.taxId }}</td>
                 <td class="muted">{{ typeLabel(row.customerType) }}</td>
                 <td><p-tag [value]="statusLabel(row.customerStatus)" [severity]="statusSeverity(row.customerStatus)"/></td>
@@ -94,49 +97,38 @@ type Row = CustomerDTO & { displayName: string };
 })
 export class CustomerDisambiguationComponent {
   private readonly router = inject(Router);
-  private readonly disamb = inject(CustomerDisambiguationService);
-  private readonly userSession = inject(UserSessionService);
+  private readonly customerApi = inject(CustomerService);
   private readonly toast = inject(ToastService);
   private readonly customerSession = inject(CustomerSessionService);
   private readonly selection = inject(CustomerSelectionService);
   private readonly progress = inject(OnboardingProgressService);
   private readonly formState = inject(OnboardingFormStateService);
 
-  protected readonly loading = signal(true);
-  protected readonly loadError = signal(false);
+  protected readonly clients = new CustomerPage(this.customerApi, PAGE_SIZE);
   protected readonly openingId = signal<string | null>(null);
   protected readonly query = signal('');
-  private readonly rows = signal<Row[]>([]);
-
-  protected readonly filtered = computed(() => {
-    const q = this.query().trim().toLowerCase();
-    if (!q) return this.rows();
-    return this.rows().filter(r => r.displayName.toLowerCase().includes(q) || (r.taxId ?? '').toLowerCase().includes(q));
-  });
+  private readonly searches = new Subject<void>();
 
   constructor() {
-    void this.loadCustomers();
+    this.searches.pipe(debounceTime(SEARCH_DELAY_MS), takeUntilDestroyed()).subscribe(() => void this.clients.load(0, this.term()));
+    void this.clients.load();
   }
 
-  private async loadCustomers(): Promise<void> {
-    const userId = this.userSession.profile()?.id;
-    if (!userId) {
-      this.loadError.set(true);
-      this.loading.set(false);
-      return;
-    }
-    try {
-      // The BE returns full customer records for the user
-      const list = (await firstValueFrom(this.disamb.listByUser(userId))) as unknown as CustomerDTO[];
-      this.rows.set((list ?? []).map(c => ({...c, displayName: this.displayName(c)})));
-    } catch {
-      this.loadError.set(true);
-    } finally {
-      this.loading.set(false);
-    }
+  private term(): string {
+    return this.query().trim();
   }
 
-  private displayName(c: CustomerDTO): string {
+  protected search(value: string): void {
+    this.query.set(value);
+    this.searches.next();
+  }
+
+  protected page(event: TableLazyLoadEvent): void {
+    const first = event.first ?? 0;
+    if (first !== this.clients.first()) void this.clients.load(first, this.term());
+  }
+
+  protected displayName(c: CustomerSummaryDTO): string {
     const person = `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim();
     return person || c.companyName || 'Unnamed customer';
   }
@@ -159,7 +151,7 @@ export class CustomerDisambiguationComponent {
     }
   }
 
-  async select(row: Row): Promise<void> {
+  async select(row: CustomerSummaryDTO): Promise<void> {
     // One customer at a time: ignore clicks on other rows while one is opening
     if (!row.id || this.openingId()) return;
     this.openingId.set(row.id);

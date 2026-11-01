@@ -47,6 +47,8 @@ export interface Quote {
 export interface PortfolioDataSource {
   readonly isSample: boolean;
   getSummary(customerId: string): Observable<PortfolioSummary>;
+  /** Total value of an advisor's onboarded clients. */
+  getBookTotal(clientCount: number): Observable<number>;
   getValueHistory(customerId: string, range: ValueRange): Observable<ValuePoint[]>;
   getPositions(customerId: string): Observable<Position[]>;
   getAllocation(customerId: string): Observable<AllocationSlice[]>;

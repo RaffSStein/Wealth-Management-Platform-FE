@@ -13,6 +13,7 @@ import {provideApi as provideProfilerApi} from './api/profiler-service';
 // interceptor which adds auth token to requests
 import {authInterceptor} from './core/interceptors/auth.interceptor';
 // counts foreground requests for the global loading bar
+import {clientAccessInterceptor} from './core/interceptors/client-access.interceptor';
 import {loadingInterceptor} from './core/interceptors/loading.interceptor';
 // UI library + theme
 import {providePrimeNG} from 'primeng/config';
@@ -39,7 +40,7 @@ export const appConfig: ApplicationConfig = {
     }),
     provideHttpClient(
       withFetch(),
-      withInterceptors([authInterceptor, loadingInterceptor])
+      withInterceptors([authInterceptor, clientAccessInterceptor, loadingInterceptor])
     ),
     provideUserApi('/user-service'),
     provideCustomerApi('/customer-service'),

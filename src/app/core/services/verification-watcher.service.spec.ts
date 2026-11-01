@@ -1,4 +1,5 @@
 import { TestBed, fakeAsync, flush, tick } from '@angular/core/testing';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { CustomerDTO, CustomerService } from '../../api/customer-service';
@@ -9,7 +10,7 @@ import { ToastService } from '../../shared/services/toast.service';
 import { VERIFICATION_SLOW_AFTER_MS, VerificationWatcherService } from './verification-watcher.service';
 
 describe('VerificationWatcherService', () => {
-  let statuses: (string | Error)[];
+  let statuses: (string | Error | HttpErrorResponse)[];
   let notifications: jasmine.SpyObj<NotificationService>;
   let toast: jasmine.SpyObj<ToastService>;
   let token: string | null;
@@ -23,9 +24,9 @@ describe('VerificationWatcherService', () => {
     const api = {
       getCustomerById: (id: string) => {
         const next = statuses.length > 1 ? statuses.shift()! : statuses[0];
-        return next instanceof Error
+        return next instanceof Error || next instanceof HttpErrorResponse
           ? throwError(() => next)
-          : of({id, firstName: 'Ada', lastName: 'Rossi', customerStatus: next} as CustomerDTO);
+          : of({id, firstName: 'Ada', lastName: 'Rossi', customerStatus: next as string} as CustomerDTO);
       }
     };
     TestBed.configureTestingModule({
@@ -60,6 +61,15 @@ describe('VerificationWatcherService', () => {
     tick(1500);
     expect(watcher.stateFor('c1')).toBe('rejected');
     expect(toast.error).toHaveBeenCalled();
+  }));
+
+  it('stops following a customer that answers 404', fakeAsync(() => {
+    statuses = ['PENDING_VERIFICATION', new HttpErrorResponse({status: 404})];
+    watcher.watch('c1');
+    tick(1500);
+    expect(watcher.stateFor('c1')).toBeNull();
+    expect(notifications.add).not.toHaveBeenCalled();
+    flush();
   }));
 
   it('does not notify for a customer that was already verified', fakeAsync(() => {

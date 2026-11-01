@@ -79,7 +79,7 @@ interface FinancialFormValue {
                   </div>
                   <div class="wmp-field">
                     <label [for]="'exp-desc-' + i">Description</label>
-                    <input pInputText [id]="'exp-desc-' + i" formControlName="description"/>
+                    <input pInputText [id]="'exp-desc-' + i" formControlName="description" maxlength="500"/>
                   </div>
                   <button pButton type="button" class="row__remove" [text]="true" severity="secondary"
                           [attr.aria-label]="'Remove expense ' + (i + 1)" (click)="removeExpense(i)">
@@ -280,7 +280,7 @@ export class FinancialInformationComponent {
       savedTypeCode: this.fb.control<string | null>(savedTypeCode),
       typeCode: this.fb.control<string | null>(typeCode),
       amountEur: this.fb.control<number | null>(amountEur),
-      description: this.fb.control<string | null>(description)
+      description: this.fb.control<string | null>(description, {validators: [Validators.maxLength(500)]})
     });
   }
 
