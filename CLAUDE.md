@@ -314,5 +314,5 @@ skill). Palette may be refined later. Dark values below; light values live in `_
 ## Conventions
 
 See `.github/copilot-instructions.md` (English-only code/comments; signals for UI state; `firstValueFrom` for one-shot
-HTTP; `ToastService` for feedback; no PII/tokens in logs or URLs). Commit only when asked; branch off `main` first.
+HTTP; `ToastService` for feedback; no PII/tokens in logs or URLs). Commit and push only when asked; work directly on `main`, no feature branches or PRs (user decision, 2026-11-01).
 Commit messages and PRs carry no AI attribution: no `Co-Authored-By` trailers and no mention of Claude or AI tools.
