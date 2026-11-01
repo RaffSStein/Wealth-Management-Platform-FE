@@ -19,11 +19,30 @@ description: Use when designing, mocking up or revising a WMP screen on the desi
 
 | File | Content |
 |---|---|
-| `Main.dc.html` | Ledger Pro style tile (entry board) |
-| `C-SignIn`, `C-Onboarding`, `C-Dashboard` `.dc.html` | Built screens: sign-in, onboarding, home dashboard |
+| `Main.dc.html` | Ledger Pro style tile |
+| `T-Components`, `T-AppPage`, `T-PublicPage`, `T-OnboardingStep` `.dc.html` | Components sheet and page templates: start every new screen from these |
 | `F-Investments`, `F-Instrument`, `F-Orders`, `F-Markets`, `F-Account`, `F-Advisor` `.dc.html` | "Future sections" concepts, with their data/API needs in notes (`nHome`, `nOrd`, `nIns`, ...) |
+| `J0-Map.dc.html` | Journey map: every journey, its status and its legacy capability |
+| `J<n>-<step>[branch]-<Name>.dc.html` | Built journeys (1 to 7), mirroring the FE |
+| `F-J<n>-<step>[branch]-<Name>.dc.html` | Concept journeys (8 to 23), one per legacy capability. Exploratory: not built, no agreed contract |
 | `CHANGELOG.md` | What changed on the canvas and what FE/BE must follow, newest first |
-| `canvas.json` | Board index, positions, notes |
+| `canvas.json` | Board index, pages, positions, notes |
+
+Canvas pages: **Foundation & future** (boards without a `page` key) and **Journeys** (`page: "journeys"`).
+
+## Adding or changing a journey
+
+1. Row on the Journeys page: a `title1` note, an intro sticky at `x: 0` (goal, who, rules, legacy capability), boards from
+   `x: 640`, 1520 px per column (width 1440). A state or branch of a step stacks under that step, with its sticky between.
+2. Board title `<step> · <name> · <route>` (concepts start with `Concept · `). Mark boards `is_interactive` and link
+   primary buttons to the next board as `<a href="<file>.dc.html">`.
+3. Sticky under each screen: `Who · Route`, `Does`, `Next`, `API`. Gray = main path, orange = state or branch, blue =
+   concept. Concepts also get an `n<Area>` note marking each endpoint exists or new.
+4. Add the journey to `J0-Map` and a CHANGELOG entry. When a concept ships, rename `F-J...` to `J...`, match the code and
+   set its status to Built.
+5. Concepts follow the legacy requirements (`C:/Users/Raffaele/Desktop/WMP/legacy-wmp-requirements/`) and the BE's
+   `.claude/skills/porting-legacy-features/reference/ui-mocks.md`: behaviour only, never legacy screens, no real bank
+   names, regulatory figures as placeholders (`[%]`, `[bps]`, `[N] days`), every card with unserved data `SAMPLE DATA`.
 
 ## Rules for every mockup
 
