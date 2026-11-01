@@ -13,7 +13,8 @@ paths:
       description: >-
         Receives the personal data of a customer to start the onboarding process. A CUSTOMER creates its own record:
         userId comes from the token and may be left out, and the bank allows one record per customer. An ADVISOR must
-        send userId. Admin roles can't create customers.
+        send userId. Admin roles can't create customers. The record always starts as DRAFT, and only the onboarding
+        steps change its status.
       operationId: initCustomer
       requestBody:
         required: true
@@ -506,7 +507,6 @@ components:
       required:
         - customerType
         - taxId
-        - customerStatus
       properties:
         id:
           type: string
@@ -553,9 +553,11 @@ components:
           maxLength: 2
         customerStatus:
           $ref: '#/components/schemas/CustomerStatus'
+          description: Set by the server. Ignored on init, where a customer always starts as DRAFT.
         onboardingDate:
           type: string
           format: date
+          description: Ignored on init.
         customerFinancials:
           type: array
           items:

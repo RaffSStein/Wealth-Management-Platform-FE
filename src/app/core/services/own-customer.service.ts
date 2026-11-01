@@ -11,7 +11,7 @@ const STATUS_ORDER = ['ACTIVE', 'PENDING_VERIFICATION', 'DRAFT', 'REJECTED', 'CL
 
 /** The record a customer user works on: DELETED ones never count. Null when the user has none in this bank yet. */
 export function pickOwnCustomer(customers: readonly CustomerDTO[]): CustomerDTO | null {
-  const rank = (c: CustomerDTO) => STATUS_ORDER.indexOf(c.customerStatus);
+  const rank = (c: CustomerDTO) => STATUS_ORDER.indexOf(c.customerStatus ?? '');
   return customers
     .filter(c => rank(c) >= 0)
     .reduce<CustomerDTO | null>((best, c) => !best || rank(c) < rank(best) ? c : best, null);

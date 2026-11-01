@@ -267,7 +267,6 @@ export class PersonalDetailsComponent {
         const dto = {
           customerType: 'INDIVIDUAL',
           taxId: raw.taxId,
-          customerStatus: 'DRAFT',
           userId,
           firstName: raw.firstName,
           lastName: raw.lastName,
