@@ -10,7 +10,10 @@ paths:
   /customer/init:
     post:
       summary: Initialize a new customer onboarding
-      description: Receives the personal data of a customer to start the onboarding process.
+      description: >-
+        Receives the personal data of a customer to start the onboarding process. A CUSTOMER creates its own record:
+        userId comes from the token and may be left out, and the bank allows one record per customer. An ADVISOR must
+        send userId. Admin roles can't create customers.
       operationId: initCustomer
       requestBody:
         required: true
@@ -27,6 +30,10 @@ paths:
                 $ref: '#/components/schemas/CustomerDTO'
         '400':
           description: Invalid input data
+        '403':
+          description: The caller is an admin, or a CUSTOMER sending another user's userId
+        '409':
+          description: A CUSTOMER already has a customer record in this bank
         '500':
           description: Internal server error
       tags:
@@ -35,7 +42,9 @@ paths:
   /customer/{customerId}:
     get:
       summary: Get customer by ID
-      description: Returns the customer details for the specified customerId.
+      description: >-
+        Returns the customer details for the specified customerId. A CUSTOMER only reaches its own record, an ADVISOR
+        or BANK_ADMIN any customer in its bank, a PLATFORM_ADMIN any customer in every bank.
       operationId: getCustomerById
       parameters:
         - name: customerId
@@ -51,13 +60,17 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CustomerDTO'
+        '404':
+          description: Not found, or the caller's role may not see this customer
       tags:
         - Customer
 
   /customer/disambiguation/{userId}:
     get:
       summary: Get a list of customers for this userId
-      description: Returns the customer list associated with the specified userId.
+      description: >-
+        Returns the customer list associated with the specified userId, an empty list when there are none. A CUSTOMER
+        may only ask for its own userId. The other roles ask for any user, within the customers they can read.
       operationId: getCustomersByUserId
       parameters:
         - name: userId
@@ -76,7 +89,7 @@ paths:
                 items:
                   $ref: '#/components/schemas/CustomerDTO'
         '404':
-          description: Customer not found
+          description: A CUSTOMER asked for another user's customers
       tags:
         - Customer
 
@@ -84,7 +97,7 @@ paths:
   /customer/{customerId}/personal-details:
     post:
       summary: Update personal details for a customer
-      description: Updates the personal details for the specified customer.
+      description: Updates the personal details for the specified customer. A CUSTOMER only reaches its own record.
       operationId: updateCustomerPersonalDetails
       parameters:
         - name: customerId
@@ -108,6 +121,10 @@ paths:
                 $ref: '#/components/schemas/CustomerDTO'
         '400':
           description: Invalid input data
+        '403':
+          description: Admin roles can't change customer data
+        '404':
+          description: Not found, or the caller's role may not see this customer
         '500':
           description: Internal server error
       tags:
@@ -183,6 +200,10 @@ paths:
                 $ref: '#/components/schemas/CustomerDTO'
         '400':
           description: Invalid input data, e.g. an id that does not belong to the customer or appears more than once
+        '403':
+          description: Admin roles can't change customer data
+        '404':
+          description: Not found, or the caller's role may not see this customer
       tags:
         - Customer
 
@@ -219,6 +240,10 @@ paths:
                 $ref: '#/components/schemas/CustomerDTO'
         '400':
           description: Invalid input data, e.g. an id that does not belong to the customer or appears more than once
+        '403':
+          description: Admin roles can't change customer data
+        '404':
+          description: Not found, or the caller's role may not see this customer
       tags:
         - Customer
   # MIFID configuration
@@ -262,6 +287,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MifidFillingDTO'
+        '403':
+          description: Admin roles can't change customer data
+        '404':
+          description: Not found, or the caller's role may not see this customer
       tags:
         - Mifid
 
@@ -285,7 +314,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/MifidFillingDTO'
         '404':
-          description: The customer has no submitted filling
+          description: The customer has no submitted filling, or the caller's role may not see this customer
       tags:
         - Mifid
 
@@ -315,7 +344,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/MifidFillingDTO'
         '404':
-          description: No filling with this id found for the customer
+          description: No filling with this id found for the customer, or the caller's role may not see this customer
       tags:
         - Mifid
 
@@ -344,6 +373,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MifidFillingDTO'
+        '403':
+          description: Admin roles can't change customer data
+        '404':
+          description: Not found, or the caller's role may not see this customer
       tags:
         - Mifid
 
@@ -378,6 +411,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MifidFillingDTO'
+        '403':
+          description: Admin roles can't change customer data
+        '404':
+          description: Not found, or the caller's role may not see this customer
       tags:
         - Mifid
 
@@ -401,6 +438,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CustomerOnboardingDTO'
+        '404':
+          description: Not found, or the caller's role may not see this customer
       tags:
         - Onboarding
 
@@ -429,6 +468,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CustomerOnboardingDTO'
+        '404':
+          description: Not found, or the caller's role may not see this customer
       tags:
         - Onboarding
 
@@ -453,6 +494,8 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/CustomerOnboardingDTO'
+        '404':
+          description: Not found, or the caller's role may not see this customer
       tags:
         - Onboarding
 
@@ -464,7 +507,6 @@ components:
         - customerType
         - taxId
         - customerStatus
-        - userId
       properties:
         id:
           type: string
@@ -473,7 +515,9 @@ components:
         userId:
           type: string
           format: uuid
-          description: Unique identifier for the user associated with the customer
+          description: >-
+            Unique identifier for the user associated with the customer. On init a CUSTOMER may leave it out (the token
+            decides); an ADVISOR must send it.
         customerType:
           $ref: '#/components/schemas/CustomerType'
         firstName:

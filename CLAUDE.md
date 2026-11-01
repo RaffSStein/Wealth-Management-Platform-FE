@@ -97,7 +97,7 @@ docs/                       functional docs (process + diagrams), mirrored from 
 - BE onboarding step names map to FE steps via `OnboardingProgressService.stepFromBackend()`. Never `parseInt` them.
   BE step status is `DONE` / `REJECTED` (not `COMPLETED`, which is only the MiFID filling status).
 - Save & exit: every onboarding step has "Exit" (layout header) and the form steps have "Save & exit"
-  (`WorkspaceContextService.exitOnboarding()`: advisors go back to their workspace, customers to their profile list).
+  (`WorkspaceContextService.exitOnboarding()`: advisors go back to their workspace, customers to their home).
   Steps pre-fill from `GET /customer/{id}` and **send row `id`s back**. Personal details uses `initCustomer` only
   for a new customer, then `POST /customer/{id}/personal-details`. Unsaved typing is a per-customer sessionStorage
   draft (`OnboardingFormStateService`), cleared after a successful save.
@@ -129,7 +129,7 @@ docs/                       functional docs (process + diagrams), mirrored from 
   current questionnaire (`prefillAnswers`, no response ids), so the first save POSTs a new filling. The BE (2026-10-30)
   deprecates the previous SUBMITTED filling on submit and skips the onboarding step and AML event for ACTIVE customers.
 - `exitOnboarding()` sends an ACTIVE customer's steps (opened from the dashboard) back to `/app/home` and keeps the
-  client selected; only customers still onboarding leave the client (advisor) or go to the profile list (customer).
+  client selected; an advisor leaves a client still onboarding, a customer goes home keeping their own record.
 - BE fixes pending a customer-service restart: Gender `NOT_SPECIFIED` accepted again; goal `targetDate` nullable;
   MiFID PATCH orphan-removal 500. CustomerType: INDIVIDUAL, LEGAL_ENTITY, SOLE_PROPRIETOR, JOINT_ACCOUNT, OTHER.
   CustomerStatus adds CLOSED and DELETED. Invalid bodies return 400 REQUEST_VALIDATION_ERROR.
@@ -179,7 +179,7 @@ docs/                       functional docs (process + diagrams), mirrored from 
   (shown as "Platform", `bankLabel`): it owns no bank data.
 - Landing pages: `homePathFor(roles, customerSelected)` (`core/services/home-path.ts`) for login, branch switch,
   role/permission guard redirects and `WorkspaceContextService.homePath()`: admins `/app/admin` (most privileged role
-  wins), advisors `/app/advisor` unless acting for a client, customers their profile or customer selection.
+  wins), advisors `/app/advisor` unless acting for a client, customers always `/app/home`.
 - Branch switcher: header chip + account menu (`BranchSwitchService`): `POST /auth/switch-branch` returns a new token
   and revokes the old one. Replace it (never keep a copy), drop the selected customer and do a full reload of the
   workspace home, since everything loaded belongs to the previous bank. The onboarding password-setup token (`purpose=PASSWORD_SETUP`)
@@ -232,9 +232,20 @@ docs/                       functional docs (process + diagrams), mirrored from 
   the BE can't check revocation: a temporary error, never a logout.
 - `WorkspaceContextService`: `actingAsClient()` (an advisor with a selected customer in `CustomerSessionService`),
   `clientName()`, `homePath()`, `exitClient()`. Customer selection (`/onboarding/disambiguation`) sets the customer.
+- **Only advisors choose a customer** (user decision, 2026-11-01): `/onboarding/disambiguation` has `roleGuard('ADVISOR')`.
+  A customer user never sees a list: `ownCustomerGuard` (on `/app` and `/onboarding`, `OwnCustomerService`) sets their own
+  record from `GET /customer/disambiguation/{own id}`, and `/app/home` shows the dashboard only for an ACTIVE customer,
+  otherwise a next-step card (`homeNoticeFor`: start, continue, verifying, rejected), never sample data.
+- Customer data access (BE f51bc18, 2026-11-01, `CustomerAccessPolicy`; step 1, the active role in the token decides):
+  CUSTOMER reads and writes only its own record (else 404); `disambiguation/{own id}` gives 200 (`[]` if none), another
+  id 404; init takes `userId` from the token, a different one gives 403, a second record in the bank 409 (FE: continue
+  from the existing one). ADVISOR: any customer in its bank, read and write, and must send `userId` on init. BANK_ADMIN
+  reads its bank, PLATFORM_ADMIN every bank; writes and init give 403. Config endpoints are open to any token.
+- **Step 2, not built (agree the contract with the BE first):** `customers.user_id` becomes the client (today it stores
+  the advisor for clients an advisor onboarded, so that person can't see them), advisors get scoped by a new
+  `branch_code`, plus a paged client list and linking a client to a login. Until then keep sending `userId` as today.
 - Login routing: admins go to `returnUrl` (only under `/app/admin`) or `/app/admin`; advisors to `returnUrl` or
-  `/app/advisor`. Customers go to customer selection unless a customer is already selected (then `returnUrl` or
-  `/app/home`).
+  `/app/advisor`. Customers go to `returnUrl` or `/app/home`.
 - Navigation model: `layout/navigation.ts` (`navigationFor({isAdvisor, isAdmin, actingAsClient, can})`,
   `activeSection(url)`, `featureOf(path)`). Add
   pages there, not in the shell. The advisor workspace pages are placeholders (`shared/components/page-placeholder` via

@@ -19,7 +19,7 @@ import {ToastService} from '../../shared/services/toast.service';
 type Row = CustomerDTO & { displayName: string };
 
 /**
- * Customer selection: advisors pick the client to act for; customers pick which of their profiles to use.
+ * Customer selection, for advisors only (roleGuard): they pick the client to act for, or onboard a new one.
  * Draft customers resume onboarding at their first incomplete step.
  */
 @Component({
@@ -29,22 +29,20 @@ type Row = CustomerDTO & { displayName: string };
     <section class="page">
       <header class="head">
         <div>
-          <h1>{{ isAdvisor() ? 'Select a client' : 'Choose a profile' }}</h1>
-          <p>{{ isAdvisor()
-            ? 'Pick the client you want to work on, or onboard a new one.'
-            : 'Choose which customer profile you want to use.' }}</p>
+          <h1>Select a client</h1>
+          <p>Pick the client you want to work on, or onboard a new one.</p>
         </div>
-        <p-button [label]="isAdvisor() ? 'Onboard new client' : 'Create new profile'" [loading]="startNewCustomerOnboarding.pending()"
+        <p-button label="Onboard new client" [loading]="startNewCustomerOnboarding.pending()"
                   (onClick)="startNewCustomerOnboarding()"/>
       </header>
 
       @if (loadError()) {
-        <p-message severity="error">The customer list could not be loaded. Reload the page to try again.</p-message>
+        <p-message severity="error">The client list could not be loaded. Reload the page to try again.</p-message>
       } @else {
         <div class="wmp-panel">
           <label class="search">
             <span class="material-symbols-outlined" aria-hidden="true">search</span>
-            <span class="wmp-sr-only">Search customers</span>
+            <span class="wmp-sr-only">Search clients</span>
             <input pInputText type="search" placeholder="Search by name or tax ID" [value]="query()"
                    (input)="query.set($any($event.target).value)"/>
           </label>
@@ -73,7 +71,7 @@ type Row = CustomerDTO & { displayName: string };
               </tr>
             </ng-template>
             <ng-template #emptymessage>
-              <tr><td colspan="5" class="empty">{{ query() ? 'No customers match your search.' : 'No customer profiles yet.' }}</td></tr>
+              <tr><td colspan="5" class="empty">{{ query() ? 'No clients match your search.' : 'No clients yet.' }}</td></tr>
             </ng-template>
           </p-table>
         </div>
@@ -104,7 +102,6 @@ export class CustomerDisambiguationComponent {
   private readonly progress = inject(OnboardingProgressService);
   private readonly formState = inject(OnboardingFormStateService);
 
-  protected readonly isAdvisor = this.userSession.isAdvisor;
   protected readonly loading = signal(true);
   protected readonly loadError = signal(false);
   protected readonly openingId = signal<string | null>(null);
@@ -169,7 +166,7 @@ export class CustomerDisambiguationComponent {
     try {
       await this.selection.open(row.id);
     } catch {
-      this.toast.error('Unable to open the selected customer.');
+      this.toast.error('Unable to open the selected client.');
     } finally {
       this.openingId.set(null);
     }

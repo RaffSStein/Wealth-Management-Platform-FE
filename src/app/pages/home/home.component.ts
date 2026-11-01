@@ -1,14 +1,20 @@
-import {Component, computed, inject, signal} from '@angular/core';
+import {Component, computed, effect, inject, signal, untracked} from '@angular/core';
 import {DecimalPipe} from '@angular/common';
-import {RouterLink} from '@angular/router';
+import {Router, RouterLink} from '@angular/router';
 import {firstValueFrom} from 'rxjs';
+import {Button, ButtonDirective, ButtonLabel} from 'primeng/button';
 import {Message} from 'primeng/message';
 import {SelectButton} from 'primeng/selectbutton';
 import {Skeleton} from 'primeng/skeleton';
 import {TableModule} from 'primeng/table';
 import {FormsModule} from '@angular/forms';
-import {CustomerDTO, CustomerService, MifidQuestionnaireConfigDTO, MifidService} from '../../api/customer-service';
+import {CustomerService, MifidQuestionnaireConfigDTO, MifidService} from '../../api/customer-service';
+import {busyAction} from '../../core/services/busy-action';
+import {CustomerSelectionService} from '../../core/services/customer-selection.service';
 import {CustomerSessionService} from '../../core/services/customer-session.service';
+import {OnboardingProgressService} from '../../core/services/onboarding-progress.service';
+import {OwnCustomerService} from '../../core/services/own-customer.service';
+import {WorkspaceContextService} from '../../core/services/workspace-context.service';
 import {UserSessionService} from '../../core/services/user-session.service';
 import {profileDisplay} from '../../core/services/mifid-questionnaire.service';
 import {financialSnapshot, goalHorizon} from '../../core/services/dashboard-stats';
@@ -18,13 +24,55 @@ import {AllocationBarComponent} from '../../shared/components/dashboard/allocati
 import {SampleBadgeComponent} from '../../shared/components/dashboard/sample-badge.component';
 import {ComingSoonBadgeComponent} from '../../shared/components/dashboard/coming-soon-badge.component';
 
+export type HomeNoticeKind = 'no-client' | 'load-failed' | 'start' | 'draft' | 'pending' | 'rejected' | 'closed';
+
+export interface HomeNotice {
+  kind: HomeNoticeKind;
+  icon: string;
+  title: string;
+  text: string;
+}
+
+const NOTICES: Record<HomeNoticeKind, Omit<HomeNotice, 'kind'>> = {
+  'no-client': {icon: 'groups', title: 'No client selected',
+    text: 'This page shows the home of a client. Pick one from your workspace.'},
+  'load-failed': {icon: 'cloud_off', title: 'Your details could not be loaded',
+    text: 'Please try again in a moment.'},
+  start: {icon: 'rocket_launch', title: 'Set up your investor profile',
+    text: 'Complete the onboarding to start using your account. You can save and continue later.'},
+  draft: {icon: 'pending_actions', title: 'Onboarding not finished',
+    text: 'Pick up where it was left to complete the onboarding.'},
+  pending: {icon: 'hourglass_top', title: 'Verification in progress',
+    text: 'The onboarding is complete and the checks are running. This page updates when they finish.'},
+  rejected: {icon: 'block', title: 'Onboarding not approved',
+    text: 'The verification did not succeed, so this account can\'t be used. Please contact your bank.'},
+  closed: {icon: 'inventory_2', title: 'Account not active',
+    text: 'This account is no longer active. Please contact your bank.'}
+};
+
+/** What the home shows instead of the dashboard, which only an ACTIVE customer has. Null: show the dashboard. */
+export function homeNoticeFor(ctx: {staff: boolean; loadFailed: boolean; status?: string}): HomeNotice | null {
+  const kind = ((): HomeNoticeKind | null => {
+    switch (ctx.status) {
+      case 'ACTIVE': return null;
+      case 'DRAFT': return 'draft';
+      case 'PENDING_VERIFICATION': return 'pending';
+      case 'REJECTED': return 'rejected';
+      case undefined: return ctx.staff ? 'no-client' : ctx.loadFailed ? 'load-failed' : 'start';
+      default: return 'closed';
+    }
+  })();
+  return kind && {kind, ...NOTICES[kind]};
+}
+
 /**
  * Customer home dashboard. Real data: investor profile, goals and financial snapshot (customer-service).
- * Portfolio, positions, allocation and watchlist come from PORTFOLIO_DATA (sample until the BE exists).
+ * Portfolio, positions, allocation and watchlist come from PORTFOLIO_DATA (sample until the BE exists), so they only
+ * show for an onboarded customer; everyone else gets a card with the next step.
  */
 @Component({
   selector: 'app-home',
-  imports: [DecimalPipe, FormsModule, RouterLink, Message, SelectButton, Skeleton, TableModule, ValueChartComponent,
+  imports: [Button, ButtonDirective, ButtonLabel, DecimalPipe, FormsModule, RouterLink, Message, SelectButton, Skeleton, TableModule, ValueChartComponent,
     AllocationBarComponent, SampleBadgeComponent, ComingSoonBadgeComponent],
   template: `
     <div class="dash">
@@ -35,139 +83,155 @@ import {ComingSoonBadgeComponent} from '../../shared/components/dashboard/coming
         </div>
       </header>
 
-      @if (summary(); as s) {
-        <section class="kpis" aria-label="Portfolio summary">
-          <div class="kpi"><span class="kpi__label">Total assets <app-sample-badge/></span><span class="kpi__value num">€{{ s.total | number:'1.2-2' }}</span></div>
-          <div class="kpi"><span class="kpi__label">Day P/L</span>
-            <span class="kpi__value num" [class.gain]="s.dayPl >= 0" [class.loss]="s.dayPl < 0">{{ s.dayPl >= 0 ? '+' : '−' }}€{{ abs(s.dayPl) | number:'1.2-2' }}</span></div>
-          <div class="kpi"><span class="kpi__label">YTD return</span>
-            <span class="kpi__value num" [class.gain]="s.ytdPct >= 0" [class.loss]="s.ytdPct < 0">{{ s.ytdPct >= 0 ? '+' : '−' }}{{ abs(s.ytdPct) | number:'1.2-2' }}%</span></div>
-          <div class="kpi"><span class="kpi__label">Available cash</span><span class="kpi__value num">€{{ s.cash | number:'1.2-2' }}</span></div>
-        </section>
-      } @else {
-        <p-skeleton height="88px"/>
-      }
-
-      <div class="row">
-        <section class="card card--wide">
-          <header class="card__head">
-            <h2>Portfolio value <app-sample-badge/></h2>
-            <p-selectbutton [options]="ranges" [ngModel]="range()" (ngModelChange)="setRange($event)" [allowEmpty]="false"
-                            ariaLabelledBy="range-label" size="small"/>
-            <span id="range-label" class="wmp-sr-only">Time range</span>
-          </header>
-          @if (history().length) {
-            <app-value-chart [data]="history()" [ariaLabel]="'Portfolio value, last ' + range()"/>
-          } @else {
-            <p-skeleton height="240px"/>
-          }
-        </section>
-
-        <section class="card">
-          <header class="card__head"><h2>Investor profile</h2></header>
-          @if (loadingCustomer()) {
-            <p-skeleton height="120px"/>
-          } @else if (profile(); as p) {
-            <p class="profile__label">{{ profileLabel() }}</p>
-            @if (p.score != null) { <p class="muted">MiFID score <span class="num">{{ p.score }}</span></p> }
-            <a routerLink="/app/investor-profile" class="link">View investor profile →</a>
-          } @else {
-            <p class="muted">No investor profile yet.</p>
-            <a routerLink="/onboarding/mifid-questionnaire" class="link">Complete the MiFID questionnaire →</a>
-          }
-        </section>
-      </div>
-
-      <div class="row">
-        <section class="card card--wide">
-          <header class="card__head">
-            <h2>Top positions <app-sample-badge/></h2>
-            <a routerLink="/app/investments/positions" class="link">All positions →</a>
-          </header>
-          <div class="table-wrap">
-            <p-table [value]="positions()" [tableStyle]="{'min-width': '36rem'}">
-              <ng-template #header>
-                <tr><th>Instrument</th><th class="r">Qty</th><th class="r">Price</th><th class="r">Value</th><th class="r">P/L</th></tr>
-              </ng-template>
-              <ng-template #body let-p>
-                <tr>
-                  <td>{{ p.name }}<div class="num muted small">{{ p.isin }}</div></td>
-                  <td class="num r">{{ p.qty | number }}</td>
-                  <td class="num r">{{ p.price | number:'1.2-2' }}</td>
-                  <td class="num r">{{ p.value | number:'1.2-2' }}</td>
-                  <td class="num r" [class.gain]="p.plPct >= 0" [class.loss]="p.plPct < 0">{{ p.plPct >= 0 ? '+' : '−' }}{{ abs(p.plPct) | number:'1.1-1' }}%</td>
-                </tr>
-              </ng-template>
-            </p-table>
+      @if (notice(); as n) {
+        <section class="card notice" [attr.role]="n.kind === 'load-failed' ? 'alert' : null">
+          <span class="material-symbols-outlined" aria-hidden="true">{{ n.icon }}</span>
+          <div class="notice__body">
+            <h2>{{ n.title }}</h2>
+            <p class="muted">{{ n.text }}</p>
+            @switch (n.kind) {
+              @case ('start') { <p-button label="Start onboarding" [loading]="startOnboarding.pending()" (onClick)="startOnboarding()"/> }
+              @case ('draft') { <p-button label="Continue onboarding" [loading]="continueOnboarding.pending()" (onClick)="continueOnboarding()"/> }
+              @case ('load-failed') { <p-button label="Try again" [loading]="retry.pending()" (onClick)="retry()"/> }
+              @case ('no-client') { <a pButton [routerLink]="workspaceHome()"><span pButtonLabel>Back to your workspace</span></a> }
+            }
           </div>
         </section>
+      } @else {
+        @if (summary(); as s) {
+          <section class="kpis" aria-label="Portfolio summary">
+            <div class="kpi"><span class="kpi__label">Total assets <app-sample-badge/></span><span class="kpi__value num">€{{ s.total | number:'1.2-2' }}</span></div>
+            <div class="kpi"><span class="kpi__label">Day P/L</span>
+              <span class="kpi__value num" [class.gain]="s.dayPl >= 0" [class.loss]="s.dayPl < 0">{{ s.dayPl >= 0 ? '+' : '−' }}€{{ abs(s.dayPl) | number:'1.2-2' }}</span></div>
+            <div class="kpi"><span class="kpi__label">YTD return</span>
+              <span class="kpi__value num" [class.gain]="s.ytdPct >= 0" [class.loss]="s.ytdPct < 0">{{ s.ytdPct >= 0 ? '+' : '−' }}{{ abs(s.ytdPct) | number:'1.2-2' }}%</span></div>
+            <div class="kpi"><span class="kpi__label">Available cash</span><span class="kpi__value num">€{{ s.cash | number:'1.2-2' }}</span></div>
+          </section>
+        } @else {
+          <p-skeleton height="88px"/>
+        }
 
-        <section class="card">
-          <header class="card__head"><h2>Allocation <app-sample-badge/></h2></header>
-          @if (allocation().length) {
-            <app-allocation-bar [items]="allocation()"/>
-          }
-        </section>
-      </div>
-
-      <div class="row">
-        <section class="card">
-          <header class="card__head">
-            <h2>Goals</h2>
-            <a routerLink="/onboarding/investment-goals" class="link">Edit</a>
-          </header>
-          @if (loadingCustomer()) {
-            <p-skeleton height="80px"/>
-          } @else if (goals().length) {
-            <ul class="goals">
-              @for (g of goals(); track $index) {
-                <li>
-                  <span class="goals__name">{{ g.goalType.description || g.goalType.name }}</span>
-                  <span class="num">€{{ g.targetAmount | number:'1.0-0' }}</span>
-                  <span class="chip">{{ horizon(g) }}</span>
-                </li>
-              }
-            </ul>
-          } @else {
-            <p class="muted">No goals yet. <a routerLink="/onboarding/investment-goals">Add your first goal →</a></p>
-          }
-        </section>
-
-        <section class="card">
-          <header class="card__head"><h2>Financial snapshot</h2></header>
-          @if (customerError()) {
-            <p-message severity="error">Customer data could not be loaded.</p-message>
-          } @else {
-            <dl class="dl">
-              <div><dt>Annual income</dt><dd class="num">€{{ snapshot().income | number:'1.0-0' }}</dd></div>
-              <div><dt>Declared investments</dt><dd class="num">€{{ snapshot().investments | number:'1.0-0' }}</dd></div>
-              <div><dt>Expenses</dt><dd class="num">€{{ snapshot().expenses | number:'1.0-0' }}</dd></div>
-            </dl>
-          }
-        </section>
-
-        <section class="card">
-          <header class="card__head"><h2>Watchlist <app-sample-badge/></h2></header>
-          <ul class="quotes">
-            @for (q of watchlist(); track q.name) {
-              <li><span>{{ q.name }}</span><span class="num">{{ q.value | number:'1.2-2' }}</span>
-                <span class="num q__chg" [class.gain]="q.changePct >= 0" [class.loss]="q.changePct < 0">{{ q.changePct >= 0 ? '+' : '−' }}{{ abs(q.changePct) | number:'1.2-2' }}%</span></li>
+        <div class="row">
+          <section class="card card--wide">
+            <header class="card__head">
+              <h2>Portfolio value <app-sample-badge/></h2>
+              <p-selectbutton [options]="ranges" [ngModel]="range()" (ngModelChange)="setRange($event)" [allowEmpty]="false"
+                              ariaLabelledBy="range-label" size="small"/>
+              <span id="range-label" class="wmp-sr-only">Time range</span>
+            </header>
+            @if (history().length) {
+              <app-value-chart [data]="history()" [ariaLabel]="'Portfolio value, last ' + range()"/>
+            } @else {
+              <p-skeleton height="240px"/>
             }
-          </ul>
-        </section>
-      </div>
+          </section>
 
-      <div class="row">
-        @for (c of comingSoon; track c.title) {
-          <section class="card card--soon">
-            <header class="card__head"><h2>{{ c.title }} <app-coming-soon-badge/></h2></header>
-            <div class="soon">
-              <span class="material-symbols-outlined" aria-hidden="true">{{ c.icon }}</span>
-              <p class="muted">{{ c.description }}</p>
+          <section class="card">
+            <header class="card__head"><h2>Investor profile</h2></header>
+            @if (loadingCustomer()) {
+              <p-skeleton height="120px"/>
+            } @else if (profile(); as p) {
+              <p class="profile__label">{{ profileLabel() }}</p>
+              @if (p.score != null) { <p class="muted">MiFID score <span class="num">{{ p.score }}</span></p> }
+              <a routerLink="/app/investor-profile" class="link">View investor profile →</a>
+            } @else {
+              <p class="muted">No investor profile yet.</p>
+              <a routerLink="/onboarding/mifid-questionnaire" class="link">Complete the MiFID questionnaire →</a>
+            }
+          </section>
+        </div>
+
+        <div class="row">
+          <section class="card card--wide">
+            <header class="card__head">
+              <h2>Top positions <app-sample-badge/></h2>
+              <a routerLink="/app/investments/positions" class="link">All positions →</a>
+            </header>
+            <div class="table-wrap">
+              <p-table [value]="positions()" [tableStyle]="{'min-width': '36rem'}">
+                <ng-template #header>
+                  <tr><th>Instrument</th><th class="r">Qty</th><th class="r">Price</th><th class="r">Value</th><th class="r">P/L</th></tr>
+                </ng-template>
+                <ng-template #body let-p>
+                  <tr>
+                    <td>{{ p.name }}<div class="num muted small">{{ p.isin }}</div></td>
+                    <td class="num r">{{ p.qty | number }}</td>
+                    <td class="num r">{{ p.price | number:'1.2-2' }}</td>
+                    <td class="num r">{{ p.value | number:'1.2-2' }}</td>
+                    <td class="num r" [class.gain]="p.plPct >= 0" [class.loss]="p.plPct < 0">{{ p.plPct >= 0 ? '+' : '−' }}{{ abs(p.plPct) | number:'1.1-1' }}%</td>
+                  </tr>
+                </ng-template>
+              </p-table>
             </div>
           </section>
-        }
-      </div>
+
+          <section class="card">
+            <header class="card__head"><h2>Allocation <app-sample-badge/></h2></header>
+            @if (allocation().length) {
+              <app-allocation-bar [items]="allocation()"/>
+            }
+          </section>
+        </div>
+
+        <div class="row">
+          <section class="card">
+            <header class="card__head">
+              <h2>Goals</h2>
+              <a routerLink="/onboarding/investment-goals" class="link">Edit</a>
+            </header>
+            @if (loadingCustomer()) {
+              <p-skeleton height="80px"/>
+            } @else if (goals().length) {
+              <ul class="goals">
+                @for (g of goals(); track $index) {
+                  <li>
+                    <span class="goals__name">{{ g.goalType.description || g.goalType.name }}</span>
+                    <span class="num">€{{ g.targetAmount | number:'1.0-0' }}</span>
+                    <span class="chip">{{ horizon(g) }}</span>
+                  </li>
+                }
+              </ul>
+            } @else {
+              <p class="muted">No goals yet. <a routerLink="/onboarding/investment-goals">Add your first goal →</a></p>
+            }
+          </section>
+
+          <section class="card">
+            <header class="card__head"><h2>Financial snapshot</h2></header>
+            @if (customerError()) {
+              <p-message severity="error">Customer data could not be loaded.</p-message>
+            } @else {
+              <dl class="dl">
+                <div><dt>Annual income</dt><dd class="num">€{{ snapshot().income | number:'1.0-0' }}</dd></div>
+                <div><dt>Declared investments</dt><dd class="num">€{{ snapshot().investments | number:'1.0-0' }}</dd></div>
+                <div><dt>Expenses</dt><dd class="num">€{{ snapshot().expenses | number:'1.0-0' }}</dd></div>
+              </dl>
+            }
+          </section>
+
+          <section class="card">
+            <header class="card__head"><h2>Watchlist <app-sample-badge/></h2></header>
+            <ul class="quotes">
+              @for (q of watchlist(); track q.name) {
+                <li><span>{{ q.name }}</span><span class="num">{{ q.value | number:'1.2-2' }}</span>
+                  <span class="num q__chg" [class.gain]="q.changePct >= 0" [class.loss]="q.changePct < 0">{{ q.changePct >= 0 ? '+' : '−' }}{{ abs(q.changePct) | number:'1.2-2' }}%</span></li>
+              }
+            </ul>
+          </section>
+        </div>
+
+        <div class="row">
+          @for (c of comingSoon; track c.title) {
+            <section class="card card--soon">
+              <header class="card__head"><h2>{{ c.title }} <app-coming-soon-badge/></h2></header>
+              <div class="soon">
+                <span class="material-symbols-outlined" aria-hidden="true">{{ c.icon }}</span>
+                <p class="muted">{{ c.description }}</p>
+              </div>
+            </section>
+          }
+        </div>
+      }
     </div>
   `,
   styles: [`
@@ -209,6 +273,11 @@ import {ComingSoonBadgeComponent} from '../../shared/components/dashboard/coming
     .soon { display: flex; gap: .75rem; align-items: flex-start; }
     .soon .material-symbols-outlined { font-size: 22px; color: var(--wmp-text-muted); }
     .soon .muted { line-height: 1.5; }
+    .notice { display: flex; gap: 1rem; align-items: flex-start; max-width: 40rem; padding: 1.25rem; }
+    .notice > .material-symbols-outlined { font-size: 28px; color: var(--wmp-primary); }
+    .notice__body { display: grid; gap: .75rem; justify-items: start; }
+    .notice__body h2 { margin: 0; font-size: 1.1rem; font-weight: 600; }
+    .notice__body .muted { font-size: .9rem; line-height: 1.5; }
     @media (max-width: 599.98px) { .dash { padding: 1rem; } }
   `]
 })
@@ -218,6 +287,11 @@ export class HomeComponent {
   private readonly mifidApi = inject(MifidService);
   private readonly customerSession = inject(CustomerSessionService);
   private readonly userSession = inject(UserSessionService);
+  private readonly ownCustomer = inject(OwnCustomerService);
+  private readonly selection = inject(CustomerSelectionService);
+  private readonly progress = inject(OnboardingProgressService);
+  private readonly workspace = inject(WorkspaceContextService);
+  private readonly router = inject(Router);
 
   protected readonly ranges: ValueRange[] = ['1M', '3M', '1Y', 'MAX'];
   protected readonly range = signal<ValueRange>('1Y');
@@ -229,10 +303,18 @@ export class HomeComponent {
   protected readonly allocation = signal<AllocationSlice[]>([]);
   protected readonly watchlist = signal<Quote[]>([]);
 
-  private readonly customer = signal<CustomerDTO | null>(this.customerSession.customer());
+  // Follows the session: the verification watcher updates it when the AML check ends
+  private readonly customer = this.customerSession.customer;
   private readonly config = signal<MifidQuestionnaireConfigDTO | null>(null);
   protected readonly loadingCustomer = signal(true);
   protected readonly customerError = signal(false);
+
+  protected readonly notice = computed(() => homeNoticeFor({
+    staff: this.userSession.isAdvisor() || this.userSession.isAdmin(),
+    loadFailed: this.ownCustomer.load() === 'failed',
+    status: this.customer()?.customerStatus
+  }));
+  protected readonly workspaceHome = this.workspace.homePath;
 
   protected readonly greeting = computed(() => {
     const c = this.customer();
@@ -258,11 +340,27 @@ export class HomeComponent {
   protected readonly horizon = goalHorizon;
   protected readonly abs = Math.abs;
 
-  private readonly customerId = this.customerSession.customer()?.id ?? 'self';
+  private readonly onboarded = computed(() => !this.notice());
+
+  protected readonly startOnboarding = busyAction(async () => {
+    this.progress.reset();
+    await this.router.navigateByUrl('/onboarding/personal-details');
+  });
+  protected readonly continueOnboarding = busyAction(async () => {
+    const id = this.customer()?.id;
+    if (id) await this.selection.open(id);
+  });
+  protected readonly retry = busyAction(() => this.ownCustomer.ensureLoaded());
 
   constructor() {
-    void this.loadPortfolio();
+    effect(() => {
+      if (this.onboarded()) untracked(() => void this.loadPortfolio());
+    });
     void this.loadCustomer();
+  }
+
+  private get customerId(): string {
+    return this.customer()?.id ?? '';
   }
 
   protected setRange(range: ValueRange): void {
@@ -291,7 +389,6 @@ export class HomeComponent {
     try {
       if (id) {
         const fresh = await firstValueFrom(this.customerApi.getCustomerById(id));
-        this.customer.set(fresh);
         this.customerSession.setCustomer(fresh);
       }
     } catch {

@@ -1,4 +1,5 @@
 import {Component, inject, signal} from '@angular/core';
+import {HttpErrorResponse} from '@angular/common/http';
 import {Router} from '@angular/router';
 import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
 import {firstValueFrom} from 'rxjs';
@@ -11,7 +12,9 @@ import {CustomerDTO, CustomerPersonalDetailsDTO, CustomerService} from '../../ap
 import {OnboardingProgressService, OnboardingStep} from '../../core/services/onboarding-progress.service';
 import {UserSessionService} from '../../core/services/user-session.service';
 import {OnboardingFormStateService} from '../../core/services/onboarding-form-state.service';
+import {CustomerSelectionService} from '../../core/services/customer-selection.service';
 import {CustomerSessionService} from '../../core/services/customer-session.service';
+import {OwnCustomerService} from '../../core/services/own-customer.service';
 import {WorkspaceContextService} from '../../core/services/workspace-context.service';
 import {ToastService} from '../../shared/services/toast.service';
 import {busyAction} from '../../core/services/busy-action';
@@ -140,6 +143,8 @@ export class PersonalDetailsComponent {
   private readonly customerSession = inject(CustomerSessionService);
   private readonly workspace = inject(WorkspaceContextService);
   private readonly toast = inject(ToastService);
+  private readonly ownCustomer = inject(OwnCustomerService);
+  private readonly selection = inject(CustomerSelectionService);
 
   readonly onSubmit = busyAction(async () => {
     if (await this.save()) await this.router.navigateByUrl(this.progress.pathFor(OnboardingStep.FinancialInformation));
@@ -286,9 +291,24 @@ export class PersonalDetailsComponent {
       this.progress.markPersonalDetailsSubmitted();
       return true;
     } catch (err: unknown) {
+      if (err instanceof HttpErrorResponse && err.status === 409 && await this.resumeExistingRecord()) return false;
       const message = (err as { error?: { message?: string } })?.error?.message;
       this.errorMsg.set(message || 'Unable to save the personal details. Please try again.');
       return false;
     }
+  }
+
+  /**
+   * A customer has one record per bank, so 409 on create means it already exists (e.g. started in another tab):
+   * continue from that record. False when it can't be loaded, and the error shows on the page.
+   */
+  private async resumeExistingRecord(): Promise<boolean> {
+    this.formState.clear('personal-details');
+    await this.ownCustomer.ensureLoaded();
+    const id = this.customerSession.customer()?.id;
+    if (!id) return false;
+    this.toast.info('You already have a profile with this bank. Continuing from it.');
+    await this.selection.open(id);
+    return true;
   }
 }

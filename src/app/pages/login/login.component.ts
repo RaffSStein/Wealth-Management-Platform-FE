@@ -5,7 +5,6 @@ import {ActivatedRoute, Router, RouterLink} from '@angular/router';
 import {AuthService as CoreAuthService} from '../../core/services/auth.service';
 import {AuthService as ApiAuthService, LoginCredentialsDTO} from '../../api/user-service';
 import {UserSessionService} from '../../core/services/user-session.service';
-import {CustomerSessionService} from '../../core/services/customer-session.service';
 import {busyAction} from '../../core/services/busy-action';
 import {SESSION_EXPIRED_PARAM} from '../../core/services/session-expiry.service';
 import {ToastService} from '../../shared/services/toast.service';
@@ -16,7 +15,7 @@ import {InputText} from 'primeng/inputtext';
 import {Message} from 'primeng/message';
 import {Password} from 'primeng/password';
 import {AuthLayoutComponent} from '../../shared/components/auth-layout/auth-layout.component';
-import {ADMIN_HOME, ADVISOR_HOME} from '../../core/services/home-path';
+import {ADMIN_HOME, ADVISOR_HOME, CUSTOMER_HOME} from '../../core/services/home-path';
 
 @Component({
   selector: 'app-login',
@@ -107,7 +106,6 @@ export class LoginComponent {
   private readonly fb = inject(FormBuilder);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-  private readonly customerSession = inject(CustomerSessionService);
   private readonly auth = inject(CoreAuthService);
   private readonly apiAuth = inject(ApiAuthService);
   private readonly userSession = inject(UserSessionService);
@@ -171,8 +169,8 @@ export class LoginComponent {
    * Where to go after a successful login:
    * - admins: back to the requested admin page (returnUrl) or the admin area;
    * - advisors: back to the requested page (returnUrl) or their workspace;
-   * - customers: customer selection first unless a customer profile is already selected,
-   *   since /app screens operate on the selected customer.
+   * - customers: back to the requested page (returnUrl) or their home; their own customer is set on the way in
+   *   (ownCustomerGuard). Only advisors choose a customer.
    */
   private postLoginUrl(): string {
     const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
@@ -180,8 +178,7 @@ export class LoginComponent {
     const safeReturnUrl = returnUrl && returnUrl.startsWith('/') && !returnUrl.startsWith('//') ? returnUrl : null;
     if (this.userSession.isAdmin()) return safeReturnUrl?.startsWith(ADMIN_HOME) ? safeReturnUrl : ADMIN_HOME;
     if (this.userSession.isAdvisor()) return safeReturnUrl ?? ADVISOR_HOME;
-    if (!this.customerSession.customer()) return '/onboarding/disambiguation';
-    return safeReturnUrl ?? '/app/home';
+    return safeReturnUrl ?? CUSTOMER_HOME;
   }
 
   onSocial(provider: 'google' | 'apple') {

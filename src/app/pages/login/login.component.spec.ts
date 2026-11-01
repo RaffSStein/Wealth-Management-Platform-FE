@@ -3,7 +3,6 @@ import { signal } from '@angular/core';
 import { LoginComponent } from './login.component';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { UserSessionService } from '../../core/services/user-session.service';
-import { CustomerSessionService } from '../../core/services/customer-session.service';
 import { AuthService as ApiAuthService, UserService } from '../../api/user-service';
 import { of, throwError } from 'rxjs';
 import { ToastService } from '../../shared/services/toast.service';
@@ -15,7 +14,6 @@ class MockUserSessionService {
   isAdmin = signal(false);
   ensureLoaded() { return Promise.resolve(this.profile); }
 }
-class MockCustomerSessionService { customer = signal<object | null>(null); }
 class MockApiAuthService { loginUser() { return of({ token: 't1' }); } }
 class MockUserApi {}
 class MockToastService { info() {}; success() {}; error() {}; }
@@ -29,14 +27,12 @@ class MockCoreAuthService {
 describe('LoginComponent', () => {
   let navigateByUrl: jasmine.Spy;
   let userSession: MockUserSessionService;
-  let customerSession: MockCustomerSessionService;
   let apiAuth: MockApiAuthService;
   let coreAuth: MockCoreAuthService;
   let queryParams: Record<string, string>;
 
   beforeEach(async () => {
     userSession = new MockUserSessionService();
-    customerSession = new MockCustomerSessionService();
     apiAuth = new MockApiAuthService();
     coreAuth = new MockCoreAuthService();
     queryParams = {};
@@ -47,7 +43,6 @@ describe('LoginComponent', () => {
         provideRouter([]),
         { provide: ActivatedRoute, useFactory: () => ({ snapshot: { queryParamMap: convertToParamMap(queryParams) } }) },
         { provide: UserSessionService, useValue: userSession },
-        { provide: CustomerSessionService, useValue: customerSession },
         { provide: ApiAuthService, useValue: apiAuth },
         { provide: UserService, useClass: MockUserApi },
         { provide: ToastService, useClass: MockToastService },
@@ -64,16 +59,15 @@ describe('LoginComponent', () => {
     return comp;
   }
 
-  it('should store the token and send customers to customer selection', async () => {
+  it('should store the token and send customers to their home', async () => {
     const comp = createWithCredentials();
     await comp.onSubmit();
     expect(coreAuth.token).toBe('t1');
-    expect(navigateByUrl).toHaveBeenCalledWith('/onboarding/disambiguation');
+    expect(navigateByUrl).toHaveBeenCalledWith('/app/home');
     expect(comp.errorOpen()).toBeFalse();
   });
 
-  it('should send customers with a selected profile back to the requested page', async () => {
-    customerSession.customer.set({ id: 'c1' });
+  it('should send customers back to the requested page', async () => {
     queryParams = { returnUrl: '/app/investments' };
     const comp = createWithCredentials();
     await comp.onSubmit();

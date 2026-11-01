@@ -59,7 +59,7 @@ describe('BranchSwitchService', () => {
     expect(api.switchBranch).toHaveBeenCalledWith({branchCode: 'BR-07', bankCode: 'BANK-B'});
     expect(auth.token()).toBe(next);
     expect(customerSession.customer()).toBeNull();
-    expect(location.assign).toHaveBeenCalledWith('/onboarding/disambiguation');
+    expect(location.assign).toHaveBeenCalledWith('/app/home');
   });
 
   it('keeps the current token and selection when the BE refuses the switch', async () => {

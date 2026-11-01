@@ -2,6 +2,7 @@ import {inject} from '@angular/core';
 import {Route, Router, Routes} from '@angular/router';
 import {onboardingStepGuard} from './core/guards/onboarding-step.guard';
 import {authGuard} from './core/guards/auth.guard';
+import {ownCustomerGuard} from './core/guards/own-customer.guard';
 import {roleAssignmentGuard} from './core/guards/role-assignment.guard';
 import {roleGuard} from './core/guards/role.guard';
 import {RoutePermission, permissionGuard} from './core/guards/permission.guard';
@@ -74,7 +75,7 @@ export const routes: Routes = [
   {
     path: 'onboarding',
     loadComponent: () => import('./layout/app-shell.component').then(m => m.AppShellComponent),
-    canActivate: [authGuard, roleAssignmentGuard],
+    canActivate: [authGuard, roleAssignmentGuard, ownCustomerGuard],
     children: [
       {
         path: 'personal-details',
@@ -107,7 +108,9 @@ export const routes: Routes = [
         data: {step: 4}
       },
       {
+        // Customer selection: only advisors choose a customer
         path: 'disambiguation',
+        canActivate: [roleGuard('ADVISOR')],
         loadComponent: () => import('./pages/onboarding/disambiguation.component').then(m => m.CustomerDisambiguationComponent)
       },
       { path: '', pathMatch: 'full', redirectTo: 'personal-details' }
@@ -118,7 +121,7 @@ export const routes: Routes = [
   {
     path: 'app',
     loadComponent: () => import('./layout/app-shell.component').then(m => m.AppShellComponent),
-    canActivate: [authGuard, roleAssignmentGuard],
+    canActivate: [authGuard, roleAssignmentGuard, ownCustomerGuard],
     canActivateChild: [permissionGuard],
     children: [
       {path: 'home', loadComponent: () => import('./pages/home/home.component').then(m => m.HomeComponent)},

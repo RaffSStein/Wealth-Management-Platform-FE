@@ -15,8 +15,8 @@ describe('homePathFor', () => {
     expect(homePathFor(roles('ADVISOR'), true)).toBe('/app/home');
   });
 
-  it('sends customers to customer selection until a profile is selected', () => {
-    expect(homePathFor(roles('CUSTOMER'), false)).toBe('/onboarding/disambiguation');
+  it('sends customers to their home, with or without a customer record', () => {
+    expect(homePathFor(roles('CUSTOMER'), false)).toBe('/app/home');
     expect(homePathFor(roles('CUSTOMER'), true)).toBe('/app/home');
   });
 });

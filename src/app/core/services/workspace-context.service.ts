@@ -7,8 +7,8 @@ import {homePathFor} from './home-path';
 /**
  * WorkspaceContextService
  * Answers "whose workspace is the user in?":
- * - customers always work on their own (selected) customer profile;
- * - advisors work in the Advisor workspace, or "act as" a client once one is selected
+ * - customers always work on their own customer (OwnCustomerService) and never choose one;
+ * - advisors work in the Advisor workspace, or "act as" a client once they select one
  *   (customer selection sets CustomerSessionService.customer).
  */
 @Injectable({providedIn: 'root'})
@@ -33,20 +33,16 @@ export class WorkspaceContextService {
   readonly homePath = computed(() => homePathFor(this.userSession.roles(), !!this.customerSession.customer()));
 
   /**
-   * Leave the onboarding flow; it can be resumed later from the customer list (CustomerSelectionService.open).
-   * Advisors leave the client context and go back to their workspace; customers go to their profile list.
+   * Leave the onboarding flow; it can be resumed later (CustomerSelectionService.open).
+   * Advisors leave the client context and go back to their workspace; customers go to their home.
    * An already onboarded customer (a step opened from the dashboard, e.g. goals) stays selected and goes home.
    */
   async exitOnboarding(): Promise<void> {
-    if (this.customerSession.customer()?.customerStatus === 'ACTIVE') {
-      await this.router.navigateByUrl('/app/home');
-      return;
-    }
-    if (this.isAdvisor()) {
+    if (this.isAdvisor() && this.customerSession.customer()?.customerStatus !== 'ACTIVE') {
       await this.exitClient();
       return;
     }
-    await this.router.navigateByUrl('/onboarding/disambiguation');
+    await this.router.navigateByUrl('/app/home');
   }
 
   /** Leave the client context and go back to the Advisor workspace. */

@@ -48,10 +48,11 @@ describe('WorkspaceContextService.exitOnboarding', () => {
     expect(customerSession.customer()).toBeNull();
   });
 
-  it('sends a customer still onboarding to the profile list', async () => {
+  it('sends a customer still onboarding to their home, keeping their customer', async () => {
     customerSession.setCustomer(customer('DRAFT'));
     await service.exitOnboarding();
-    expect(router.navigateByUrl).toHaveBeenCalledWith('/onboarding/disambiguation');
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/app/home');
+    expect(customerSession.customer()?.id).toBe('c1');
   });
 
   it('sends an onboarded customer home', async () => {
